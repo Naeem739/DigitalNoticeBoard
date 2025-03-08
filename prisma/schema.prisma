@@ -16,23 +16,31 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
-model notices {
-  id      String @id @default(uuid()) // Unique identifier for each notice
-  notice_id   String? // Notice title (optional)
-  width   Int    // Width of the notice
-  height  Int    // Height of the notice
-  left    Int    // X-coordinate position
-  top     Int    // Y-coordinate position
-  color   String // Background color of the notice
+model Notice {
+  id          String @id @default(uuid()) 
+  title       String
+  content     String
+  category    String
+  categoryId   String 
+  createdAt   DateTime? @default(now())
+  categoryRelation  Category @relation(fields: [categoryId], references: [id])
+  container   Container?
 }
 
+model Container{
+  id       String     @id @default(uuid())
+  type     String
+  height   Float
+  width    Float
+  top      Float
+  left     Float 
+  NoticeRelation Notice @relation(fields: [noticeId], references: [id])
+  noticeId  String @unique
+}
 
-model AllNotice {
-  id          String   @id @default(uuid()) // Unique identifier for each notice
-  title       String   // Title of the notice
-  description String   // Description of the notice
-  category    String   // Category of the notice
-  time        DateTime // Date and time of the notice
-  createdAt   DateTime @default(now()) // Timestamp of creation
-  updatedAt   DateTime @updatedAt // Timestamp of last update
+model Category {
+  id      String @id @default(uuid())
+  name    String @unique
+  notices Notice[]
+  // noticeId
 }

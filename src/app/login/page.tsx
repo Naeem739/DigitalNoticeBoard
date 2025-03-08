@@ -26,7 +26,7 @@ const LoginPage = () => {
   console.log(errors);
 
   const onSubmit = async (data: FormValues) => {
-    console.log(data);
+    // console.log(data);
 
     const result = await signIn ("credentials", {
       email: data.email,

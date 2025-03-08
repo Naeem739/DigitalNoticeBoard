@@ -11,11 +11,11 @@ export  async function middleware(request: NextRequest) {
 //   const token = request.cookies.get('token')?.value || ''
 const token = await getToken({req:request});
 const url = request.nextUrl;
-console.log("From middleware______________________________");
-console.log("TOKEN " ,token);
-console.log("______________________________________");
-console.log("URL ", url);
-console.log("______________________________________");
+// console.log("From middleware______________________________");
+// console.log("TOKEN " ,token);
+// console.log("______________________________________");
+// console.log("URL ", url);
+// console.log("______________________________________");
 
 //   if(isPublicPath && token) {
 //     return NextResponse.redirect(new URL('/', request.nextUrl))

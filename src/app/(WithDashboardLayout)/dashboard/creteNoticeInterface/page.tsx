@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { FaTrashAlt } from "react-icons/fa";
-import io, { Socket } from "socket.io-client";
+// import io, { Socket } from "socket.io-client";
 
 interface Notice {
   id: string;
@@ -31,70 +31,70 @@ const ReactGridLayout = dynamic(() => import("react-grid-layout"), { ssr: false 
 const Home: React.FC = () => {
   const [layout, setLayout] = useState<LayoutItem[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [socket, setSocket] = useState<Socket | null>(null);
+  // const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const socketConnection = io();
-    setSocket(socketConnection);
+    // const socketConnection = io();
+    // setSocket(socketConnection);
 
-    fetchNotices();
-    socketConnection.on("notice-update", fetchNotices);
+    // fetchNotices();
+    // socketConnection.on("notice-update", fetchNotices);
 
     return () => {
-      socketConnection.disconnect();
+      // socketConnection.disconnect();
     };
   }, []);
 
-  const fetchNotices = async () => {
-    try {
-      const response = await fetch("/api/get");
-      const data: Notice[] = await response.json();
+  // const fetchNotices = async () => {
+  //   try {
+  //     const response = await fetch("/api/get");
+  //     const data: Notice[] = await response.json();
 
-      if (!Array.isArray(data)) {
-        throw new Error("API response is not an array");
-      }
+  //     if (!Array.isArray(data)) {
+  //       throw new Error("API response is not an array");
+  //     }
 
-      setLayout(
-        data.map(item => ({
-          i: item.id.toString(),
-          x: item.left || 0,
-          y: item.top || 0,
-          w: item.width || 4,
-          h: item.height || 2,
-          color: item.color || "#ffcc00",
-        }))
-      );
-      setNotices(data);
-    } catch (error) {
-      console.error("Error fetching notices:", error);
-    }
-  };
+  //     setLayout(
+  //       data.map(item => ({
+  //         i: item.id.toString(),
+  //         x: item.left || 0,
+  //         y: item.top || 0,
+  //         w: item.width || 4,
+  //         h: item.height || 2,
+  //         color: item.color || "#ffcc00",
+  //       }))
+  //     );
+  //     setNotices(data);
+  //   } catch (error) {
+  //     console.error("Error fetching notices:", error);
+  //   }
+  // };
 
-  const saveNoticeToDB = async (notice: Partial<Notice>) => {
-    try {
-      await fetch("/api/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(notice),
-      });
-      fetchNotices();
-    } catch (error) {
-      console.error("Error saving notice:", error);
-    }
-  };
+  // const saveNoticeToDB = async (notice: Partial<Notice>) => {
+  //   try {
+  //     await fetch("/api/save", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(notice),
+  //     });
+  //     fetchNotices();
+  //   } catch (error) {
+  //     console.error("Error saving notice:", error);
+  //   }
+  // };
 
-  const deleteItem = async (id: string) => {
-    try {
-      await fetch("/api/delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      fetchNotices();
-    } catch (error) {
-      console.error("Error deleting notice:", error);
-    }
-  };
+  // const deleteItem = async (id: string) => {
+  //   try {
+  //     await fetch("/api/delete", {
+  //       method: "DELETE",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ id }),
+  //     });
+  //     fetchNotices();
+  //   } catch (error) {
+  //     console.error("Error deleting notice:", error);
+  //   }
+  // };
 
   const addShape = () => {
     const newShape: LayoutItem = {
@@ -106,15 +106,15 @@ const Home: React.FC = () => {
       color: "#ffcc00",
     };
     setLayout(prevLayout => [...prevLayout, newShape]);
-    saveNoticeToDB(newShape);
+    // saveNoticeToDB(newShape);
   };
 
-  const updateColor = (id: string, newColor: string) => {
-    setLayout(prevLayout =>
-      prevLayout.map(item => (item.i === id ? { ...item, color: newColor } : item))
-    );
-    saveNoticeToDB({ id, color: newColor });
-  };
+  // const updateColor = (id: string, newColor: string) => {
+  //   setLayout(prevLayout =>
+  //     prevLayout.map(item => (item.i === id ? { ...item, color: newColor } : item))
+  //   );
+  //   saveNoticeToDB({ id, color: newColor });
+  // };
 
   return (
     <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px", fontFamily: "Arial, sans-serif" }}>
@@ -165,16 +165,16 @@ const Home: React.FC = () => {
         layout={layout}
         onLayoutChange={newLayout => {
           newLayout.forEach(item => {
-            const existingNotice = notices.find(n => n.id === item.i); // Find existing notice
-            saveNoticeToDB({
-              id: item.i,
-              notice_id: existingNotice?.notice_id || "", // Keep existing title
-              width: item.w,
-              height: item.h,
-              left: item.x,
-              top: item.y,
-              color: existingNotice?.color || "#ffcc00", // Keep color
-            });
+            // const existingNotice = notices.find(n => n.id === item.i); // Find existing notice
+            // saveNoticeToDB({
+            //   id: item.i,
+            //   notice_id: existingNotice?.notice_id || "", // Keep existing title
+            //   width: item.w,
+            //   height: item.h,
+            //   left: item.x,
+            //   top: item.y,
+            //   color: existingNotice?.color || "#ffcc00", // Keep color
+            // });
           });
         }}
         
@@ -199,7 +199,7 @@ const Home: React.FC = () => {
               onDrop={(e) => {
                 const droppedTitle = e.dataTransfer.getData("title");
                 if (droppedTitle) {
-                  saveNoticeToDB({ id: item.i, notice_id: droppedTitle }); // Save to DB
+                  // saveNoticeToDB({ id: item.i, notice_id: droppedTitle }); // Save to DB
                   setNotices((prev) =>
                     prev.map((n) => (n.id === item.i ? { ...n, notice_id: droppedTitle } : n))
                   );
@@ -215,7 +215,7 @@ const Home: React.FC = () => {
               <input
                 type="color"
                 value={item.color}
-                onChange={e => updateColor(item.i, e.target.value)}
+                // onChange={e => updateColor(item.i, e.target.value)}
                 style={{
                   position: "absolute",
                   bottom: "10px",

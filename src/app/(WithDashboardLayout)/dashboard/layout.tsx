@@ -22,7 +22,7 @@ export default function DashboardLayout({
   if (status === "loading") return <Loading></Loading>;
   if (!session) return <p>Access Denied</p>;
 
-  console.log(session)
+  // console.log(session)
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">

@@ -16,7 +16,7 @@ const handler = NextAuth({
         password: {}
       },
       async authorize(credentials) {
-        console.log(credentials);
+        // console.log(credentials);
         if (!credentials?.email || !credentials?.password) {
           return null
         }
@@ -52,9 +52,9 @@ const handler = NextAuth({
         session.user.id = token.sub;
       }
 
-      console.log("From session_________________________");
-      console.log("session", session);
-      console.log(token);
+      // console.log("From session_________________________");
+      // console.log("session", session);
+      // console.log(token);
       return session;
     },
     async jwt({token, user}){
@@ -63,10 +63,10 @@ const handler = NextAuth({
         token.email = user.email;
          token.id = user.id;
       }
-      console.log("token", token);
-      console.log("user from NextAuth ",user);
+      // console.log("token", token);
+      // console.log("user from NextAuth ",user);
 
-      console.log("_____________________________________________________________");
+      // console.log("_____________________________________________________________");
       return token;
     }
   },

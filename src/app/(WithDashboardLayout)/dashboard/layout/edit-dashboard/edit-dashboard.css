@@ -1,0 +1,15 @@
+.react-grid-item.react-grid-placeholder {
+    background: #1a73e8;
+    opacity: 0.2;
+    border-radius: 0.5rem;
+  }
+  
+  .react-grid-item > .react-resizable-handle {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cpath d='M6 6H0V4.2h4.2V0H6v6z' fill='rgba(0,0,0,.2)'/%3E%3C/svg%3E");
+    background-position: bottom right;
+    padding: 0 3px 3px 0;
+    background-repeat: no-repeat;
+    background-origin: content-box;
+    box-sizing: border-box;
+    cursor: se-resize;
+  }
