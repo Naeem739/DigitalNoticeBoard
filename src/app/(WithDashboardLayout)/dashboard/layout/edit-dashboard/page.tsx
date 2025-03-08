@@ -1,27 +1,41 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import GridLayout, { Layout } from 'react-grid-layout';
 import { Plus, X, LineChart, ChevronDown } from 'lucide-react';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import './edit-dashboard.css';
-import { AspectRatio, Category, Widget } from '@/types/types';
+import { AspectRatio, TNotice, Widget } from '@/types/types';
+import { getCategoriesWithNotices } from '@/app/actions/category.action';
 
 
 
-// const CATEGORIES: Category[] = [
+type TCategoriesWithNotices = {
+  id: string
+  name: string
+  notices: TNotice[]
+}
+
+type TResult = {
+  success: boolean
+  result: TCategoriesWithNotices[]
+}
+
+// const categories = [
 //   {
+//     id: "dlfdfaf"
 //     name: 'Analytics',
-//     titles: ['Daily Users', 'Revenue', 'Active Sessions', 'Conversion Rate']
-//   },
-//   {
-//     name: 'Performance',
-//     titles: ['CPU Usage', 'Memory Usage', 'Network Traffic', 'Response Time']
-//   },
-//   {
-//     name: 'Marketing',
-//     titles: ['Campaign ROI', 'Social Media Reach', 'Email Opens', 'Click-through Rate']
-//   }
+//     notices: [
+//                    {
+//                       id:"afdafafa",
+//                       title:"a;dfas",
+//                       content:" dfajdfadfa",
+//                       category: "a;dsfkaf"
+//                    }
+//              ]
+//    },
+//    ....
+//
 // ];
 
 const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
@@ -36,8 +50,21 @@ function App() {
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>(null);
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [CATEGORIES,setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState<TCategoriesWithNotices | null>(null);
+  const [categories,setCategories] = useState<TCategoriesWithNotices[]>([]);
+
+    useEffect(() => {
+      const getData = async () => {
+        const categoriesWithNotices = await getCategoriesWithNotices() as TResult;
+        if (categoriesWithNotices.success) {
+          console.log(categoriesWithNotices);
+          setCategories(categoriesWithNotices.result as TCategoriesWithNotices[]);
+        }
+      };
+  
+      getData();
+    }, []);
+
 
   const addWidget = () => {
     if (!selectedRatio) return;
@@ -75,7 +102,7 @@ function App() {
     setLayout([]);
   };
 
-  const handleCategorySelect = (category: Category) => {
+  const handleCategorySelect = (category: TCategoriesWithNotices) => {
     setSelectedCategory(category);
     setIsCategoryDropdownOpen(false);
   };
@@ -158,7 +185,7 @@ function App() {
           </button>
           {isCategoryDropdownOpen && (
             <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10 min-w-[200px]">
-              {CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <button
                   key={category.name}
                   onClick={() => handleCategorySelect(category)}
@@ -176,14 +203,14 @@ function App() {
         <div className="mb-6 p-4 bg-white rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-3">Draggable Titles:</h3>
           <div className="flex flex-wrap gap-2">
-            {selectedCategory.titles.map((title) => (
+            {selectedCategory.notices.map((notice) => (
               <div
-                key={title}
+                key={notice.id}
                 draggable
-                onDragStart={(e) => handleDragStart(e, title)}
+                onDragStart={(e) => handleDragStart(e, notice.title)}
                 className="bg-gray-100 px-3 py-1 rounded cursor-move hover:bg-gray-200 transition-colors"
               >
-                {title}
+                {notice.title}
               </div>
             ))}
           </div>

@@ -49,3 +49,22 @@ export const getCategories = async() =>{
     }
     
 }
+export const getCategoriesWithNotices = async() =>{
+    try{
+        const result = await prisma.category.findMany({
+            include:{
+                notices:true
+            }
+        });
+
+        return {success:true, result}
+
+       
+
+    }
+    catch(error){
+        return {success:false, result:error};
+
+    }
+    
+}

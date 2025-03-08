@@ -13,6 +13,7 @@ export type Category = {
 
 
   export type TNotice = {
+    id: string
     title : string
     content: string
     category : string

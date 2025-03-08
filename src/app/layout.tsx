@@ -40,11 +40,12 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { Toaster } from "@/components/ui/toaster"
+// import { Toaster } from "@/components/ui/toaster"
 // import { SessionProvider } from "next-auth/react"
 
 import "./globals.css"
 import Providers from '@/lib/providers'
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ["latin"] })
 

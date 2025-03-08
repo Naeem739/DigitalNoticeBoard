@@ -18,12 +18,9 @@ import {
 import { getCategories } from "@/app/actions/category.action";
 import { Category } from "@/types/types";
 import { createNotice } from "@/app/actions/notice.action";
-// import { saveArticle } from "@/lib/storage"
-// import { toast } from "sonner";
-// import Image from "next/image";
-// import { createArticle } from "@/app/actions/article.action";
+import { toast } from "sonner";
 
-export default function ArticleEditor() {
+export default function NoticeEditor() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -31,7 +28,7 @@ export default function ArticleEditor() {
 
   useEffect(() => {
     const getData = async () => {
-      const categories = await getCategories();
+      const categories = await getCategoriesWithNotices();
       if (categories.success) {
         console.log(categories);
         setCategories(categories.result as []);
@@ -58,6 +55,7 @@ export default function ArticleEditor() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log(title, content, selectedCategory);
 
     if (!title || !content || !selectedCategory) return;
 
@@ -75,21 +73,25 @@ export default function ArticleEditor() {
     
     }
     try {
-        const article =  await createNotice(data);
-        console.log(article);
-      // if(article){
+        const newNotice =  await createNotice(data);
+        console.log(newNotice);
 
-      //   // toast.success("Article saved successfully!");
-      // }
-      // else{
-      //   // toast.error("Failed to save content")
-      // }
+      if(newNotice.success){
+
+        toast("Notice is created successfully!");
+      }
+      else{
+        toast("Failed to save content")
+      }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
 
-      // toast.error("Failed to save article");
+      toast.error("Failed to save article");
     } finally {
       setIsSaving(false);
+      setTitle("");
+      setContent("");
+      setSelectedCategory("");
     }
   };
 
@@ -124,40 +126,6 @@ export default function ArticleEditor() {
             className="text-lg font-semibold mb-4"
           />
         </div>
-
-        {/* <div>
-        <label
-          htmlFor="photo"
-          className="block text-sm font-medium text-gray-700"
-        >
-          Photo
-        </label>
-        <input
-          type="file"
-          id="photo"
-          name="photo"
-          accept="image/*"
-          onChange={handleImageChange}
-          className="mt-1 block w-full text-sm text-gray-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-full file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-indigo-50 file:text-indigo-700
-                  hover:file:bg-indigo-100"
-          required
-        />
-      </div> */}
-        {/* {preview && (
-        <div className="mt-4">
-          <Image
-            src={preview || "/placeholder.svg"}
-            alt="Preview"
-            width={200}
-            height={200}
-            className="rounded-md"
-          />
-        </div>
-      )} */}
 
         <Tabs defaultValue="write" className="space-y-4">
           <TabsList className="grid w-full grid-cols-2">
