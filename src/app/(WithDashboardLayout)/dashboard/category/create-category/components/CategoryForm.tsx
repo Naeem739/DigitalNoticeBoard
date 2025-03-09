@@ -58,7 +58,7 @@ export function CategoryForm() {
         form.reset();
         router.refresh();
       } else {
-        toast("Something went wrong");
+        toast("Already Exist Try Another");
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
@@ -86,7 +86,11 @@ export function CategoryForm() {
                       <FormLabel>Category Name</FormLabel>
 
                       <FormControl>
-                        <Input placeholder="Enter category name" {...field} />
+                      <Input
+                          className="w-full h-12" // Increase the width and height
+                          placeholder="Enter category name"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

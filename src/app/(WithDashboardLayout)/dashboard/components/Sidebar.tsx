@@ -93,7 +93,8 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
         <DropdownMenu
           title="Notice Content"
           items={[
-            { href: "/dashboard/create-notice", icon: FilePenLine, label: "Add New Notice Content" }
+            { href: "/dashboard/create-notice", icon: FilePenLine, label: "Add New Notice" },
+           // { href: "/dashboard/showNotices", icon: FilePenLine, label: "Show Notices" }
           ]}
         />
 
