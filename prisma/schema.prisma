@@ -44,3 +44,11 @@ model Category {
   notices Notice[]
   // noticeId
 }
+
+
+model Dashboard {
+  id           String @id @default(uuid())
+  aspectRatio  String
+  containers   Json
+  createdAt   DateTime? @default(now())
+}
