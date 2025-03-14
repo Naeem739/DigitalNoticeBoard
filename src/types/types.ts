@@ -3,7 +3,9 @@ export type Widget = {
   title?: string;
   content?: string;
   category?: string;
-  noticeId?: string;
+  noticeIds?: string;
+  topNotices?: TNotice[];
+  notices?: TNotice[];
 };
 
 export type AspectRatio = '4:3' | '16:9' | '16:10';
@@ -37,7 +39,7 @@ export type TDashboard = {
     title: string | undefined
     id: string
     category: string | undefined
-    noticeId: string | undefined
+    noticeIds: string | undefined
     width: string
     height: string
   }[]
@@ -55,7 +57,7 @@ export type TDashboard2 = {
     title: string | undefined
     id: string
     category: string | undefined
-    noticeId: string | undefined
+    noticeIds: string | undefined
     width: string
     height: string
     leftPercent: string 
