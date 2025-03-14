@@ -108,9 +108,9 @@ export  const Dashboard = ({ data }:{data:TDashboard | null}) => {
                       {container.category}
                     </span>
                   )}
-                  {container.noticeId && (
+                  {container.noticeIds && (
                     <div className="mt-3 text-sm text-gray-600 truncate">
-                      Notice ID: {container.noticeId}
+                      Notice ID: {container.noticeIds}
                     </div>
                   )}
                 </div>
