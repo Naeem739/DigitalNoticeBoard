@@ -1,25 +1,25 @@
-'use client'
-import React, { useEffect, useState } from 'react';
-import GridLayout, { Layout } from 'react-grid-layout';
-import { Plus, X, LineChart, ChevronDown } from 'lucide-react';
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
-import './edit-dashboard.css';
-import { AspectRatio, TNotice, Widget } from '@/types/types';
-import { getCategoriesWithNotices } from '@/app/actions/category.action';
-
-
+"use client";
+import React, { useEffect, useState } from "react";
+import GridLayout, { Layout } from "react-grid-layout";
+import { Plus, X, ChevronDown } from "lucide-react";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
+import "./edit-dashboard.css";
+import { AspectRatio, TNotice, Widget } from "@/types/types";
+import { getCategoriesWithNotices } from "@/app/actions/category.action";
+import { createDashboard } from "@/app/actions/dashboard.action";
+import { toast } from "sonner";
 
 type TCategoriesWithNotices = {
-  id: string
-  name: string
-  notices: TNotice[]
-}
+  id: string;
+  name: string;
+  notices: TNotice[];
+};
 
 type TResult = {
-  success: boolean
-  result: TCategoriesWithNotices[]
-}
+  success: boolean;
+  result: TCategoriesWithNotices[];
+};
 
 // const categories = [
 //   {
@@ -38,40 +38,42 @@ type TResult = {
 //
 // ];
 
-const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
-  '4:3': { width: 800, height: 600 },
-  '16:9': { width: 960, height: 540 },
-  '16:10': { width: 960, height: 600 }
-};
+const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> =
+  {
+    "4:3": { width: 800, height: 600 },
+    "16:9": { width: 960, height: 540 },
+    "16:10": { width: 960, height: 600 },
+  };
 
-function App() {
+function EditDashboardDemo() {
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [layout, setLayout] = useState<Layout[]>([]);
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>(null);
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<TCategoriesWithNotices | null>(null);
-  const [categories,setCategories] = useState<TCategoriesWithNotices[]>([]);
+  const [selectedCategory, setSelectedCategory] =
+    useState<TCategoriesWithNotices | null>(null);
+  const [categories, setCategories] = useState<TCategoriesWithNotices[]>([]);
 
-    useEffect(() => {
-      const getData = async () => {
-        const categoriesWithNotices = await getCategoriesWithNotices() as TResult;
-        if (categoriesWithNotices.success) {
-          console.log(categoriesWithNotices);
-          setCategories(categoriesWithNotices.result as TCategoriesWithNotices[]);
-        }
-      };
-  
-      getData();
-    }, []);
+  useEffect(() => {
+    const getData = async () => {
+      const categoriesWithNotices =
+        (await getCategoriesWithNotices()) as TResult;
+      if (categoriesWithNotices.success) {
+        console.log(categoriesWithNotices);
+        setCategories(categoriesWithNotices.result as TCategoriesWithNotices[]);
+      }
+    };
 
+    getData();
+  }, []);
 
   const addWidget = () => {
     if (!selectedRatio) return;
 
     const newWidget: Widget = {
       id: `widget-${Date.now()}`,
-      title: `Widget ${widgets.length + 1}`,
+      title: `Notice ${widgets.length + 1}`,
     };
 
     const newLayout: Layout = {
@@ -89,8 +91,8 @@ function App() {
   const removeWidget = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const updatedWidgets = widgets.filter(widget => widget.id !== id);
-    const updatedLayout = layout.filter(item => item.i !== id);
+    const updatedWidgets = widgets.filter((widget) => widget.id !== id);
+    const updatedLayout = layout.filter((item) => item.i !== id);
     setWidgets(updatedWidgets);
     setLayout(updatedLayout);
   };
@@ -108,15 +110,27 @@ function App() {
   };
 
   const handleDragStart = (e: React.DragEvent, title: string) => {
-    e.dataTransfer.setData('text/plain', title);
+    e.dataTransfer.setData("text/plain", title);
   };
 
   const handleDrop = (e: React.DragEvent, widgetId: string) => {
     e.preventDefault();
-    const title = e.dataTransfer.getData('text/plain');
-    setWidgets(widgets.map(widget => 
-      widget.id === widgetId ? { ...widget, content: title } : widget
-    ));
+    const title = e.dataTransfer.getData("text/plain");
+    const notice = selectedCategory?.notices.filter(
+      (notice) => notice.title === title
+    )[0];
+    setWidgets(
+      widgets.map((widget) =>
+        widget.id === widgetId
+          ? {
+              ...widget,
+              content: title,
+              noticeId: notice?.id,
+              category: selectedCategory?.name,
+            }
+          : widget
+      )
+    );
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -124,22 +138,138 @@ function App() {
   };
 
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
-    if (!selectedRatio) return { width: '0%', height: '0%' };
-    
+    if (!selectedRatio) return { width: "0%", height: "0%" };
+
     const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32; // Accounting for container padding
     const containerHeight = RATIO_DIMENSIONS[selectedRatio].height;
-    
-    const colWidth = (containerWidth - (5 * 12 * 2)) / 6; // Subtracting margins (5 gaps * 12px * 2 sides)
+
+    const colWidth = (containerWidth - 5 * 12 * 2) / 6; // Subtracting margins (5 gaps * 12px * 2 sides)
     const rowHeight = 100; // Fixed row height
-    
-    const widgetWidth = (widgetLayout.w * colWidth + (widgetLayout.w - 1) * 24) / containerWidth * 100;
-    const widgetHeight = (widgetLayout.h * rowHeight + (widgetLayout.h - 1) * 24) / containerHeight * 100;
-    
+
+    const widgetWidth =
+      ((widgetLayout.w * colWidth + (widgetLayout.w - 1) * 24) /
+        containerWidth) *
+      100;
+    const widgetHeight =
+      ((widgetLayout.h * rowHeight + (widgetLayout.h - 1) * 24) /
+        containerHeight) *
+      100;
+
     return {
       width: `${widgetWidth.toFixed(1)}%`,
-      height: `${widgetHeight.toFixed(1)}%`
+      height: `${widgetHeight.toFixed(1)}%`,
     };
   };
+
+  const handleSave = async () => {
+
+
+    const dashboard = {
+      aspectRatio: selectedRatio,
+      containers: [...positions],
+    };
+
+    try {
+      const result = await createDashboard(dashboard);
+      if (result.success) {
+        return toast("Dashboard Created Successfully!");
+      } else {
+        return toast("Something went wrong!");
+      }
+    } catch (error) {
+      toast(`${error}`);
+    }
+  };
+
+
+  const calculatePercentagePositions = () => {
+
+    const containers = widgets.map((widget) => {
+      const specificLayout = layout.filter((item) => widget.id === item.i)[0];
+      // const {width, height} = calculateDimensionsPercentage(specificLayout);
+
+      const containerWidth = RATIO_DIMENSIONS["4:3"].width - 32; // Accounting for container padding
+      const containerHeight = RATIO_DIMENSIONS["4:3"].height;
+
+      const colWidth = (containerWidth - 5 * 12 * 2) / 6; // Subtracting margins (5 gaps * 12px * 2 sides)
+      const rowHeight = 100; // Fixed row height from the original code
+
+      const leftPx = specificLayout.x * (colWidth + 24); // x position * (column width + margin)
+      const topPx = specificLayout.y * (rowHeight + 24); // y position * (row height + margin)
+
+      // Convert positions to percentages of container dimensions
+      const leftPercent = (leftPx / containerWidth) * 100;
+      const topPercent = (topPx / containerHeight) * 100;
+
+      // Calculate dimensions as percentages (as in the original code)
+      const widgetWidth =
+        ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) /
+          containerWidth) *
+        100;
+      const widgetHeight =
+        ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) /
+          containerHeight) *
+        100;
+
+      return {
+        id: specificLayout.i,
+        x: specificLayout.x,
+        y: specificLayout.y,
+        w: specificLayout.w,
+        h: specificLayout.h,
+        leftPx: `${leftPx.toFixed(1)}px`,
+        topPx: `${topPx.toFixed(1)}px`,
+        leftPercent: `${leftPercent.toFixed(2)}%`,
+        topPercent: `${topPercent.toFixed(2)}%`,
+        width: `${widgetWidth.toFixed(2)}%`,
+        height: `${widgetHeight.toFixed(2)}%`,
+        title: widget.content,
+        category: selectedCategory?.name,
+        noticeId: widget.noticeId,
+      };
+    });
+
+
+    return containers;
+  };
+
+  //   const containerWidth = RATIO_DIMENSIONS['4:3'].width - 32 // Accounting for container padding
+  //   const containerHeight = RATIO_DIMENSIONS['4:3'].height
+
+  //   const colWidth = (containerWidth - 5 * 12 * 2) / 6 // Subtracting margins (5 gaps * 12px * 2 sides)
+  //   const rowHeight = 100 // Fixed row height from the original code
+
+  //   return layout.map((item) => {
+  //     // Calculate absolute position (top, left) in pixels
+  //     const leftPx = item.x * (colWidth + 24) // x position * (column width + margin)
+  //     const topPx = item.y * (rowHeight + 24) // y position * (row height + margin)
+
+  //     // Convert positions to percentages of container dimensions
+  //     const leftPercent = (leftPx / containerWidth) * 100
+  //     const topPercent = (topPx / containerHeight) * 100
+
+  //     // Calculate dimensions as percentages (as in the original code)
+  //     const widgetWidth = ((item.w * colWidth + (item.w - 1) * 24) / containerWidth) * 100
+  //     const widgetHeight = ((item.h * rowHeight + (item.h - 1) * 24) / containerHeight) * 100
+
+  //     return {
+  //       id: item.i,
+  //       x: item.x,
+  //       y: item.y,
+  //       w: item.w,
+  //       h: item.h,
+  //       leftPx: `${leftPx.toFixed(1)}px`,
+  //       topPx: `${topPx.toFixed(1)}px`,
+  //       leftPercent: `${leftPercent.toFixed(2)}%`,
+  //       topPercent: `${topPercent.toFixed(2)}%`,
+  //       width: `${widgetWidth.toFixed(2)}%`,
+  //       height: `${widgetHeight.toFixed(2)}%`,
+  //     }
+  //   })
+  // }
+
+  const positions = calculatePercentagePositions();
+  console.log(positions);
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -149,11 +279,12 @@ function App() {
             onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)}
             className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 flex items-center gap-2"
           >
-            Select Display {selectedRatio ? `(${selectedRatio})` : ''} <ChevronDown size={16} />
+            Select Display {selectedRatio ? `(${selectedRatio})` : ""}{" "}
+            <ChevronDown size={16} />
           </button>
           {isRatioDropdownOpen && (
             <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-              {(['4:3', '16:9', '16:10'] as AspectRatio[]).map((ratio) => (
+              {(["4:3", "16:9", "16:10"] as AspectRatio[]).map((ratio) => (
                 <button
                   key={ratio}
                   onClick={() => handleRatioSelect(ratio)}
@@ -170,8 +301,8 @@ function App() {
           disabled={!selectedRatio}
           className={`flex items-center gap-2 px-4 py-2 rounded ${
             selectedRatio
-              ? 'bg-blue-500 text-white hover:bg-blue-600'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ? "bg-blue-500 text-white hover:bg-blue-600"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
           }`}
         >
           <Plus size={20} /> Create Widget
@@ -181,7 +312,8 @@ function App() {
             onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
             className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center gap-2"
           >
-            Category {selectedCategory ? `(${selectedCategory.name})` : ''} <ChevronDown size={16} />
+            Category {selectedCategory ? `(${selectedCategory.name})` : ""}{" "}
+            <ChevronDown size={16} />
           </button>
           {isCategoryDropdownOpen && (
             <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10 min-w-[200px]">
@@ -236,9 +368,12 @@ function App() {
             draggableHandle=".widget-drag-handle"
           >
             {widgets.map((widget) => {
-              const widgetLayout = layout.find(l => l.i === widget.id);
-              const dimensions = widgetLayout ? calculateDimensionsPercentage(widgetLayout) : { width: '0%', height: '0%' };
-              
+              const widgetLayout = layout.find((l) => l.i === widget.id);
+              const dimensions = widgetLayout
+                ? calculateDimensionsPercentage(widgetLayout)
+                : { width: "0%", height: "0%" };
+              console.log(widget);
+
               return (
                 <div
                   key={widget.id}
@@ -250,16 +385,23 @@ function App() {
                     {dimensions.width} × {dimensions.height}
                   </div>
                   <div className="widget-drag-handle cursor-move p-4">
-                    <h3 className="text-lg font-semibold text-center">{widget.title}</h3>
+                    <h3 className="text-lg font-semibold text-center">
+                      {widget.title}
+                    </h3>
                     {widget.content ? (
                       <div className="mt-4 text-center">
-                        <p className="text-xl font-bold text-gray-700">{widget.content}</p>
-                        <LineChart className="w-12 h-12 mx-auto mt-2" />
+                        <p className="text-xl font-bold text-gray-700">
+                          {widget.content}
+                        </p>
+                        <span className="text-xs  text-green-500 p-1 rounded">
+                          {widget.category}
+                        </span>
+                        {/* <LineChart className="w-12 h-12 mx-auto mt-2" /> */}
                       </div>
                     ) : (
                       <div className="mt-4 text-center text-gray-400">
                         <p>Drag a title here</p>
-                        <LineChart className="w-12 h-12 mx-auto mt-2" />
+                        {/* <LineChart className="w-12 h-12 mx-auto mt-2" /> */}
                       </div>
                     )}
                   </div>
@@ -275,8 +417,13 @@ function App() {
           </GridLayout>
         </div>
       )}
+      {selectedRatio && (
+        <div className="w-full border flex justify-end">
+          <button onClick={handleSave}>Save</button>
+        </div>
+      )}
     </div>
   );
 }
 
-export default App;
+export default EditDashboardDemo;
