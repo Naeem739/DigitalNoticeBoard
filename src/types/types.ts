@@ -47,7 +47,8 @@ export type TDashboard = {
 
 
 export type TDashboard2 = {
-  aspectRatio: string | null
+  aspectRatio: string | null,
+  notices: TNotice[],
   containers: {
     i: string
     h: number
@@ -57,7 +58,7 @@ export type TDashboard2 = {
     title: string | undefined
     id: string
     category: string | undefined
-    noticeIds: string | undefined
+    noticeIds: string[]
     width: string
     height: string
     leftPercent: string 

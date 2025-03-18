@@ -28,11 +28,29 @@ export const getDashboards = async() => {
         const result = await prisma.dashboard.findMany({
             orderBy:{
                 createdAt:"desc"
-            }
+            },
+            take:1
         });
+        console.log(result);
+
+      const notices = await prisma.notice.findMany({
+        where:{
+            id:{
+                // @ts-expect-error hobe na
+                in:result[0].noticeIds
+            }
+        }
+    });
+
+    console.log("notices", notices);
+    console.log("result", result);
+
         return {
             success: true,
-            result
+            result:{
+                notices,
+                ...result[0]
+            }
         }
 
     }
