@@ -23,6 +23,7 @@ interface WidgetContainerProps {
 }
 
 export function WidgetContainer({ data }: WidgetContainerProps) {
+  console.log(data);
   return (
     <div className="w-full border border-green-600 ">
 
@@ -36,7 +37,14 @@ export function WidgetContainer({ data }: WidgetContainerProps) {
         // minHeight: `${Math.max(...widgets.map(w => parseFloat(w.topPercent) + parseFloat(w.height)))}%`
       }}
     > <div className=" bg-gray-100 w-[100%] mx-auto h-[80vh] relative">
-      {data.containers.map((widget) => (
+      {data.containers.map((widget) => {
+        const height = widget.height.split(".")[0]; 
+        const top = widget.topPercent.split(".")[0]; 
+        const totalHeight = parseFloat(height) + parseFloat(top);
+        console.log(totalHeight);
+        console.log(totalHeight);
+
+        return(
         <div
           key={widget.id}
           className={`absolute  rounded-lg shadow-sm p-4 bg-white`}
@@ -44,19 +52,26 @@ export function WidgetContainer({ data }: WidgetContainerProps) {
             left: widget.leftPercent,
             top: widget.topPercent,
             width: widget.width,
-            height: widget.height,
+            height: totalHeight >= 100 ? `${98-parseFloat(top)}%` : widget.height,
             border: "1px solid rgba(0,0,0,0.1)",
             transition: "all 0.2s ease-in-out",
           }}
         >
           
           <div className="font-medium">
-            <h3>All Notice id: </h3>
-            {widget.noticeIds }
+            <h3 className="text-center font-bold text-3xl ">{widget?.category }</h3>
+            {widget?.noticeIds.map(id => {
+              return <div className="font-semibold text-xl text-center overflow-x-auto" key={id}>
+                {   
+                    data.notices.find(notice => notice.id === id)?.title
+
+                 }
+                </div>
+            }) }
              </div>
 
         </div>
-      ))}
+      )  })}
        </div>
     </div>
     </div>

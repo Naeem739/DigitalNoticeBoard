@@ -10,8 +10,8 @@ import { Toaster } from 'sonner';
 // const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-   title: 'BANDHON ',
-   description: 'BANDHON  homepage',
+   title: 'Smart Notice Board',
+   description: 'Smart Notice Board',
 };
 
 export default function RootLayout({

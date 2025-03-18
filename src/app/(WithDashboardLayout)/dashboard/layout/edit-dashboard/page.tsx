@@ -322,7 +322,7 @@ function EditDashboardDemo() {
             <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10 min-w-[200px]">
               {categories.map((category) => (
                 <button
-                  key={category.name}
+                  key={category.name    }
                   onClick={() => handleCategorySelect(category)}
                   className="block w-full text-left px-4 py-2 hover:bg-gray-100"
                 >
@@ -647,7 +647,7 @@ function EditDashboardDemo() {
         width: `${widgetWidth.toFixed(2)}%`,
         height: `${widgetHeight.toFixed(2)}%`,
         title: widget.content || widget.title,
-        categoryId: widget.category,
+        category: widget.category,
         noticeIds: noticeIds,
   
       };

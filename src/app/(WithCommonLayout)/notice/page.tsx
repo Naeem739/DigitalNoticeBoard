@@ -9,7 +9,7 @@ import { WidgetContainer } from "./components/edit-dashboard-demo-two";
 
 type TResult = {
     success: boolean
-    result : TDashboard2[]
+    result : TDashboard2
 }
 const PublicNoticeBoard = ()=>{
     const [dashboard, setDashboard] = useState<TDashboard2 | null >(null);
@@ -20,7 +20,7 @@ const PublicNoticeBoard = ()=>{
             const publicDashboards = await getDashboards() as TResult ;
             if (publicDashboards.success) {
               console.log(publicDashboards);
-              setDashboard(publicDashboards?.result[0]);
+              setDashboard(publicDashboards?.result);
             }
             setLoading(false);
 
