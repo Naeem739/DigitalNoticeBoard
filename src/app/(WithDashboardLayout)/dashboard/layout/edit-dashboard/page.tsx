@@ -437,9 +437,9 @@ export default EditDashboardDemo;
 // Naeem er Code 
 
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import GridLayout, { Layout } from "react-grid-layout";
-import { Plus, X, ChevronDown } from "lucide-react";
+import { Plus, X, ChevronDown, Settings, Palette, Type, ListFilter, Layers, GripVertical } from "lucide-react";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import "./edit-dashboard.css";
@@ -459,12 +459,39 @@ type TResult = {
   result: TCategoriesWithNotices[];
 };
 
-const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> =
-  {
-    "4:3": { width: 800, height: 600 },
-    "16:9": { width: 960, height: 540 },
-    "16:10": { width: 960, height: 600 },
-  };
+type WidgetSettings = {
+  backgroundColor: string;
+  backgroundOpacity: number;
+  cardOpacity: number;
+  borderColor: string;
+  borderWidth: number;
+  fontColor: string;
+  noticeCount: number;
+};
+
+const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
+  backgroundColor: "#ffffff",
+  backgroundOpacity: 0.3,
+  cardOpacity: 0.9,
+  borderColor: "#e2e8f0",
+  borderWidth: 1,
+  fontColor: "#1e293b",
+  noticeCount: 3
+};
+
+const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
+  "4:3": { width: 800, height: 600 },
+  "16:9": { width: 960, height: 540 },
+  "16:10": { width: 960, height: 600 },
+};
+
+// Helper function to convert hex color to rgba
+const hexToRgba = (hex: string, opacity: number) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
 
 function EditDashboardDemo() {
   const [widgets, setWidgets] = useState<Widget[]>([]);
@@ -472,13 +499,19 @@ function EditDashboardDemo() {
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>(null);
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false);
   const [categories, setCategories] = useState<TCategoriesWithNotices[]>([]);
+  const [activeSettingsWidget, setActiveSettingsWidget] = useState<string | null>(null);
+  const [widgetSettings, setWidgetSettings] = useState<Record<string, WidgetSettings>>({});
+  
+  // New state for draggable settings panel
+  const [settingsPosition, setSettingsPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [startPosition, setStartPosition] = useState({ x: 0, y: 0 });
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const getData = async () => {
-      const categoriesWithNotices =
-        (await getCategoriesWithNotices()) as TResult;
+      const categoriesWithNotices = (await getCategoriesWithNotices()) as TResult;
       if (categoriesWithNotices.success) {
-        console.log(categoriesWithNotices);
         setCategories(categoriesWithNotices.result as TCategoriesWithNotices[]);
       }
     };
@@ -486,11 +519,62 @@ function EditDashboardDemo() {
     getData();
   }, []);
 
+  // Add event handlers for dragging the settings panel
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      
+      const newX = settingsPosition.x + (e.clientX - startPosition.x);
+      const newY = settingsPosition.y + (e.clientY - startPosition.y);
+      
+      setSettingsPosition({ x: newX, y: newY });
+      setStartPosition({ x: e.clientX, y: e.clientY });
+    };
+    
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+    
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, startPosition, settingsPosition]);
+  
+  // Reset settings position when opening for a new widget
+  useEffect(() => {
+    if (activeSettingsWidget && settingsRef.current) {
+      // Position it near the current widget but ensure it's visible
+      const widgetElement = document.getElementById(activeSettingsWidget);
+      if (widgetElement) {
+        const rect = widgetElement.getBoundingClientRect();
+        setSettingsPosition({ 
+          x: Math.min(rect.right, window.innerWidth - 300), 
+          y: Math.max(rect.top, 100)
+        });
+      } else {
+        // Default position if widget not found
+        setSettingsPosition({ x: window.innerWidth / 2 - 150, y: 100 });
+      }
+    }
+  }, [activeSettingsWidget]);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setStartPosition({ x: e.clientX, y: e.clientY });
+  };
+
   const addWidget = () => {
     if (!selectedRatio) return;
 
+    const newWidgetId = `widget-${Date.now()}`;
     const newWidget: Widget = {
-      id: `widget-${Date.now()}`,
+      id: newWidgetId,
       title: `Widget ${widgets.length + 1}`,
     };
 
@@ -502,17 +586,35 @@ function EditDashboardDemo() {
       h: 2,
     };
 
+    // Initialize settings for this widget
+    setWidgetSettings(prev => ({
+      ...prev,
+      [newWidgetId]: { ...DEFAULT_WIDGET_SETTINGS }
+    }));
+
     setWidgets([...widgets, newWidget]);
     setLayout([...layout, newLayout]);
+    
+    toast.success("Widget added successfully!");
   };
 
   const removeWidget = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
+    
     const updatedWidgets = widgets.filter((widget) => widget.id !== id);
     const updatedLayout = layout.filter((item) => item.i !== id);
+    
+    // Also remove settings for this widget
+    const updatedSettings = { ...widgetSettings };
+    delete updatedSettings[id];
+    
     setWidgets(updatedWidgets);
     setLayout(updatedLayout);
+    setWidgetSettings(updatedSettings);
+    setActiveSettingsWidget(null);
+    
+    toast.success("Widget removed");
   };
 
   const handleRatioSelect = (ratio: AspectRatio) => {
@@ -520,9 +622,11 @@ function EditDashboardDemo() {
     setIsRatioDropdownOpen(false);
     setWidgets([]);
     setLayout([]);
+    setWidgetSettings({});
+    toast(`Display ratio set to ${ratio}`);
   };
 
-  const handleDragStart = (e: React.DragEvent, category: TCategoriesWithNotices) => {
+  const handleDragStart2 = (e: React.DragEvent, category: TCategoriesWithNotices) => {
     e.dataTransfer.setData("categoryId", category.id);
     e.dataTransfer.setData("categoryName", category.name);
   };
@@ -535,8 +639,9 @@ function EditDashboardDemo() {
     const category = categories.find(cat => cat.id === categoryId);
     if (!category) return;
 
-    // Get top 4 notices from the category
-    const topNotices = [...category.notices].slice(0, 4);
+    // Get top N notices from the category based on widget settings
+    const noticeCount = widgetSettings[widgetId]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount;
+    const topNotices = [...category.notices].slice(0, noticeCount);
 
     setWidgets(
       widgets.map((widget) =>
@@ -552,6 +657,8 @@ function EditDashboardDemo() {
           : widget
       )
     );
+    
+    toast.success(`Added ${categoryName} to widget`);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -561,11 +668,11 @@ function EditDashboardDemo() {
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
     if (!selectedRatio) return { width: "0%", height: "0%" };
 
-    const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32; // Accounting for container padding
+    const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32;
     const containerHeight = RATIO_DIMENSIONS[selectedRatio].height;
 
-    const colWidth = (containerWidth - 5 * 12 * 2) / 6; // Subtracting margins (5 gaps * 12px * 2 sides)
-    const rowHeight = 100; // Fixed row height
+    const colWidth = (containerWidth - 5 * 12 * 2) / 6;
+    const rowHeight = 100;
 
     const widgetWidth =
       ((widgetLayout.w * colWidth + (widgetLayout.w - 1) * 24) /
@@ -592,12 +699,12 @@ function EditDashboardDemo() {
     try {
       const result = await createDashboard(dashboard);
       if (result.success) {
-        return toast("Dashboard Created Successfully!");
+        toast.success("Dashboard Created Successfully!");
       } else {
-        return toast("Something went wrong!");
+        toast.error("Something went wrong!");
       }
     } catch (error) {
-      toast(`${error}`);
+      toast.error(`${error}`);
     }
   };
 
@@ -609,17 +716,15 @@ function EditDashboardDemo() {
       const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32;
       const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height;
 
-      const colWidth = (containerWidth - 5 * 12 * 2) / 6; // Subtracting margins (5 gaps * 12px * 2 sides)
-      const rowHeight = 100; // Fixed row height from the original code
+      const colWidth = (containerWidth - 5 * 12 * 2) / 6;
+      const rowHeight = 100;
 
-      const leftPx = specificLayout.x * (colWidth + 24); // x position * (column width + margin)
-      const topPx = specificLayout.y * (rowHeight + 24); // y position * (row height + margin)
+      const leftPx = specificLayout.x * (colWidth + 24);
+      const topPx = specificLayout.y * (rowHeight + 24);
 
-      // Convert positions to percentages of container dimensions
       const leftPercent = (leftPx / containerWidth) * 100;
       const topPercent = (topPx / containerHeight) * 100;
 
-      // Calculate dimensions as percentages
       const widgetWidth =
         ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) /
           containerWidth) *
@@ -629,6 +734,8 @@ function EditDashboardDemo() {
           containerHeight) *
         100;
 
+      const settings = widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS;
+      
       // Select relevant notice IDs from the top notices
       const noticeIds = widget.topNotices 
         ? widget.topNotices.map(notice => notice.id) 
@@ -649,23 +756,68 @@ function EditDashboardDemo() {
         title: widget.content || widget.title,
         category: widget.category,
         noticeIds: noticeIds,
-  
+        settings: settings
       };
     }).filter(Boolean);
 
     return containers;
   };
 
+  const toggleWidgetSettings = (widgetId: string) => {
+    if (activeSettingsWidget === widgetId) {
+      setActiveSettingsWidget(null);
+    } else {
+      setActiveSettingsWidget(widgetId);
+    }
+  };
+
+  const updateWidgetSetting = (widgetId: string, setting: keyof WidgetSettings, value: any) => {
+    setWidgetSettings(prev => ({
+      ...prev,
+      [widgetId]: {
+        ...prev[widgetId],
+        [setting]: value
+      }
+    }));
+    
+    // If this is a notice count change and the widget has a category, update topNotices
+    if (setting === 'noticeCount') {
+      const widget = widgets.find(w => w.id === widgetId);
+      if (widget && widget.notices) {
+        const topNotices = [...widget.notices].slice(0, value);
+        setWidgets(
+          widgets.map((w) =>
+            w.id === widgetId
+              ? {
+                  ...w,
+                  topNotices: topNotices,
+                }
+              : w
+          )
+        );
+      }
+    }
+  };
+
+  const getPresetColors = () => [
+    "#ffffff", "#f8fafc", "#f1f5f9", "#e2e8f0", 
+    "#cbd5e1", "#94a3b8", "#64748b", "#1e293b",
+    "#ef4444", "#f97316", "#eab308", "#10b981", 
+    "#3b82f6", "#6366f1", "#8b5cf6", "#d946ef"
+  ];
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <div className="mb-6 flex gap-4">
+      <div className="mb-6 flex flex-wrap gap-4">
         <div className="relative">
           <button
             onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)}
-            className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 flex items-center gap-2"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center gap-2 transition-all shadow hover:shadow-md"
           >
-            Select Display {selectedRatio ? `(${selectedRatio})` : ""}{" "}
-            <ChevronDown size={16} />
+            <span className="flex items-center gap-2">
+              Select Display {selectedRatio ? `(${selectedRatio})` : ""}
+              <ChevronDown size={16} />
+            </span>
           </button>
           {isRatioDropdownOpen && (
             <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
@@ -673,7 +825,7 @@ function EditDashboardDemo() {
                 <button
                   key={ratio}
                   onClick={() => handleRatioSelect(ratio)}
-                  className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-2 hover:bg-indigo-50 transition-colors"
                 >
                   {ratio}
                 </button>
@@ -684,17 +836,28 @@ function EditDashboardDemo() {
         <button
           onClick={addWidget}
           disabled={!selectedRatio}
-          className={`flex items-center gap-2 px-4 py-2 rounded ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ${
             selectedRatio
-              ? "bg-blue-500 text-white hover:bg-blue-600"
+              ? "bg-blue-600 text-white hover:bg-blue-700"
               : "bg-gray-300 text-gray-500 cursor-not-allowed"
           }`}
         >
           <Plus size={20} /> Create Widget
         </button>
+        
+        <button
+          onClick={handleSave}
+          disabled={!selectedRatio || widgets.length === 0}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ml-auto ${
+            selectedRatio && widgets.length > 0
+              ? "bg-green-600 text-white hover:bg-green-700"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
+          Save Dashboard
+        </button>
       </div>
 
-     
       <div className="mb-6 p-4 bg-white rounded-lg shadow-md">
         <h3 className="text-lg font-semibold mb-3">Draggable Categories:</h3>
         <div className="flex flex-wrap gap-2">
@@ -702,8 +865,8 @@ function EditDashboardDemo() {
             <div
               key={category.id}
               draggable
-              onDragStart={(e) => handleDragStart(e, category)}
-              className="bg-gray-100 px-3 py-1 rounded cursor-move hover:bg-gray-200 transition-colors"
+              onDragStart={(e) => handleDragStart2(e, category)}
+              className="bg-indigo-50 px-3 py-1 rounded-md cursor-move hover:bg-indigo-100 transition-colors border border-indigo-200"
             >
               {category.name} ({category.notices.length} notices)
             </div>
@@ -713,7 +876,7 @@ function EditDashboardDemo() {
 
       {selectedRatio && (
         <div
-          className="border-4 border-dashed border-gray-300 rounded-lg mx-auto overflow-hidden"
+          className="border-4 border-dashed border-gray-300 rounded-lg mx-auto overflow-hidden bg-white p-4"
           style={{
             width: RATIO_DIMENSIONS[selectedRatio].width,
             height: RATIO_DIMENSIONS[selectedRatio].height,
@@ -734,19 +897,52 @@ function EditDashboardDemo() {
               const dimensions = widgetLayout
                 ? calculateDimensionsPercentage(widgetLayout)
                 : { width: "0%", height: "0%" };
+              const settings = widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS;
+              
+              // Generate background color with opacity
+              const bgColor = hexToRgba(settings.backgroundColor, settings.backgroundOpacity);
+              const cardBgColor = hexToRgba(settings.backgroundColor, settings.cardOpacity);
 
               return (
                 <div
+                  id={widget.id}
                   key={widget.id}
-                  className="bg-white rounded-lg shadow-md relative"
+                  className="rounded-lg shadow-md relative"
+                  style={{
+                    backgroundColor: bgColor,
+                    borderColor: settings.borderColor,
+                    borderWidth: `${settings.borderWidth}px`,
+                    borderStyle: 'solid',
+                    transition: 'all 0.2s ease'
+                  }}
                   onDrop={(e) => handleDrop(e, widget.id)}
                   onDragOver={handleDragOver}
                 >
-                  <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md z-50">
+                  <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md z-10">
                     {dimensions.width} × {dimensions.height}
                   </div>
+                  
+                  <div className="absolute top-2 right-10 z-10">
+                    <button
+                      onClick={() => toggleWidgetSettings(widget.id)}
+                      className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <Settings size={20} className="text-gray-600" />
+                    </button>
+                  </div>
+                  
+                  <button
+                    onClick={(e) => removeWidget(e, widget.id)}
+                    className="absolute top-2 right-2 p-1 hover:bg-red-100 rounded-full transition-colors z-10"
+                  >
+                    <X size={20} className="text-red-500" />
+                  </button>
+                  
                   <div className="widget-drag-handle cursor-move p-4 overflow-auto h-full">
-                    <h3 className="text-lg font-semibold text-center mb-2">
+                    <h3 
+                      className="text-lg font-semibold text-center mb-2"
+                      style={{ color: settings.fontColor }}
+                    >
                       {widget.content || widget.title}
                     </h3>
                     {widget.topNotices ? (
@@ -756,58 +952,242 @@ function EditDashboardDemo() {
                             Top {widget.topNotices.length} Notices
                           </span>
                         </div>
-                        <ul className="space-y-2">
+                        <div className="space-y-2">
                           {widget.topNotices.map((notice) => (
-                            <li 
+                            <div 
                               key={notice.id} 
-                              className="border-b border-gray-100 pb-1"
+                              className="rounded shadow p-2"
+                              style={{
+                                backgroundColor: cardBgColor,
+                                borderLeft: `3px solid ${settings.borderColor}`
+                              }}
                             >
-                              <p className="text-sm font-medium">{notice.title}</p>
+                              <p 
+                                className="text-sm font-medium"
+                                style={{ color: settings.fontColor }}
+                              >
+                                {notice.title}
+                              </p>
                               {notice.content && (
-                                <p className="text-xs text-gray-500 truncate">
+                                <p 
+                                  className="text-xs truncate mt-1"
+                                  style={{ color: settings.fontColor, opacity: 0.7 }}
+                                >
                                   {notice.content.substring(0, 50)}
                                   {notice.content.length > 50 ? "..." : ""}
                                 </p>
                               )}
-                            </li>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                         {widget.notices && (
-                          <p className="text-xs text-gray-500 mt-2 text-right">
+                          <p 
+                            className="text-xs mt-2 text-right"
+                            style={{ color: settings.fontColor, opacity: 0.6 }}
+                          >
                             Total: {widget.notices.length} notices
                           </p>
                         )}
                       </div>
                     ) : (
-                      <div className="mt-4 text-center text-gray-400 flex items-center justify-center h-16">
-                        <p>Drag a category here</p>
+                      <div 
+                        className="mt-4 text-center flex items-center justify-center h-16 border-2 border-dashed rounded-lg"
+                        style={{ borderColor: settings.fontColor, opacity: 0.4 }}
+                      >
+                        <p style={{ color: settings.fontColor }}>Drag a category here</p>
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={(e) => removeWidget(e, widget.id)}
-                    className="absolute top-2 right-2 p-1 hover:bg-red-100 rounded-full transition-colors z-50"
-                  >
-                    <X size={20} className="text-red-500" />
-                  </button>
                 </div>
               );
             })}
           </GridLayout>
         </div>
       )}
-      {selectedRatio && (
-        <div className="w-full mt-4 flex justify-end">
-          <button 
-            onClick={handleSave}
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+      
+      {/* Draggable Settings Modal */}
+      {activeSettingsWidget && (
+        <div 
+          ref={settingsRef}
+          className="fixed bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 w-64 max-h-screen overflow-y-auto"
+          style={{ 
+            left: `${settingsPosition.x}px`, 
+            top: `${settingsPosition.y}px` 
+          }}
+        >
+          <div 
+            className="flex items-center justify-between mb-3 cursor-move bg-gray-50 rounded-md p-2"
+            onMouseDown={handleDragStart}
           >
-            Save Dashboard
-          </button>
+            <div className="flex items-center gap-2">
+              <GripVertical size={16} className="text-gray-400" />
+              <h4 className="font-medium text-sm">Widget Settings</h4>
+            </div>
+            <button
+              onClick={() => setActiveSettingsWidget(null)}
+              className="hover:bg-gray-200 rounded-full p-1 transition-colors"
+            >
+              <X size={16} className="text-gray-500" />
+            </button>
+          </div>
+          
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 flex items-center gap-1">
+              <Palette size={14} /> Background Color
+            </label>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {getPresetColors().map(color => (
+                <button
+                  key={color}
+                  onClick={() => updateWidgetSetting(activeSettingsWidget, 'backgroundColor', color)}
+                  className="w-6 h-6 rounded-full border border-gray-300"
+                  style={{ 
+                    backgroundColor: color,
+                    outline: widgetSettings[activeSettingsWidget]?.backgroundColor === color ? '2px solid #3b82f6' : 'none'
+                  }}
+                  title={color}
+                />
+              ))}
+              <input
+                type="color"
+                value={widgetSettings[activeSettingsWidget]?.backgroundColor || DEFAULT_WIDGET_SETTINGS.backgroundColor}
+                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'backgroundColor', e.target.value)}
+                className="w-6 h-6 p-0 rounded-full ml-1"
+              />
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 flex items-center gap-1">
+              <Layers size={14} /> Background Opacity
+            </label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="range"
+                min="0.1"
+                max="1"
+                step="0.1"
+                value={widgetSettings[activeSettingsWidget]?.backgroundOpacity || DEFAULT_WIDGET_SETTINGS.backgroundOpacity}
+                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'backgroundOpacity', parseFloat(e.target.value))}
+                className="flex-1"
+              />
+              <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">
+                {Math.round((widgetSettings[activeSettingsWidget]?.backgroundOpacity || DEFAULT_WIDGET_SETTINGS.backgroundOpacity) * 100)}%
+              </span>
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 flex items-center gap-1">
+              <Layers size={14} /> Card Opacity
+            </label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="range"
+                min="0.1"
+                max="1"
+                step="0.1"
+                value={widgetSettings[activeSettingsWidget]?.cardOpacity || DEFAULT_WIDGET_SETTINGS.cardOpacity}
+                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'cardOpacity', parseFloat(e.target.value))}
+                className="flex-1"
+              />
+              <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">
+                {Math.round((widgetSettings[activeSettingsWidget]?.cardOpacity || DEFAULT_WIDGET_SETTINGS.cardOpacity) * 100)}%
+              </span>
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 flex items-center gap-1">
+              <Palette size={14} /> Border Color
+            </label>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {getPresetColors().map(color => (
+                <button
+                  key={color}
+                  onClick={() => updateWidgetSetting(activeSettingsWidget, 'borderColor', color)}
+                  className="w-6 h-6 rounded-full border border-gray-300"
+                  style={{ 
+                    backgroundColor: color,
+                    outline: widgetSettings[activeSettingsWidget]?.borderColor === color ? '2px solid #3b82f6' : 'none'
+                  }}
+                  title={color}
+                />
+              ))}
+              <input
+                type="color"
+                value={widgetSettings[activeSettingsWidget]?.borderColor || DEFAULT_WIDGET_SETTINGS.borderColor}
+                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'borderColor', e.target.value)}
+                className="w-6 h-6 p-0 rounded-full ml-1"
+              />
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 flex items-center gap-1">
+              <Type size={14} /> Font Color
+            </label>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {getPresetColors().map(color => (
+                <button
+                  key={color}
+                  onClick={() => updateWidgetSetting(activeSettingsWidget, 'fontColor', color)}
+                  className="w-6 h-6 rounded-full border border-gray-300"
+                  style={{ 
+                    backgroundColor: color,
+                    outline: widgetSettings[activeSettingsWidget]?.fontColor === color ? '2px solid #3b82f6' : 'none'
+                  }}
+                  title={color}
+                />
+              ))}
+              <input
+                type="color"
+                value={widgetSettings[activeSettingsWidget]?.fontColor || DEFAULT_WIDGET_SETTINGS.fontColor}
+                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'fontColor', e.target.value)}
+                className="w-6 h-6 p-0 rounded-full ml-1"
+              />
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 flex items-center gap-1">
+              <ListFilter size={14} /> Number of Notices
+            </label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={widgetSettings[activeSettingsWidget]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount}
+                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'noticeCount', parseInt(e.target.value))}
+                className="flex-1"
+              />
+              <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">
+                {widgetSettings[activeSettingsWidget]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount}
+              </span>
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <label className="text-xs text-gray-500">Border Width</label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="range"
+                min="0"
+                max="5"
+                value={widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}
+                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'borderWidth', parseInt(e.target.value))}
+                className="flex-1"
+              />
+              <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">
+                {widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}px
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export default EditDashboardDemo; 
+export default EditDashboardDemo;
