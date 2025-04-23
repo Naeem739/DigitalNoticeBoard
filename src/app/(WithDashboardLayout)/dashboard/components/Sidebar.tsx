@@ -5,6 +5,8 @@ import { useState, useRef, useEffect } from "react"
 import { Home, BarChart2, Users, FolderPlus, FilePenLine, ChevronDown, ChevronRight } from "lucide-react"
 import * as Collapsible from "@radix-ui/react-collapsible"
 import type React from "react"
+import { Megaphone } from "lucide-react";
+
 
 export default function Sidebar({ isOpen }: { isOpen: boolean }) {
   const [openMenus, setOpenMenus] = useState<string[]>([])
@@ -94,9 +96,11 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
           title="Notice Content"
           items={[
             { href: "/dashboard/create-notice", icon: FilePenLine, label: "Add New Notice" },
-           // { href: "/dashboard/showNotices", icon: FilePenLine, label: "Show Notices" }
+            {href: "/dashboard/showNotices", icon: Megaphone, label: "Show Notices" }
+
           ]}
         />
+    
 
         
         <DropdownMenu
