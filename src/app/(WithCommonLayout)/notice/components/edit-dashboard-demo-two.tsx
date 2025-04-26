@@ -184,6 +184,7 @@ export function WidgetContainer({ data }: WidgetContainerProps) {
                         {getNoticeIcon(notice?.title)}
                         <div className="font-semibold text-xl">
                           {notice?.title}
+                      
                         </div>
                       </div>
                     </div>

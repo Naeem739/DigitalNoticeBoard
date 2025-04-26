@@ -392,6 +392,11 @@ function EditDashboardDemo() {
     "#3b82f6", "#6366f1", "#8b5cf6", "#d946ef"
   ];
 
+  const handleSaveTemplate = (widget: Widget) => {
+    // Implement save template logic here
+    console.log("Save template for widget:", widget);
+  };
+
   useEffect(() => {
     const autoScrollWidgets = widgets.filter(widget => 
       widgetSettings[widget.id]?.autoScroll
@@ -1009,6 +1014,18 @@ function EditDashboardDemo() {
               </div>
             )}
           </div>
+
+          <button
+            onClick={() => {
+              const widget = widgets.find(w => w.id === activeSettingsWidget);
+              if (widget) {
+                handleSaveTemplate(widget);
+              }
+            }}
+            className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
+          >
+            Save as Template
+          </button>
         </div>
       )}
     </div>
