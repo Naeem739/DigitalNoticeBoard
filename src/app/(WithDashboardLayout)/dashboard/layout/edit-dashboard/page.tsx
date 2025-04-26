@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import GridLayout, { Layout } from "react-grid-layout";
-import { Plus, X, ChevronDown, Settings, Palette, Type, ListFilter, Layers, GripVertical } from "lucide-react";
+import { Plus, X, ChevronDown, Settings, Palette, Type, ListFilter, Layers, GripVertical, Box, Layout as LayoutIcon } from "lucide-react";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import "./edit-dashboard.css";
@@ -29,6 +29,11 @@ type WidgetSettings = {
   borderWidth: number;
   fontColor: string;
   noticeCount: number;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: string;
+  autoScroll: boolean;
+  showFullContent: boolean;
 };
 
 const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
@@ -38,7 +43,12 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   borderColor: "#e2e8f0",
   borderWidth: 1,
   fontColor: "#1e293b",
-  noticeCount: 3
+  noticeCount: 3,
+  fontFamily: 'Inter',
+  fontSize: 14,
+  fontWeight: 'normal',
+  autoScroll: false,
+  showFullContent: false
 };
 
 const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
@@ -55,6 +65,17 @@ const hexToRgba = (hex: string, opacity: number) => {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
 
+// Add this type for the settings tabs
+type SettingsTab = 'style' | 'typography' | 'layout' | 'content';
+
+// Add this before the EditDashboardDemo component
+const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'style', label: 'Style', icon: <Palette size={16} /> },
+  { id: 'typography', label: 'Text', icon: <Type size={16} /> },
+  { id: 'layout', label: 'Layout', icon: <LayoutIcon size={16} /> },
+  { id: 'content', label: 'Content', icon: <Box size={16} /> }
+];
+
 function EditDashboardDemo() {
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [layout, setLayout] = useState<Layout[]>([]);
@@ -69,6 +90,9 @@ function EditDashboardDemo() {
   const [isDragging, setIsDragging] = useState(false);
   const [startPosition, setStartPosition] = useState({ x: 0, y: 0 });
   const settingsRef = useRef<HTMLDivElement>(null);
+
+  // Inside the EditDashboardDemo component, add this state
+  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>('style');
 
   useEffect(() => {
     const getData = async () => {
@@ -373,6 +397,49 @@ function EditDashboardDemo() {
     console.log("Save template for widget:", widget);
   };
 
+  useEffect(() => {
+    const autoScrollWidgets = widgets.filter(widget => 
+      widgetSettings[widget.id]?.autoScroll
+    );
+
+    const scrollIntervals = autoScrollWidgets.map(widget => {
+      const element = document.getElementById(widget.id);
+      if (!element) return null;
+
+      const noticesContainer = element.querySelector('.notices-container');
+      if (!noticesContainer) return null;
+
+      let scrollPosition = 0;
+      let isScrollingDown = true;
+      const scrollSpeed = 1;
+      const maxScroll = noticesContainer.scrollHeight - noticesContainer.clientHeight;
+
+      const interval = setInterval(() => {
+        if (isScrollingDown) {
+          scrollPosition += scrollSpeed;
+          if (scrollPosition >= maxScroll) {
+            isScrollingDown = false;
+          }
+        } else {
+          scrollPosition -= scrollSpeed;
+          if (scrollPosition <= 0) {
+            isScrollingDown = true;
+          }
+        }
+        
+        noticesContainer.scrollTop = scrollPosition;
+      }, 30);
+
+      return interval;
+    });
+
+    return () => {
+      scrollIntervals.forEach(interval => {
+        if (interval) clearInterval(interval);
+      });
+    };
+  }, [widgets, widgetSettings]);
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="mb-6 flex flex-wrap gap-4">
@@ -505,65 +572,101 @@ function EditDashboardDemo() {
                     <X size={20} className="text-red-500" />
                   </button>
                   
-                  <div className="widget-drag-handle cursor-move p-4 overflow-auto h-full">
+                  <div className="widget-drag-handle cursor-move p-4"
+                    style={{
+                      fontFamily: settings.fontFamily,
+                      fontSize: `${settings.fontSize}px`,
+                      fontWeight: settings.fontWeight
+                    }}
+                  >
                     <h3 
                       className="text-lg font-semibold text-center mb-2"
-                      style={{ color: settings.fontColor }}
+                      style={{ 
+                        color: settings.fontColor,
+                        fontFamily: settings.fontFamily,
+                        fontSize: `${settings.fontSize}px`,
+                        fontWeight: settings.fontWeight
+                      }}
                     >
                       {widget.content || widget.title}
                     </h3>
-                    {widget.topNotices ? (
-                      <div className="mt-2">
-                        <div className="bg-indigo-50 py-1 px-2 rounded mb-2 text-center">
-                          <span className="text-sm font-medium text-indigo-600">
-                            Top {widget.topNotices.length} Notices
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {widget.topNotices.map((notice) => (
-                            <div 
-                              key={notice.id} 
-                              className="rounded shadow p-2"
-                              style={{
-                                backgroundColor: cardBgColor,
-                                borderLeft: `3px solid ${settings.borderColor}`
-                              }}
-                            >
-                              <p 
-                                className="text-sm font-medium"
-                                style={{ color: settings.fontColor }}
-                              >
-                                {notice.title}
-                              </p>
-                              {notice.content && (
-                                <p 
-                                  className="text-xs truncate mt-1"
-                                  style={{ color: settings.fontColor, opacity: 0.7 }}
-                                >
-                                  {notice.content.substring(0, 50)}
-                                  {notice.content.length > 50 ? "..." : ""}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        {widget.notices && (
-                          <p 
-                            className="text-xs mt-2 text-right"
-                            style={{ color: settings.fontColor, opacity: 0.6 }}
+                    {/* Widget Content */}
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold mb-4">{widget.content || widget.title}</h3>
+                      {widget.topNotices ? (
+                        <div className="mt-2">
+                          <div className="bg-indigo-50 py-1 px-2 rounded mb-2 text-center">
+                            <span className="text-sm font-medium text-indigo-600">
+                              Top {widget.topNotices.length} Notices
+                            </span>
+                          </div>
+                          <div 
+                            className={`space-y-2 notices-container ${
+                              settings.autoScroll ? 'max-h-[200px] overflow-hidden' : ''
+                            }`}
+                            style={{
+                              height: '200px',
+                              overflow: 'hidden',
+                              position: 'relative'
+                            }}
                           >
-                            Total: {widget.notices.length} notices
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div 
-                        className="mt-4 text-center flex items-center justify-center h-16 border-2 border-dashed rounded-lg"
-                        style={{ borderColor: settings.fontColor, opacity: 0.4 }}
-                      >
-                        <p style={{ color: settings.fontColor }}>Drag a category here</p>
-                      </div>
-                    )}
+                            {widget.topNotices.map(notice => (
+                              <div 
+                                key={notice.id} 
+                                className="rounded shadow p-2"
+                                style={{
+                                  backgroundColor: cardBgColor,
+                                  borderLeft: `3px solid ${settings.borderColor}`,
+                                  fontFamily: settings.fontFamily
+                                }}
+                              >
+                                <p 
+                                  className="text-sm font-medium"
+                                  style={{ 
+                                    color: settings.fontColor,
+                                    fontSize: `${settings.fontSize}px`,
+                                    fontWeight: settings.fontWeight
+                                  }}
+                                >
+                                  {notice.title}
+                                </p>
+                                {settings.showFullContent && notice.content && (
+                                  <p 
+                                    className="text-xs mt-1"
+                                    style={{ 
+                                      color: settings.fontColor, 
+                                      opacity: 0.7,
+                                      fontFamily: settings.fontFamily
+                                    }}
+                                  >
+                                    {notice.content}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {widget.notices && (
+                            <p 
+                              className="text-xs mt-2 text-right"
+                              style={{ color: settings.fontColor, opacity: 0.6 }}
+                            >
+                              Total: {widget.notices.length} notices
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div 
+                          className="mt-4 text-center flex items-center justify-center h-16 border-2 border-dashed rounded-lg"
+                          style={{ 
+                            borderColor: settings.fontColor, 
+                            opacity: 0.4,
+                            fontFamily: settings.fontFamily
+                          }}
+                        >
+                          <p style={{ color: settings.fontColor }}>Drag a category here</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -576,19 +679,20 @@ function EditDashboardDemo() {
       {activeSettingsWidget && (
         <div 
           ref={settingsRef}
-          className="fixed bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 w-64 max-h-screen overflow-y-auto"
+          className="fixed bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-96 max-h-[80vh] flex flex-col"
           style={{ 
             left: `${settingsPosition.x}px`, 
             top: `${settingsPosition.y}px` 
           }}
         >
+          {/* Header */}
           <div 
-            className="flex items-center justify-between mb-3 cursor-move bg-gray-50 rounded-md p-2"
+            className="flex items-center justify-between p-3 cursor-move bg-gray-50 rounded-t-lg border-b"
             onMouseDown={handleDragStart}
           >
             <div className="flex items-center gap-2">
               <GripVertical size={16} className="text-gray-400" />
-              <h4 className="font-medium text-sm">Widget Settings</h4>
+              <h4 className="font-medium">Widget Settings</h4>
             </div>
             <button
               onClick={() => setActiveSettingsWidget(null)}
@@ -598,11 +702,35 @@ function EditDashboardDemo() {
             </button>
           </div>
           
-          <div className="mb-3">
-            <label className="text-xs text-gray-500 flex items-center gap-1">
+          {/* Tabs */}
+          <div className="flex border-b">
+            {SETTINGS_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveSettingsTab(tab.id)}
+                className={`flex items-center gap-1 px-4 py-2 text-sm transition-colors flex-1
+                  ${activeSettingsTab === tab.id 
+                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' 
+                    : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Settings Content with proper scrolling */}
+          <div className="p-4 overflow-y-auto flex-1">
+            {/* Style Tab */}
+            {activeSettingsTab === 'style' && (
+              <div className="space-y-4">
+                {/* Background Color */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
               <Palette size={14} /> Background Color
             </label>
-            <div className="flex flex-wrap gap-1 mt-1">
+                  <div className="flex flex-wrap gap-1">
               {getPresetColors().map(color => (
                 <button
                   key={color}
@@ -610,7 +738,9 @@ function EditDashboardDemo() {
                   className="w-6 h-6 rounded-full border border-gray-300"
                   style={{ 
                     backgroundColor: color,
-                    outline: widgetSettings[activeSettingsWidget]?.backgroundColor === color ? '2px solid #3b82f6' : 'none'
+                          outline: widgetSettings[activeSettingsWidget]?.backgroundColor === color 
+                            ? '2px solid #3b82f6' 
+                            : 'none'
                   }}
                   title={color}
                 />
@@ -624,11 +754,14 @@ function EditDashboardDemo() {
             </div>
           </div>
           
-          <div className="mb-3">
-            <label className="text-xs text-gray-500 flex items-center gap-1">
-              <Layers size={14} /> Background Opacity
+                {/* Background & Card Opacity */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Layers size={14} /> Opacity Settings
             </label>
-            <div className="flex items-center gap-2 mt-1">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-20">Background:</span>
               <input
                 type="range"
                 min="0.1"
@@ -638,17 +771,12 @@ function EditDashboardDemo() {
                 onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'backgroundOpacity', parseFloat(e.target.value))}
                 className="flex-1"
               />
-              <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">
+                      <span className="text-sm w-12 text-right">
                 {Math.round((widgetSettings[activeSettingsWidget]?.backgroundOpacity || DEFAULT_WIDGET_SETTINGS.backgroundOpacity) * 100)}%
               </span>
             </div>
-          </div>
-          
-          <div className="mb-3">
-            <label className="text-xs text-gray-500 flex items-center gap-1">
-              <Layers size={14} /> Card Opacity
-            </label>
-            <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-20">Card:</span>
               <input
                 type="range"
                 min="0.1"
@@ -658,17 +786,20 @@ function EditDashboardDemo() {
                 onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'cardOpacity', parseFloat(e.target.value))}
                 className="flex-1"
               />
-              <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">
+                      <span className="text-sm w-12 text-right">
                 {Math.round((widgetSettings[activeSettingsWidget]?.cardOpacity || DEFAULT_WIDGET_SETTINGS.cardOpacity) * 100)}%
               </span>
+                    </div>
             </div>
           </div>
           
-          <div className="mb-3">
-            <label className="text-xs text-gray-500 flex items-center gap-1">
-              <Palette size={14} /> Border Color
+                {/* Border Settings */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Box size={14} /> Border Settings
             </label>
-            <div className="flex flex-wrap gap-1 mt-1">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-1">
               {getPresetColors().map(color => (
                 <button
                   key={color}
@@ -676,25 +807,42 @@ function EditDashboardDemo() {
                   className="w-6 h-6 rounded-full border border-gray-300"
                   style={{ 
                     backgroundColor: color,
-                    outline: widgetSettings[activeSettingsWidget]?.borderColor === color ? '2px solid #3b82f6' : 'none'
+                            outline: widgetSettings[activeSettingsWidget]?.borderColor === color 
+                              ? '2px solid #3b82f6' 
+                              : 'none'
                   }}
                   title={color}
                 />
               ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-20">Width:</span>
               <input
-                type="color"
-                value={widgetSettings[activeSettingsWidget]?.borderColor || DEFAULT_WIDGET_SETTINGS.borderColor}
-                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'borderColor', e.target.value)}
-                className="w-6 h-6 p-0 rounded-full ml-1"
-              />
+                        type="range"
+                        min="0"
+                        max="5"
+                        value={widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'borderWidth', parseInt(e.target.value))}
+                        className="flex-1"
+                      />
+                      <span className="text-sm w-12 text-right">
+                        {widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}px
+                      </span>
             </div>
           </div>
-          
-          <div className="mb-3">
-            <label className="text-xs text-gray-500 flex items-center gap-1">
+                </div>
+              </div>
+            )}
+
+            {/* Typography Tab */}
+            {activeSettingsTab === 'typography' && (
+              <div className="space-y-4">
+                {/* Font Color */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
               <Type size={14} /> Font Color
             </label>
-            <div className="flex flex-wrap gap-1 mt-1">
+                  <div className="flex flex-wrap gap-1">
               {getPresetColors().map(color => (
                 <button
                   key={color}
@@ -702,25 +850,98 @@ function EditDashboardDemo() {
                   className="w-6 h-6 rounded-full border border-gray-300"
                   style={{ 
                     backgroundColor: color,
-                    outline: widgetSettings[activeSettingsWidget]?.fontColor === color ? '2px solid #3b82f6' : 'none'
+                          outline: widgetSettings[activeSettingsWidget]?.fontColor === color 
+                            ? '2px solid #3b82f6' 
+                            : 'none'
                   }}
                   title={color}
                 />
               ))}
+                  </div>
+                </div>
+
+                {/* Font Family */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Font Family
+                  </label>
+                  <select
+                    value={widgetSettings[activeSettingsWidget]?.fontFamily || DEFAULT_WIDGET_SETTINGS.fontFamily}
+                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'fontFamily', e.target.value)}
+                    className="w-full text-sm border rounded-md p-2"
+                  >
+                    <option value="Inter">Inter</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Helvetica">Helvetica</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="system-ui">System UI</option>
+                  </select>
+                </div>
+
+                {/* Font Size */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Font Size
+                  </label>
+                  <div className="flex items-center gap-2">
               <input
-                type="color"
-                value={widgetSettings[activeSettingsWidget]?.fontColor || DEFAULT_WIDGET_SETTINGS.fontColor}
-                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'fontColor', e.target.value)}
-                className="w-6 h-6 p-0 rounded-full ml-1"
-              />
+                      type="range"
+                      min="12"
+                      max="24"
+                      value={widgetSettings[activeSettingsWidget]?.fontSize || DEFAULT_WIDGET_SETTINGS.fontSize}
+                      onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'fontSize', parseInt(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="text-sm w-12 text-right">
+                      {widgetSettings[activeSettingsWidget]?.fontSize || DEFAULT_WIDGET_SETTINGS.fontSize}px
+                    </span>
             </div>
           </div>
           
-          <div className="mb-3">
-            <label className="text-xs text-gray-500 flex items-center gap-1">
+                {/* Font Weight */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Font Weight
+                  </label>
+                  <select
+                    value={widgetSettings[activeSettingsWidget]?.fontWeight || DEFAULT_WIDGET_SETTINGS.fontWeight}
+                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'fontWeight', e.target.value)}
+                    className="w-full text-sm border rounded-md p-2"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="medium">Medium</option>
+                    <option value="semibold">Semibold</option>
+                    <option value="bold">Bold</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Layout Tab */}
+            {activeSettingsTab === 'layout' && (
+              <div className="space-y-4">
+                {/* Add layout-specific settings here */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <LayoutIcon size={14} /> Padding
+                  </label>
+                  {/* Add padding controls */}
+                </div>
+                {/* Add more layout settings as needed */}
+              </div>
+            )}
+
+            {/* Content Tab */}
+            {activeSettingsTab === 'content' && (
+              <div className="space-y-4">
+                {/* Notice Count */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
               <ListFilter size={14} /> Number of Notices
             </label>
-            <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2">
               <input
                 type="range"
                 min="1"
@@ -729,27 +950,69 @@ function EditDashboardDemo() {
                 onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'noticeCount', parseInt(e.target.value))}
                 className="flex-1"
               />
-              <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">
+                    <span className="text-sm w-12 text-right">
                 {widgetSettings[activeSettingsWidget]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount}
               </span>
             </div>
           </div>
           
-          <div className="mb-3">
-            <label className="text-xs text-gray-500">Border Width</label>
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                type="range"
-                min="0"
-                max="5"
-                value={widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}
-                onChange={(e) => updateWidgetSetting(activeSettingsWidget, 'borderWidth', parseInt(e.target.value))}
-                className="flex-1"
-              />
-              <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">
-                {widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}px
+                {/* Auto Scroll Toggle */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <ListFilter size={14} /> Auto Scroll
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateWidgetSetting(activeSettingsWidget, 'autoScroll', !(widgetSettings[activeSettingsWidget]?.autoScroll || false))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                        widgetSettings[activeSettingsWidget]?.autoScroll 
+                          ? 'bg-blue-600' 
+                          : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          widgetSettings[activeSettingsWidget]?.autoScroll 
+                            ? 'translate-x-6' 
+                            : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-sm text-gray-600">
+                      {widgetSettings[activeSettingsWidget]?.autoScroll ? 'Enabled' : 'Disabled'}
               </span>
             </div>
+                </div>
+
+                {/* Show Full Content Toggle */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <ListFilter size={14} /> Show Full Content
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateWidgetSetting(activeSettingsWidget, 'showFullContent', !(widgetSettings[activeSettingsWidget]?.showFullContent || false))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                        widgetSettings[activeSettingsWidget]?.showFullContent 
+                          ? 'bg-blue-600' 
+                          : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          widgetSettings[activeSettingsWidget]?.showFullContent 
+                            ? 'translate-x-6' 
+                            : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-sm text-gray-600">
+                      {widgetSettings[activeSettingsWidget]?.showFullContent ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <button

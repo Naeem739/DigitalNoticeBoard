@@ -4,6 +4,33 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --primary: #2563eb;
+  --secondary: #7c3aed;
+}
+
+@layer base {
+  body {
+    @apply text-gray-900 bg-white;
+  }
+}
+
+.bg-primary {
+  background-color: var(--primary);
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+.from-primary {
+  --tw-gradient-from: var(--primary);
+}
+
+.to-secondary {
+  --tw-gradient-to: var(--secondary);
+}
+
 *{
     padding: 0;
     margin: 0;
