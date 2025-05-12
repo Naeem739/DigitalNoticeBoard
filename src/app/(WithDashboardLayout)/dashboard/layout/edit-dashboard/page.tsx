@@ -110,8 +110,8 @@ const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
       { id: "widget-2", title: "New Users" },
     ],
     layout: [
-      { i: "widget-1", x: 0, y: 0, w: 2, h: 2 },
-      { i: "widget-2", x: 2, y: 0, w: 2, h: 2 },
+      { i: "widget-1", x: 0, y: 0, w: 5, h: 4 },
+      { i: "widget-2", x: 6, y: 0, w: 5, h: 4 },
     ],
     widgetSettings: {
       "widget-1": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#f0fdfa" },
@@ -127,8 +127,8 @@ const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
       { id: "widget-4", title: "Lead Generation" },
     ],
     layout: [
-      { i: "widget-3", x: 0, y: 0, w: 3, h: 2 },
-      { i: "widget-4", x: 3, y: 0, w: 3, h: 2 },
+      { i: "widget-3", x: 0, y: 0, w: 6, h: 4 },
+      { i: "widget-4", x: 6, y: 0, w: 6, h: 4 },
     ],
     widgetSettings: {
       "widget-3": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#f0f9ff" },
@@ -145,9 +145,9 @@ const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
       { id: "widget-7", title: "Additional Details" },
     ],
     layout: [
-      { i: "widget-5", x: 0, y: 0, w: 3, h: 4 }, // Left widget takes half width, full height
-      { i: "widget-6", x: 3, y: 0, w: 3, h: 2 }, // Top-right widget
-      { i: "widget-7", x: 3, y: 2, w: 3, h: 2 }, // Bottom-right widget
+      { i: "widget-5", x: 0, y: 0, w: 6, h: 8 }, // Left widget takes half width, full height
+      { i: "widget-6", x: 6, y: 0, w: 6, h: 4 }, // Top-right widget
+      { i: "widget-7", x: 6, y: 4, w: 6, h: 4 }, // Bottom-right widget
     ],
     widgetSettings: {
       "widget-5": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#f5f3ff", borderColor: "#c4b5fd" },
@@ -165,9 +165,9 @@ const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
       { id: "widget-10", title: "Detailed Overview" },
     ],
     layout: [
-      { i: "widget-8", x: 0, y: 0, w: 3, h: 2 }, // Top-left widget
-      { i: "widget-9", x: 0, y: 2, w: 3, h: 2 }, // Bottom-left widget
-      { i: "widget-10", x: 3, y: 0, w: 3, h: 4 }, // Right widget takes half width, full height
+      { i: "widget-8", x: 0, y: 0, w: 6, h: 4 }, // Top-left widget
+      { i: "widget-9", x: 0, y: 4, w: 6, h: 4 }, // Bottom-left widget
+      { i: "widget-10", x: 6, y: 0, w: 6, h: 8 }, // Right widget takes half width, full height
     ],
     widgetSettings: {
       "widget-8": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#eff6ff", borderColor: "#93c5fd" },
@@ -185,9 +185,9 @@ const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
       { id: "widget-13", title: "Bottom Section" },
     ],
     layout: [
-      { i: "widget-11", x: 0, y: 0, w: 6, h: 1 }, // Top widget, full width
-      { i: "widget-12", x: 0, y: 1, w: 6, h: 1 }, // Middle widget, full width
-      { i: "widget-13", x: 0, y: 2, w: 6, h: 1 }, // Bottom widget, full width
+      { i: "widget-11", x: 0, y: 0, w: 12, h: 3 }, // Top widget, full width
+      { i: "widget-12", x: 0, y: 3, w: 12, h: 3 }, // Middle widget, full width
+      { i: "widget-13", x: 0, y: 6, w: 12, h: 3 }, // Bottom widget, full width
     ],
     widgetSettings: {
       "widget-11": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#ecfdf5", borderColor: "#6ee7b7" },
@@ -205,9 +205,9 @@ const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
       { id: "widget-16", title: "Right Column" },
     ],
     layout: [
-      { i: "widget-14", x: 0, y: 0, w: 2, h: 4 }, // Left column, 1/3 width, full height
-      { i: "widget-15", x: 2, y: 0, w: 2, h: 4 }, // Middle column, 1/3 width, full height
-      { i: "widget-16", x: 4, y: 0, w: 2, h: 4 }, // Right column, 1/3 width, full height
+      { i: "widget-14", x: 0, y: 0, w: 4, h: 8 }, // Left column, 1/3 width, full height
+      { i: "widget-15", x: 4, y: 0, w: 4, h: 8 }, // Middle column, 1/3 width, full height
+      { i: "widget-16", x: 8, y: 0, w: 4, h: 8 }, // Right column, 1/3 width, full height
     ],
     widgetSettings: {
       "widget-14": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#eff6ff", borderColor: "#93c5fd" },
@@ -308,10 +308,10 @@ function EditDashboardDemo() {
 
     const newLayout: Layout = {
       i: newWidget.id,
-      x: (layout.length * 2) % 6,
+      x: (layout.length * 2) % 12, // Updated to use 12 columns
       y: Number.POSITIVE_INFINITY,
-      w: 2,
-      h: 2,
+      w: 4, // Adjusted for 12 columns
+      h: 4, // Adjusted for smaller rowHeight
     }
 
     // Initialize settings for this widget
@@ -400,8 +400,8 @@ function EditDashboardDemo() {
     const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
     const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
 
-    const colWidth = (containerWidth - 5 * 12 * 2) / 6
-    const rowHeight = 100
+    const colWidth = (containerWidth - 11 * 12 * 2) / 12 // Updated for 12 columns
+    const rowHeight = 50 // Match the new rowHeight
 
     const widgetWidth = ((widgetLayout.w * colWidth + (widgetLayout.w - 1) * 24) / containerWidth) * 100
     const widgetHeight = ((widgetLayout.h * rowHeight + (widgetLayout.h - 1) * 24) / containerHeight) * 100
@@ -440,8 +440,8 @@ function EditDashboardDemo() {
         const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32
         const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height
 
-        const colWidth = (containerWidth - 5 * 12 * 2) / 6
-        const rowHeight = 100
+        const colWidth = (containerWidth - 11 * 12 * 2) / 12 // Updated for 12 columns
+        const rowHeight = 50 // Match the new rowHeight
 
         const leftPx = specificLayout.x * (colWidth + 24)
         const topPx = specificLayout.y * (rowHeight + 24)
@@ -586,7 +586,7 @@ function EditDashboardDemo() {
     if (!widgetLayout) return 200 // Default height
 
     // Calculate based on widget height
-    const rowHeight = 100
+    const rowHeight = 50 // Match the new rowHeight
     const widgetHeight = widgetLayout.h * rowHeight
 
     // Reserve space for widget header and padding
@@ -753,8 +753,8 @@ function EditDashboardDemo() {
           <GridLayout
             className="layout"
             layout={layout}
-            cols={6}
-            rowHeight={100}
+            cols={12}
+            rowHeight={50}
             width={RATIO_DIMENSIONS[selectedRatio].width - 32}
             onLayoutChange={(newLayout) => setLayout(newLayout)}
             margin={[12, 12]}
