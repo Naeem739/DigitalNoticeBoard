@@ -1,4 +1,5 @@
 "use client"
+
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import GridLayout, { type Layout } from "react-grid-layout"
@@ -47,6 +48,15 @@ type WidgetSettings = {
   fontWeight: string
   autoScroll: boolean
   showFullContent: boolean
+  // New category styling options
+  categoryFont: string
+  categoryFontSize: number
+  categoryFontWeight: string
+  categoryFontColor: string
+  categoryBackgroundColor: string
+  categoryHeight: number
+  categoryBorderColor: string
+  categoryBorderWidth: number
 }
 
 const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
@@ -62,6 +72,15 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   fontWeight: "normal",
   autoScroll: false,
   showFullContent: false,
+  // Default values for new category styling options
+  categoryFont: "Inter",
+  categoryFontSize: 16,
+  categoryFontWeight: "semibold",
+  categoryFontColor: "#1e293b",
+  categoryBackgroundColor: "#f8fafc",
+  categoryHeight: 40,
+  categoryBorderColor: "#e2e8f0",
+  categoryBorderWidth: 0,
 }
 
 const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
@@ -79,7 +98,7 @@ const hexToRgba = (hex: string, opacity: number) => {
 }
 
 // Add this type for the settings tabs
-type SettingsTab = "style" | "typography" | "layout" | "content"
+type SettingsTab = "style" | "typography" | "layout" | "content" | "category"
 
 // Add this before the EditDashboardDemo component
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
@@ -87,6 +106,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[]
   { id: "typography", label: "Text", icon: <Type size={16} /> },
   { id: "layout", label: "Layout", icon: <LayoutIcon size={16} /> },
   { id: "content", label: "Content", icon: <Box size={16} /> },
+  { id: "category", label: "Category", icon: <ListFilter size={16} /> },
 ]
 
 // Define the template type
@@ -452,11 +472,13 @@ function EditDashboardDemo() {
         const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
         const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
 
+        // Get complete widget settings or use defaults
         const settings = widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
 
         // Select relevant notice IDs from the top notices
         const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
 
+        // Ensure we're sending all settings properties to the database
         return {
           id: specificLayout.i,
           x: specificLayout.x,
@@ -472,7 +494,30 @@ function EditDashboardDemo() {
           title: widget.content || widget.title,
           category: widget.category,
           noticeIds: noticeIds,
-          settings: settings,
+          settings: {
+            // Include all settings properties explicitly to ensure nothing is missed
+            backgroundColor: settings.backgroundColor,
+            backgroundOpacity: settings.backgroundOpacity,
+            cardOpacity: settings.cardOpacity,
+            borderColor: settings.borderColor,
+            borderWidth: settings.borderWidth,
+            fontColor: settings.fontColor,
+            noticeCount: settings.noticeCount,
+            fontFamily: settings.fontFamily,
+            fontSize: settings.fontSize,
+            fontWeight: settings.fontWeight,
+            autoScroll: settings.autoScroll,
+            showFullContent: settings.showFullContent,
+            // New category styling properties
+            categoryFont: settings.categoryFont,
+            categoryFontSize: settings.categoryFontSize,
+            categoryFontWeight: settings.categoryFontWeight,
+            categoryFontColor: settings.categoryFontColor,
+            categoryBackgroundColor: settings.categoryBackgroundColor,
+            categoryHeight: settings.categoryHeight,
+            categoryBorderColor: settings.categoryBorderColor,
+            categoryBorderWidth: settings.categoryBorderWidth,
+          },
         }
       })
       .filter(Boolean)
@@ -771,6 +816,10 @@ function EditDashboardDemo() {
               const bgColor = hexToRgba(settings.backgroundColor, settings.backgroundOpacity)
               const cardBgColor = hexToRgba(settings.backgroundColor, settings.cardOpacity)
 
+              // Generate category background color
+              const categoryBgColor =
+                settings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
+
               // Calculate the appropriate height for notices container
               const noticesContainerHeight = calculateNoticesContainerHeight(widgetLayout)
 
@@ -816,18 +865,24 @@ function EditDashboardDemo() {
                   <div
                     className="widget-drag-handle cursor-move p-2 flex-shrink-0"
                     style={{
-                      fontFamily: settings.fontFamily,
-                      fontSize: `${settings.fontSize}px`,
-                      fontWeight: settings.fontWeight,
+                      backgroundColor: categoryBgColor,
+                      height: `${settings.categoryHeight}px`,
+                      borderBottom:
+                        settings.categoryBorderWidth > 0
+                          ? `${settings.categoryBorderWidth}px solid ${settings.categoryBorderColor}`
+                          : "none",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
                     <h3
-                      className="text-lg font-semibold text-center mb-1"
+                      className="text-lg font-semibold text-center"
                       style={{
-                        color: settings.fontColor,
-                        fontFamily: settings.fontFamily,
-                        fontSize: `${settings.fontSize}px`,
-                        fontWeight: settings.fontWeight,
+                        color: settings.categoryFontColor,
+                        fontFamily: settings.categoryFont,
+                        fontSize: `${settings.categoryFontSize}px`,
+                        fontWeight: settings.categoryFontWeight,
                       }}
                     >
                       {widget.content || widget.title}
@@ -946,12 +1001,12 @@ function EditDashboardDemo() {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b">
+          <div className="flex border-b overflow-x-auto">
             {SETTINGS_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveSettingsTab(tab.id)}
-                className={`flex items-center gap-1 px-4 py-2 text-sm transition-colors flex-1
+                className={`flex items-center gap-1 px-3 py-2 text-sm transition-colors whitespace-nowrap
                   ${
                     activeSettingsTab === tab.id
                       ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
@@ -1285,6 +1340,232 @@ function EditDashboardDemo() {
                     <span className="text-sm text-gray-600">
                       {widgetSettings[activeSettingsWidget]?.showFullContent ? "Enabled" : "Disabled"}
                     </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Category Tab - New tab for category styling */}
+            {activeSettingsTab === "category" && (
+              <div className="space-y-4">
+                {/* Category Background Color */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Palette size={14} /> Category Background
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {getPresetColors().map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => updateWidgetSetting(activeSettingsWidget, "categoryBackgroundColor", color)}
+                        className="w-6 h-6 rounded-full border border-gray-300"
+                        style={{
+                          backgroundColor: color,
+                          outline:
+                            widgetSettings[activeSettingsWidget]?.categoryBackgroundColor === color
+                              ? "2px solid #3b82f6"
+                              : "none",
+                        }}
+                        title={color}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={
+                        widgetSettings[activeSettingsWidget]?.categoryBackgroundColor ||
+                        DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
+                      }
+                      onChange={(e) =>
+                        updateWidgetSetting(activeSettingsWidget, "categoryBackgroundColor", e.target.value)
+                      }
+                      className="w-6 h-6 p-0 rounded-full ml-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Category Height */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Box size={14} /> Category Height
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="30"
+                      max="80"
+                      value={
+                        widgetSettings[activeSettingsWidget]?.categoryHeight || DEFAULT_WIDGET_SETTINGS.categoryHeight
+                      }
+                      onChange={(e) =>
+                        updateWidgetSetting(activeSettingsWidget, "categoryHeight", Number.parseInt(e.target.value))
+                      }
+                      className="flex-1"
+                    />
+                    <span className="text-sm w-12 text-right">
+                      {widgetSettings[activeSettingsWidget]?.categoryHeight || DEFAULT_WIDGET_SETTINGS.categoryHeight}px
+                    </span>
+                  </div>
+                </div>
+
+                {/* Category Font Color */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Category Font Color
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {getPresetColors().map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => updateWidgetSetting(activeSettingsWidget, "categoryFontColor", color)}
+                        className="w-6 h-6 rounded-full border border-gray-300"
+                        style={{
+                          backgroundColor: color,
+                          outline:
+                            widgetSettings[activeSettingsWidget]?.categoryFontColor === color
+                              ? "2px solid #3b82f6"
+                              : "none",
+                        }}
+                        title={color}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={
+                        widgetSettings[activeSettingsWidget]?.categoryFontColor ||
+                        DEFAULT_WIDGET_SETTINGS.categoryFontColor
+                      }
+                      onChange={(e) => updateWidgetSetting(activeSettingsWidget, "categoryFontColor", e.target.value)}
+                      className="w-6 h-6 p-0 rounded-full ml-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Category Font Family */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Category Font
+                  </label>
+                  <select
+                    value={widgetSettings[activeSettingsWidget]?.categoryFont || DEFAULT_WIDGET_SETTINGS.categoryFont}
+                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, "categoryFont", e.target.value)}
+                    className="w-full text-sm border rounded-md p-2"
+                  >
+                    <option value="Inter">Inter</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Helvetica">Helvetica</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="system-ui">System UI</option>
+                  </select>
+                </div>
+
+                {/* Category Font Size */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Category Font Size
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="12"
+                      max="28"
+                      value={
+                        widgetSettings[activeSettingsWidget]?.categoryFontSize ||
+                        DEFAULT_WIDGET_SETTINGS.categoryFontSize
+                      }
+                      onChange={(e) =>
+                        updateWidgetSetting(activeSettingsWidget, "categoryFontSize", Number.parseInt(e.target.value))
+                      }
+                      className="flex-1"
+                    />
+                    <span className="text-sm w-12 text-right">
+                      {widgetSettings[activeSettingsWidget]?.categoryFontSize ||
+                        DEFAULT_WIDGET_SETTINGS.categoryFontSize}
+                      px
+                    </span>
+                  </div>
+                </div>
+
+                {/* Category Font Weight */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Category Font Weight
+                  </label>
+                  <select
+                    value={
+                      widgetSettings[activeSettingsWidget]?.categoryFontWeight ||
+                      DEFAULT_WIDGET_SETTINGS.categoryFontWeight
+                    }
+                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, "categoryFontWeight", e.target.value)}
+                    className="w-full text-sm border rounded-md p-2"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="medium">Medium</option>
+                    <option value="semibold">Semibold</option>
+                    <option value="bold">Bold</option>
+                  </select>
+                </div>
+
+                {/* Category Border */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Box size={14} /> Category Border
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-1">
+                      {getPresetColors().map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => updateWidgetSetting(activeSettingsWidget, "categoryBorderColor", color)}
+                          className="w-6 h-6 rounded-full border border-gray-300"
+                          style={{
+                            backgroundColor: color,
+                            outline:
+                              widgetSettings[activeSettingsWidget]?.categoryBorderColor === color
+                                ? "2px solid #3b82f6"
+                                : "none",
+                          }}
+                          title={color}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        value={
+                          widgetSettings[activeSettingsWidget]?.categoryBorderColor ||
+                          DEFAULT_WIDGET_SETTINGS.categoryBorderColor
+                        }
+                        onChange={(e) =>
+                          updateWidgetSetting(activeSettingsWidget, "categoryBorderColor", e.target.value)
+                        }
+                        className="w-6 h-6 p-0 rounded-full ml-1"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-20">Width:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        value={
+                          widgetSettings[activeSettingsWidget]?.categoryBorderWidth ||
+                          DEFAULT_WIDGET_SETTINGS.categoryBorderWidth
+                        }
+                        onChange={(e) =>
+                          updateWidgetSetting(
+                            activeSettingsWidget,
+                            "categoryBorderWidth",
+                            Number.parseInt(e.target.value),
+                          )
+                        }
+                        className="flex-1"
+                      />
+                      <span className="text-sm w-12 text-right">
+                        {widgetSettings[activeSettingsWidget]?.categoryBorderWidth ||
+                          DEFAULT_WIDGET_SETTINGS.categoryBorderWidth}
+                        px
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

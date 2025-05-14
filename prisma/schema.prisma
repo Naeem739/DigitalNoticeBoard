@@ -52,3 +52,12 @@ model Dashboard {
   containers   Json
   createdAt   DateTime? @default(now())
 }
+
+
+
+model Template {
+  id           String @id @default(uuid())
+  aspectRatio  String
+  containers   Json
+  createdAt   DateTime? @default(now())
+}
