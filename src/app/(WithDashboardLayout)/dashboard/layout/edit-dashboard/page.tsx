@@ -236,6 +236,40 @@ function EditDashboardDemo() {
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
 
+  // Add useEffect to load saved state on component mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('dashboardState')
+    if (savedState) {
+      try {
+        const { widgets: savedWidgets, layout: savedLayout, selectedRatio: savedRatio, widgetSettings: savedSettings } = JSON.parse(savedState)
+        setWidgets(savedWidgets)
+        setLayout(savedLayout)
+        setSelectedRatio(savedRatio)
+        setWidgetSettings(savedSettings)
+      } catch (error) {
+        console.error('Error loading saved dashboard state:', error)
+      }
+    }
+  }, [])
+
+  // Add useEffect to save state whenever it changes
+  useEffect(() => {
+    if (widgets.length > 0 || layout.length > 0) {
+      const stateToSave = {
+        widgets,
+        layout,
+        selectedRatio,
+        widgetSettings
+      }
+      localStorage.setItem('dashboardState', JSON.stringify(stateToSave))
+    }
+  }, [widgets, layout, selectedRatio, widgetSettings])
+
+  // Add function to clear saved state
+  const clearSavedState = () => {
+    localStorage.removeItem('dashboardState')
+  }
+
   useEffect(() => {
     const getData = async () => {
       const categoriesWithNotices = (await getCategoriesWithNotices()) as TResult
@@ -377,10 +411,30 @@ function EditDashboardDemo() {
   const handleRatioSelect = (ratio: AspectRatio) => {
     setSelectedRatio(ratio)
     setIsRatioDropdownOpen(false)
-    setWidgets([])
-    setLayout([])
-    setWidgetSettings({})
-    toast(`Display ratio set to ${ratio}`)
+    
+    // Instead of clearing everything, adjust the layout to fit the new ratio
+    if (layout.length > 0) {
+      const newLayout = layout.map(item => {
+        // Keep the same relative position but ensure it fits within the new dimensions
+        const newX = Math.min(item.x, 11) // Ensure x doesn't exceed 11 (12 columns - 1)
+        const newY = Math.min(item.y, 11) // Ensure y doesn't exceed 11
+        const newW = Math.min(item.w, 12 - newX) // Ensure width fits within remaining space
+        const newH = Math.min(item.h, 12 - newY) // Ensure height fits within remaining space
+        
+        return {
+          ...item,
+          x: newX,
+          y: newY,
+          w: newW,
+          h: newH
+        }
+      })
+      
+      setLayout(newLayout)
+      toast(`Display ratio adjusted to ${ratio} while preserving widgets`)
+    } else {
+      toast(`Display ratio set to ${ratio}`)
+    }
   }
 
   const handleDragStart2 = (e: React.DragEvent, category: TCategoriesWithNotices) => {
@@ -451,6 +505,7 @@ function EditDashboardDemo() {
     try {
       const result = await createDashboard(dashboard)
       if (result.success) {
+        clearSavedState() // Clear saved state after successful save
         toast.success("Dashboard Created Successfully!")
       } else {
         toast.error("Something went wrong!")
@@ -701,18 +756,61 @@ function EditDashboardDemo() {
   }
 
   // Add this function inside the EditDashboardDemo component
+  const applyTemplate = (template: DashboardTemplate) => {
+    // Create a map of existing widget notices based on position
+    const existingNotices = new Map(
+      widgets.map((widget, index) => [index, {
+        notices: widget.notices,
+        topNotices: widget.topNotices,
+        category: widget.category,
+        categoryId: widget.categoryId,
+        content: widget.content
+      }])
+    )
+
+    // Apply template while preserving notices
+    const newWidgets = template.widgets.map((templateWidget, index) => {
+      const existingData = existingNotices.get(index)
+      return {
+        ...templateWidget,
+        notices: existingData?.notices || [],
+        topNotices: existingData?.topNotices || [],
+        category: existingData?.category || templateWidget.title,
+        categoryId: existingData?.categoryId || '',
+        content: existingData?.content || templateWidget.title
+      }
+    })
+
+    // Update widget settings to include notice count from existing widgets
+    const newWidgetSettings = { ...template.widgetSettings }
+    widgets.forEach((widget, index) => {
+      if (newWidgetSettings[template.widgets[index]?.id]) {
+        newWidgetSettings[template.widgets[index].id] = {
+          ...newWidgetSettings[template.widgets[index].id],
+          noticeCount: widgetSettings[widget.id]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount
+        }
+      }
+    })
+
+    setWidgets(newWidgets)
+    setLayout(template.layout)
+    setWidgetSettings(newWidgetSettings)
+    toast.success(`Applied "${template.name}" Template while preserving notices!`)
+  }
+
   const createDashboardFromTemplate = async (template: DashboardTemplate) => {
     if (!selectedRatio) {
       toast.error("Please select a display ratio first")
       return
     }
 
-    // Apply the template first
-    applyTemplate(template)
+    // Apply template without preserving notices
+    setWidgets(template.widgets)
+    setLayout(template.layout)
+    setWidgetSettings(template.widgetSettings)
 
     // Wait a moment for the state to update
     setTimeout(async () => {
-      // Then save the dashboard
       try {
         const positions = calculatePercentagePositions()
         const dashboard = {
@@ -732,13 +830,6 @@ function EditDashboardDemo() {
         toast.error(`${error}`)
       }
     }, 500)
-  }
-
-  const applyTemplate = (template: DashboardTemplate) => {
-    setWidgets(template.widgets)
-    setLayout(template.layout)
-    setWidgetSettings(template.widgetSettings)
-    toast.success(`Applied "${template.name}" Template!`)
   }
 
   return (
