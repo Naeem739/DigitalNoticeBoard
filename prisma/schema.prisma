@@ -56,8 +56,12 @@ model Dashboard {
 
 
 model Template {
-  id           String @id @default(uuid())
-  aspectRatio  String
-  containers   Json
-  createdAt   DateTime? @default(now())
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  widgets        Json
+  layout         Json
+  widgetSettings Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
