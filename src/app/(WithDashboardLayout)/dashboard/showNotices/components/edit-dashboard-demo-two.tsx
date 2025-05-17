@@ -1,6 +1,6 @@
 "use client"
 
-import { TDashboard2, TNotice } from "@/types/types"
+import { TDashboard2, TNotice, Category } from "@/types/types"
 import { useState, useEffect } from "react"
 import { Pencil, Trash2, X, Check, ChevronDown, Filter, AlertCircle, Search, Save, XCircle } from "lucide-react"
 import { toast, Toaster } from "react-hot-toast"
@@ -30,6 +30,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   
   // Loading states for operations
   const [isLoading, setIsLoading] = useState<{id: string, operation: string} | null>(null);
+
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -62,8 +64,28 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     fetchNotices();
   }, []);
 
-  // Get all unique categories from notices
-  const categories = ["all", ...new Set(notices.map(notice => notice.categoryRelation?.name || 'Uncategorized'))];
+  // Fetch categories from API on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/category/get-all');
+        const result = await response.json();
+        if (result.success) {
+          setCategories(result.data);
+        } else {
+          toast.error('Failed to fetch categories');
+        }
+      } catch (error) {
+        toast.error('Failed to fetch categories');
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Replace this:
+  // const categories = ["all", ...new Set(notices.map(notice => notice.categoryRelation?.name || 'Uncategorized'))];
+  // With this:
+  const categoryOptions = ["all", ...categories.map(cat => cat.name)];
   
   // Filter notices based on selected category and search term
   const filteredNotices = notices
@@ -253,7 +275,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             
             {showDropdown && (
               <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-60 overflow-auto">
-                {categories.map((category) => (
+                {categoryOptions.map((category) => (
                   <div 
                     key={category}
                     className={`px-4 py-2 hover:bg-indigo-50 cursor-pointer transition-colors duration-150 ${selectedCategory === category ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-gray-700'}`}

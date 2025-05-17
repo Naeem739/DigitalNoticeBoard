@@ -19,8 +19,9 @@ import {
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import "./edit-dashboard.css"
-import type { AspectRatio, TNotice, Widget } from "@/types/types"
+import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } from "@/types/template-types"
 import { getCategoriesWithNotices } from "@/app/actions/category.action"
+import {  saveTemplate, getTemplates } from "@/app/actions/template.action"
 import { createDashboard } from "@/app/actions/dashboard.action"
 import { toast } from "sonner"
 
@@ -33,30 +34,6 @@ type TCategoriesWithNotices = {
 type TResult = {
   success: boolean
   result: TCategoriesWithNotices[]
-}
-
-type WidgetSettings = {
-  backgroundColor: string
-  backgroundOpacity: number
-  cardOpacity: number
-  borderColor: string
-  borderWidth: number
-  fontColor: string
-  noticeCount: number
-  fontFamily: string
-  fontSize: number
-  fontWeight: string
-  autoScroll: boolean
-  showFullContent: boolean
-  // New category styling options
-  categoryFont: string
-  categoryFontSize: number
-  categoryFontWeight: string
-  categoryFontColor: string
-  categoryBackgroundColor: string
-  categoryHeight: number
-  categoryBorderColor: string
-  categoryBorderWidth: number
 }
 
 const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
@@ -110,14 +87,6 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[]
 ]
 
 // Define the template type
-type DashboardTemplate = {
-  id: string
-  name: string
-  description: string
-  widgets: Widget[]
-  layout: Layout[]
-  widgetSettings: Record<string, WidgetSettings>
-}
 
 // Define the dashboard templates
 const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
@@ -256,6 +225,51 @@ function EditDashboardDemo() {
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>("style")
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false)
 
+  // First, add a new state for custom templates and template modal
+  // Add these after the existing state declarations (around line 370)
+
+  const [customTemplates, setCustomTemplates] = useState<DashboardTemplate[]>([])
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [newTemplateName, setNewTemplateName] = useState("")
+  const [newTemplateDescription, setNewTemplateDescription] = useState("")
+  const [canCreateTemplate, setCanCreateTemplate] = useState(false)
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false)
+
+  // Add useEffect to load saved state on component mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('dashboardState')
+    if (savedState) {
+      try {
+        const { widgets: savedWidgets, layout: savedLayout, selectedRatio: savedRatio, widgetSettings: savedSettings } = JSON.parse(savedState)
+        setWidgets(savedWidgets)
+        setLayout(savedLayout)
+        setSelectedRatio(savedRatio)
+        setWidgetSettings(savedSettings)
+      } catch (error) {
+        console.error('Error loading saved dashboard state:', error)
+      }
+    }
+  }, [])
+
+  // Add useEffect to save state whenever it changes
+  useEffect(() => {
+    if (widgets.length > 0 || layout.length > 0) {
+      const stateToSave = {
+        widgets,
+        layout,
+        selectedRatio,
+        widgetSettings
+      }
+      localStorage.setItem('dashboardState', JSON.stringify(stateToSave))
+    }
+  }, [widgets, layout, selectedRatio, widgetSettings])
+
+  // Add function to clear saved state
+  const clearSavedState = () => {
+    localStorage.removeItem('dashboardState')
+  }
+
   useEffect(() => {
     const getData = async () => {
       const categoriesWithNotices = (await getCategoriesWithNotices()) as TResult
@@ -311,6 +325,35 @@ function EditDashboardDemo() {
       }
     }
   }, [activeSettingsWidget])
+
+  // Add this useEffect to check if template creation should be enabled
+  // Add after the other useEffect hooks
+
+  useEffect(() => {
+    // Enable template creation if there's at least one widget
+    setCanCreateTemplate(widgets.length > 0)
+  }, [widgets, layout])
+
+  // Add this after the existing useEffect hooks
+  useEffect(() => {
+    const loadTemplates = async () => {
+      setIsLoadingTemplates(true)
+      try {
+        const result = await getTemplates()
+        if (result.success) {
+          setCustomTemplates(result?.templates)
+        } else {
+          toast.error("Failed to load templates")
+        }
+      } catch (error) {
+        console.error("Error loading templates:", error)
+      } finally {
+        setIsLoadingTemplates(false)
+      }
+    }
+
+    loadTemplates()
+  }, [])
 
   const handleDragStart = (e: React.MouseEvent) => {
     setIsDragging(true)
@@ -368,10 +411,30 @@ function EditDashboardDemo() {
   const handleRatioSelect = (ratio: AspectRatio) => {
     setSelectedRatio(ratio)
     setIsRatioDropdownOpen(false)
-    setWidgets([])
-    setLayout([])
-    setWidgetSettings({})
-    toast(`Display ratio set to ${ratio}`)
+    
+    // Instead of clearing everything, adjust the layout to fit the new ratio
+    if (layout.length > 0) {
+      const newLayout = layout.map(item => {
+        // Keep the same relative position but ensure it fits within the new dimensions
+        const newX = Math.min(item.x, 11) // Ensure x doesn't exceed 11 (12 columns - 1)
+        const newY = Math.min(item.y, 11) // Ensure y doesn't exceed 11
+        const newW = Math.min(item.w, 12 - newX) // Ensure width fits within remaining space
+        const newH = Math.min(item.h, 12 - newY) // Ensure height fits within remaining space
+        
+        return {
+          ...item,
+          x: newX,
+          y: newY,
+          w: newW,
+          h: newH
+        }
+      })
+      
+      setLayout(newLayout)
+      toast(`Display ratio adjusted to ${ratio} while preserving widgets`)
+    } else {
+      toast(`Display ratio set to ${ratio}`)
+    }
   }
 
   const handleDragStart2 = (e: React.DragEvent, category: TCategoriesWithNotices) => {
@@ -442,6 +505,7 @@ function EditDashboardDemo() {
     try {
       const result = await createDashboard(dashboard)
       if (result.success) {
+        clearSavedState() // Clear saved state after successful save
         toast.success("Dashboard Created Successfully!")
       } else {
         toast.error("Something went wrong!")
@@ -580,9 +644,60 @@ function EditDashboardDemo() {
     "#d946ef",
   ]
 
-  const handleSaveTemplate = (widget: Widget) => {
-    // Implement save template logic here
-    console.log("Save template for widget:", widget)
+  // Replace the handleSaveTemplate function with this implementation
+  // Around line 650
+
+  const handleSaveTemplate = () => {
+    setIsTemplateModalOpen(true)
+  }
+
+  // Add this new function to save the custom template
+  // Add after handleSaveTemplate
+
+  const saveCustomTemplate = async () => {
+    if (!newTemplateName.trim()) {
+      toast.error("Please enter a template name")
+      return
+    }
+
+    const newTemplateId = `custom-template-${Date.now()}`
+
+    // Create a deep copy of the current widgets and settings
+    const templateWidgets = JSON.parse(JSON.stringify(widgets))
+    const templateLayout = JSON.parse(JSON.stringify(layout))
+    const templateSettings = JSON.parse(JSON.stringify(widgetSettings))
+
+    const newTemplate: DashboardTemplate = {
+      id: newTemplateId,
+      name: newTemplateName,
+      description: newTemplateDescription || "Custom template",
+      widgets: templateWidgets,
+      layout: templateLayout,
+      widgetSettings: templateSettings,
+    }
+
+    // Add loading state
+    setIsSavingTemplate(true)
+
+    try {
+      // Save to database
+      const result = await saveTemplate(newTemplate)
+
+      if (result.success) {
+        // Update local state
+        setCustomTemplates([...customTemplates, newTemplate])
+        setIsTemplateModalOpen(false)
+        setNewTemplateName("")
+        setNewTemplateDescription("")
+        toast.success(`Template "${newTemplateName}" saved successfully!`)
+      } else {
+        toast.error("Failed to save template to database")
+      }
+    } catch (error) {
+      toast.error(`Error saving template: ${error}`)
+    } finally {
+      setIsSavingTemplate(false)
+    }
   }
 
   useEffect(() => {
@@ -641,18 +756,61 @@ function EditDashboardDemo() {
   }
 
   // Add this function inside the EditDashboardDemo component
+  const applyTemplate = (template: DashboardTemplate) => {
+    // Create a map of existing widget notices based on position
+    const existingNotices = new Map(
+      widgets.map((widget, index) => [index, {
+        notices: widget.notices,
+        topNotices: widget.topNotices,
+        category: widget.category,
+        categoryId: widget.categoryId,
+        content: widget.content
+      }])
+    )
+
+    // Apply template while preserving notices
+    const newWidgets = template.widgets.map((templateWidget, index) => {
+      const existingData = existingNotices.get(index)
+      return {
+        ...templateWidget,
+        notices: existingData?.notices || [],
+        topNotices: existingData?.topNotices || [],
+        category: existingData?.category || templateWidget.title,
+        categoryId: existingData?.categoryId || '',
+        content: existingData?.content || templateWidget.title
+      }
+    })
+
+    // Update widget settings to include notice count from existing widgets
+    const newWidgetSettings = { ...template.widgetSettings }
+    widgets.forEach((widget, index) => {
+      if (newWidgetSettings[template.widgets[index]?.id]) {
+        newWidgetSettings[template.widgets[index].id] = {
+          ...newWidgetSettings[template.widgets[index].id],
+          noticeCount: widgetSettings[widget.id]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount
+        }
+      }
+    })
+
+    setWidgets(newWidgets)
+    setLayout(template.layout)
+    setWidgetSettings(newWidgetSettings)
+    toast.success(`Applied "${template.name}" Template while preserving notices!`)
+  }
+
   const createDashboardFromTemplate = async (template: DashboardTemplate) => {
     if (!selectedRatio) {
       toast.error("Please select a display ratio first")
       return
     }
 
-    // Apply the template first
-    applyTemplate(template)
+    // Apply template without preserving notices
+    setWidgets(template.widgets)
+    setLayout(template.layout)
+    setWidgetSettings(template.widgetSettings)
 
     // Wait a moment for the state to update
     setTimeout(async () => {
-      // Then save the dashboard
       try {
         const positions = calculatePercentagePositions()
         const dashboard = {
@@ -672,13 +830,6 @@ function EditDashboardDemo() {
         toast.error(`${error}`)
       }
     }, 500)
-  }
-
-  const applyTemplate = (template: DashboardTemplate) => {
-    setWidgets(template.widgets)
-    setLayout(template.layout)
-    setWidgetSettings(template.widgetSettings)
-    toast.success(`Applied "${template.name}" Template!`)
   }
 
   return (
@@ -730,10 +881,12 @@ function EditDashboardDemo() {
           </button>
           {isTemplateDropdownOpen && (
             <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10 w-64">
+              {/* Built-in Templates */}
+              <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50">Built-in Templates</div>
               {DASHBOARD_TEMPLATES.map((template) => (
                 <div
                   key={template.id}
-                  className="block w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-gray-100 last:border-0"
+                  className="block w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-gray-100"
                 >
                   <div className="font-medium">{template.name}</div>
                   <div className="text-xs text-gray-500 mt-1">{template.description}</div>
@@ -754,9 +907,54 @@ function EditDashboardDemo() {
                   </div>
                 </div>
               ))}
+
+              {/* Custom Templates */}
+              <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50">Custom Templates</div>
+              {isLoadingTemplates ? (
+                <div className="p-4 text-center text-sm text-gray-500">Loading templates...</div>
+              ) : customTemplates.length > 0 ? (
+                customTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="block w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-gray-100 last:border-0"
+                  >
+                    <div className="font-medium">{template.name}</div>
+                    <div className="text-xs text-gray-500 mt-1">{template.description}</div>
+                    <div className="text-xs text-purple-600 mt-1">{template.widgets.length} widgets</div>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => applyTemplate(template)}
+                        className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200"
+                      >
+                        Apply Template
+                      </button>
+                      <button
+                        onClick={() => createDashboardFromTemplate(template)}
+                        className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                      >
+                        Create Dashboard
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-sm text-gray-500">No custom templates yet</div>
+              )}
             </div>
           )}
         </div>
+
+        <button
+          onClick={handleSaveTemplate}
+          disabled={!canCreateTemplate}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ${
+            canCreateTemplate
+              ? "bg-purple-600 text-white hover:bg-purple-700"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
+          Create Template
+        </button>
 
         <button
           onClick={handleSave}
@@ -1572,6 +1770,9 @@ function EditDashboardDemo() {
             )}
           </div>
 
+          {/* Update the button in the settings panel to use the new function */}
+          {/* Find the button at the end of the settings panel (around line 1300) */}
+          {/* Replace:
           <button
             onClick={() => {
               const widget = widgets.find((w) => w.id === activeSettingsWidget)
@@ -1582,9 +1783,81 @@ function EditDashboardDemo() {
             className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
           >
             Save as Template
-          </button>
+          </button> */}
+
+          {/* With: */}
+          <div className="p-3 border-t">
+            <button
+              onClick={handleSaveTemplate}
+              className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
+            >
+              Save as Template
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Add the template modal at the end of the component, just before the final closing div */}
+      {/* Add this before the final </div> (around line 1310) */}
+
+      {/* Template Creation Modal */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-full">
+            <h3 className="text-lg font-semibold mb-4">Save as Template</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="template-name" className="block text-sm font-medium text-gray-700 mb-1">
+                  Template Name *
+                </label>
+                <input
+                  id="template-name"
+                  type="text"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  placeholder="My Custom Template"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="template-description" className="block text-sm font-medium text-gray-700 mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  id="template-description"
+                  value={newTemplateDescription}
+                  onChange={(e) => setNewTemplateDescription(e.target.value)}
+                  placeholder="Describe your template..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveCustomTemplate}
+                disabled={isSavingTemplate}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed"
+              >
+                {isSavingTemplate ? "Saving..." : "Save Template"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update the template dropdown to include custom templates */}
+      {/* Find the template dropdown section (around line 520) and modify it: */}
     </div>
   )
 }
