@@ -31,6 +31,10 @@ export type TNotice = {
   category: string;
   categoryId: string;
   createdAt?: Date;
+  categoryRelation?: {
+    id: string;
+    name: string;
+  };
 };
 
 export type TDashboard = {

@@ -13,8 +13,8 @@ interface WidgetContainerProps {
 export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   // Deep clone data to make it mutable
   const [localData, setLocalData] = useState<TDashboard2>(JSON.parse(JSON.stringify(data)));
-  const [notices, setNotices] = useState<TNotice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [notices, setNotices] = useState<TNotice[]>(data.notices || []);
+  const [loading, setLoading] = useState(false);
   
   // States for category filter
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -30,6 +30,10 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   
   // Loading states for operations
   const [isLoading, setIsLoading] = useState<{id: string, operation: string} | null>(null);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const noticesPerPage = 5;
 
   // Fetch all notices on component mount
   useEffect(() => {
@@ -59,19 +63,30 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   }, []);
 
   // Get all unique categories from notices
-  const categories = ["all", ...new Set(notices.map(notice => notice.category))];
+  const categories = ["all", ...new Set(notices.map(notice => notice.categoryRelation?.name || 'Uncategorized'))];
   
   // Filter notices based on selected category and search term
   const filteredNotices = notices
     .filter(notice => notice.title && notice.title.trim() !== '')
-    .filter(notice => selectedCategory === "all" || notice.category === selectedCategory)
+    .filter(notice => selectedCategory === "all" || notice.categoryRelation?.name === selectedCategory)
     .filter(notice => 
       !searchTerm || 
       notice.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notice.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (notice.categoryRelation?.name && notice.categoryRelation.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (notice.content && notice.content.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   
+  // Calculate pagination
+  const indexOfLastNotice = currentPage * noticesPerPage;
+  const indexOfFirstNotice = indexOfLastNotice - noticesPerPage;
+  const currentNotices = filteredNotices.slice(indexOfFirstNotice, indexOfLastNotice);
+  const totalPages = Math.ceil(filteredNotices.length / noticesPerPage);
+
+  // Handle page change
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
   // Handle opening the edit modal
   const handleEdit = (notice: TNotice) => {
     if (!notice || !notice.id) return;
@@ -306,68 +321,112 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl shadow-md border border-gray-200">
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white">
-              <thead>
-                <tr className="bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
-                  <th className="py-3 px-6 text-left font-medium tracking-wider">Category</th>
-                  <th className="py-3 px-6 text-left font-medium tracking-wider">Notice</th>
-                  <th className="py-3 px-6 text-center font-medium tracking-wider w-32">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredNotices.map((notice, index) => (
-                  <tr 
-                    key={notice.id || index} 
-                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-indigo-50 transition-colors duration-150`}
-                  >
-                    <td className="py-4 px-6 whitespace-nowrap">
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                        {notice.category}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex flex-col">
-                        <span className="text-gray-700 font-medium">{notice.title}</span>
-                        {notice.content && (
-                          <span className="text-gray-500 text-sm mt-1 truncate max-w-md">
-                            {notice.content.substring(0, 100)}
-                            {notice.content.length > 100 ? '...' : ''}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex justify-center space-x-2">
-                        <button 
-                          onClick={() => handleEdit(notice)}
-                          disabled={isLoading !== null}
-                          className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full transition-colors duration-150 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          title="Edit Notice"
-                        >
-                          <Pencil className="h-5 w-5" />
-                        </button>
-                        <button 
-                          onClick={() => confirmDelete(notice.id, notice.title)}
-                          disabled={isLoading !== null}
-                          className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-full transition-colors duration-150 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          title="Delete Notice"
-                        >
-                          {isLoading?.id === notice.id && isLoading?.operation === 'delete' ? (
-                            <span className="h-5 w-5 block rounded-full border-2 border-t-transparent border-red-600 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-5 w-5" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
+        <>
+          <div className="overflow-hidden rounded-xl shadow-md border border-gray-200">
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
+                    <th className="py-3 px-6 text-left font-medium tracking-wider">Category</th>
+                    <th className="py-3 px-6 text-left font-medium tracking-wider">Notice</th>
+                    <th className="py-3 px-6 text-center font-medium tracking-wider w-32">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {currentNotices.map((notice, index) => (
+                    <tr 
+                      key={notice.id || index} 
+                      className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-indigo-50 transition-colors duration-150`}
+                    >
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                          {notice.categoryRelation?.name || 'Uncategorized'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex flex-col">
+                          <span className="text-gray-700 font-medium">{notice.title}</span>
+                          {notice.content && (
+                            <span className="text-gray-500 text-sm mt-1 truncate max-w-md">
+                              {notice.content.substring(0, 100)}
+                              {notice.content.length > 100 ? '...' : ''}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        <div className="flex justify-center space-x-2">
+                          <button 
+                            onClick={() => handleEdit(notice)}
+                            disabled={isLoading !== null}
+                            className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full transition-colors duration-150 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            title="Edit Notice"
+                          >
+                            <Pencil className="h-5 w-5" />
+                          </button>
+                          <button 
+                            onClick={() => confirmDelete(notice.id, notice.title)}
+                            disabled={isLoading !== null}
+                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-full transition-colors duration-150 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            title="Delete Notice"
+                          >
+                            {isLoading?.id === notice.id && isLoading?.operation === 'delete' ? (
+                              <span className="h-5 w-5 block rounded-full border-2 border-t-transparent border-red-600 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-5 w-5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center space-x-2 mt-6">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+              >
+                Previous
+              </button>
+              
+              {[...Array(totalPages)].map((_, index) => (
+                <button
+                  key={index + 1}
+                  onClick={() => handlePageChange(index + 1)}
+                  className={`px-3 py-1 rounded-lg ${
+                    currentPage === index + 1
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  } transition-colors duration-150`}
+                >
+                  {index + 1}
+                </button>
+              ))}
+              
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+              >
+                Next
+              </button>
+            </div>
+          )}
+
+          {/* Page Info */}
+          {filteredNotices.length > 0 && (
+            <div className="text-center text-gray-600 mt-4">
+              Showing {indexOfFirstNotice + 1} to {Math.min(indexOfLastNotice, filteredNotices.length)} of {filteredNotices.length} notices
+            </div>
+          )}
+        </>
       )}
 
       {/* Edit Notice Modal */}
@@ -394,7 +453,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                     Category
                   </label>
                   <div className="bg-gray-100 px-4 py-2 rounded-lg text-gray-800">
-                    {editingNotice.category}
+                    {editingNotice.categoryRelation?.name || 'Uncategorized'}
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
                     Category cannot be changed from this interface
