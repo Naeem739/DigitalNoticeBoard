@@ -1,6 +1,6 @@
 "use client"
-import React, { useState } from 'react';
-
+import React, { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, 
@@ -14,7 +14,10 @@ import {
   X,
   Zap,
   Lock,
-  Clock
+  Clock,
+  User,
+  LogOut,
+  Settings
 } from 'lucide-react';
 
 import { useInView } from 'framer-motion';
@@ -38,9 +41,11 @@ const staggerChildren = {
 };
 
 export default function Home() {
+  const { data: session, status } = useSession();
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('monthly');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   
   const pricingPlans = [
     {
@@ -113,6 +118,34 @@ export default function Home() {
     }
   ];
 
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/' });
+    setUserMenuOpen(false);
+  };
+
+  const handleGetStarted = () => {
+    if (session) {
+      window.open('/dashboard', '_blank');
+    } else {
+      window.location.href = '/signup';
+    }
+  };
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (userMenuOpen && !target.closest('.user-menu')) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
+
   return (
     <div className="min-h-screen bg-[#121212] text-white overflow-x-hidden">
       <nav className="sticky top-0 z-50 bg-[#1e1e1e] px-6 py-4">
@@ -123,21 +156,62 @@ export default function Home() {
           </div>
           
           <div className="hidden md:flex space-x-6 items-center">
-            <a href="/dashboard" target='_blank' className="text-gray-300 hover:text-yellow-500 transition">Dashboard</a>
-            <a href="/notice" target='_blank' className="text-gray-300 hover:text-yellow-500 transition">Notice</a>
+            {session && (
+              <>
+                <a href="/dashboard" target='_blank' className="text-gray-300 hover:text-yellow-500 transition">Dashboard</a>
+                <a href="/notice" target='_blank' className="text-gray-300 hover:text-yellow-500 transition">Notice</a>
+              </>
+            )}
             <a href="#pricing" className="text-gray-300 hover:text-yellow-500 transition">Pricing</a>
             <a href="#features" className="text-gray-300 hover:text-yellow-500 transition">Features</a>
             <a href="#faq" className="text-gray-300 hover:text-yellow-500 transition">FAQ</a>
             
             <div className="flex space-x-4">
-
-            <a href="/login" className="text-gray-300 hover:text-yellow-500 transition"><button className="bg-transparent border border-yellow-500 text-yellow-500 px-4 py-2 rounded-md hover:bg-yellow-500 hover:text-black transition">
-                Login
-              </button></a>
-              
-              <button className="bg-yellow-500 text-black px-4 py-2 rounded-md hover:bg-yellow-600 transition">
-                Get Started
-              </button>
+              {session ? (
+                // Logged in state
+                <div className="relative user-menu">
+                  <button 
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center space-x-2 bg-[#2a2a2a] px-4 py-2 rounded-md hover:bg-[#3a3a3a] transition"
+                  >
+                    <User className="w-5 h-5 text-yellow-500" />
+                    <span className="text-gray-300">
+                      {session.user?.name || session.user?.email?.split('@')[0] || 'User'}
+                    </span>
+                  </button>
+                  
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-[#2a2a2a] rounded-md shadow-lg py-1 z-50">
+                      <div className="px-4 py-2 border-b border-gray-700">
+                        <p className="text-sm text-gray-300">{session.user?.email}</p>
+                      </div>
+                     
+                      
+                      <button 
+                        onClick={handleLogout}
+                        className="flex items-center w-full px-4 py-2 text-sm text-red-400 hover:bg-[#3a3a3a] transition"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Logged out state
+                <>
+                  <a href="/login" className="text-gray-300 hover:text-yellow-500 transition">
+                    <button className="bg-transparent border border-yellow-500 text-yellow-500 px-4 py-2 rounded-md hover:bg-yellow-500 hover:text-black transition">
+                      Login
+                    </button>
+                  </a>
+                  <a href="/signup">
+                    <button className="bg-yellow-500 text-black px-4 py-2 rounded-md hover:bg-yellow-600 transition">
+                      Get Started
+                    </button>
+                  </a>
+                </>
+              )}
             </div>
           </div>
           
@@ -154,19 +228,48 @@ export default function Home() {
         {mobileMenuOpen && (
           <div className="md:hidden absolute left-0 right-0 bg-[#1e1e1e] py-4">
             <div className="container mx-auto px-6 space-y-4">
-            <a href="/dashboard" target='_blank' className="text-gray-300 hover:text-yellow-500 transition">Dashboard</a>
-            <a href="/notice" target='_blank' className="text-gray-300 hover:text-yellow-500 transition">Notice</a>
-            <a href="#pricing" className="text-gray-300 hover:text-yellow-500 transition">Pricing</a>
-            <a href="#features" className="text-gray-300 hover:text-yellow-500 transition">Features</a>
-            <a href="#faq" className="text-gray-300 hover:text-yellow-500 transition">FAQ</a>
+              {session && (
+                <>
+                  <a href="/dashboard" target='_blank' className="text-gray-300 hover:text-yellow-500 transition">Dashboard</a>
+                  <a href="/notice" target='_blank' className="text-gray-300 hover:text-yellow-500 transition">Notice</a>
+                </>
+              )}
+              <a href="#pricing" className="text-gray-300 hover:text-yellow-500 transition">Pricing</a>
+              <a href="#features" className="text-gray-300 hover:text-yellow-500 transition">Features</a>
+              <a href="#faq" className="text-gray-300 hover:text-yellow-500 transition">FAQ</a>
               
               <div className="flex flex-col space-y-4">
-                <button className="bg-transparent border border-yellow-500 text-yellow-500 px-4 py-2 rounded-md hover:bg-yellow-500 hover:text-black transition">
-                  Login
-                </button>
-                <button className="bg-yellow-500 text-black px-4 py-2 rounded-md hover:bg-yellow-600 transition">
-                  Get Started
-                </button>
+                {session ? (
+                  <>
+                    <div className="px-4 py-2 bg-[#2a2a2a] rounded-md">
+                      <p className="text-sm text-gray-300">Welcome, {session.user?.name || session.user?.email?.split('@')[0] || 'User'}!</p>
+                    </div>
+                    <a href="/dashboard" target="_blank">
+                      <button className="w-full bg-yellow-500 text-black px-4 py-2 rounded-md hover:bg-yellow-600 transition">
+                        Go to Dashboard
+                      </button>
+                    </a>
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full bg-transparent border border-red-500 text-red-500 px-4 py-2 rounded-md hover:bg-red-500 hover:text-white transition"
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <a href="/login">
+                      <button className="w-full bg-transparent border border-yellow-500 text-yellow-500 px-4 py-2 rounded-md hover:bg-yellow-500 hover:text-black transition">
+                        Login
+                      </button>
+                    </a>
+                    <a href="/signup">
+                      <button className="w-full bg-yellow-500 text-black px-4 py-2 rounded-md hover:bg-yellow-600 transition">
+                        Get Started
+                      </button>
+                    </a>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -176,26 +279,62 @@ export default function Home() {
       <main className="container mx-auto px-6 py-16 grid md:grid-cols-2 gap-12 items-center">
         <div>
           <h1 className="text-5xl font-bold mb-6">
-            Revolutionize Your <span className="text-yellow-500">Team Communication</span>
+            {session ? (
+              <>
+                Welcome back, <span className="text-yellow-500">{session.user?.name || 'User'}!</span>
+              </>
+            ) : (
+              <>
+                Revolutionize Your <span className="text-yellow-500">Team Communication</span>
+              </>
+            )}
           </h1>
           <p className="text-xl text-gray-400 mb-8">
-            Smart Notice Board is the ultimate platform for seamless, real-time team collaboration and information sharing.
+            {session ? (
+              'Ready to manage your notices? Access your dashboard to create, organize, and share important information with your team.'
+            ) : (
+              'Smart Notice Board is the ultimate platform for seamless, real-time team collaboration and information sharing.'
+            )}
           </p>
           <div className="flex space-x-4">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-yellow-500 text-black px-6 py-3 rounded-md hover:bg-yellow-600 transition"
-            >
-              Start Free Trial
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-transparent border border-yellow-500 text-yellow-500 px-6 py-3 rounded-md hover:bg-yellow-500 hover:text-black transition"
-            >
-              Learn More
-            </motion.button>
+            {session ? (
+              <>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => window.open('/dashboard', '_blank')}
+                  className="bg-yellow-500 text-black px-6 py-3 rounded-md hover:bg-yellow-600 transition"
+                >
+                  Go to Dashboard
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => window.open('/notice', '_blank')}
+                  className="bg-transparent border border-yellow-500 text-yellow-500 px-6 py-3 rounded-md hover:bg-yellow-500 hover:text-black transition"
+                >
+                  View Notice Board
+                </motion.button>
+              </>
+            ) : (
+              <>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleGetStarted}
+                  className="bg-yellow-500 text-black px-6 py-3 rounded-md hover:bg-yellow-600 transition"
+                >
+                  Start Free Trial
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-transparent border border-yellow-500 text-yellow-500 px-6 py-3 rounded-md hover:bg-yellow-500 hover:text-black transition"
+                >
+                  Learn More
+                </motion.button>
+              </>
+            )}
           </div>
         </div>
         <div className="hidden md:block">
@@ -210,9 +349,15 @@ export default function Home() {
               <Share2 className="text-blue-500 w-8 h-8" />
               <LayoutDashboard className="text-green-500 w-8 h-8" />
             </div>
-            <h3 className="text-2xl font-bold mb-2">Collaborative Workspace</h3>
+            <h3 className="text-2xl font-bold mb-2">
+              {session ? 'Your Workspace' : 'Collaborative Workspace'}
+            </h3>
             <p className="text-gray-400">
-              Bring your team together with real-time updates, shared boards, and seamless communication.
+              {session ? (
+                'Manage your notices, collaborate with your team, and stay organized with our powerful dashboard.'
+              ) : (
+                'Bring your team together with real-time updates, shared boards, and seamless communication.'
+              )}
             </p>
           </motion.div>
         </div>
