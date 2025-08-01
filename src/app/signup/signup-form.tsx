@@ -6,108 +6,193 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-// import { toast } from "@/components/ui/use-toast"
+import { Eye, EyeOff, User, Mail, Lock, Loader2 } from "lucide-react"
 
 export default function SignUpForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = React.useState<boolean>(false)
-  const {toast} = useToast();
+  const [showPassword, setShowPassword] = React.useState<boolean>(false)
+  const [formData, setFormData] = React.useState({
+    name: "",
+    email: "",
+    password: ""
+  })
+  const [errors, setErrors] = React.useState<{[key: string]: string}>({})
+  const { toast } = useToast()
+
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {}
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required"
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Name must be at least 2 characters"
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required"
+    } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
+      newErrors.email = "Invalid email address"
+    }
+
+    if (!formData.password) {
+      newErrors.password = "Password is required"
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: "" }))
+    }
+  }
 
   async function onSubmit(event: React.SyntheticEvent) {
     event.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
     setIsLoading(true)
 
-    const target = event.target as typeof event.target & {
-      name: { value: string }
-      email: { value: string }
-      password: { value: string }
-    }
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
 
-    const response = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: target.name.value,
-        email: target.email.value,
-        password: target.password.value,
-      }),
-    })
+      if (!response?.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Sign up failed")
+      }
 
-    setIsLoading(false)
+      toast({
+        title: "Account created successfully!",
+        description: "You can now sign in with your new account.",
+      })
 
-    if (!response?.ok) {
-      return toast({
+      router.push("/login")
+    } catch (error) {
+      toast({
         title: "Something went wrong.",
-        description: "Your sign up request failed. Please try again.",
+        description: error instanceof Error ? error.message : "Your sign up request failed. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsLoading(false)
     }
-
-    toast({
-      title: "Account created.",
-      description: "We've created your account for you.",
-    })
-
-    router.push("/login")
   }
 
   return (
-    <div className="grid gap-6">
-      <form onSubmit={onSubmit}>
-        <div className="grid gap-2">
-          <div className="grid gap-1">
-            <Label className="sr-only" htmlFor="name">
-              Name
-            </Label>
-            <Input
-              id="name"
-              placeholder="Name"
-              type="text"
-              autoCapitalize="words"
-              autoComplete="name"
-              autoCorrect="off"
-              disabled={isLoading}
-            />
-          </div>
-          <div className="grid gap-1">
-            <Label className="sr-only" htmlFor="email">
-              Email
-            </Label>
-            <Input
-              id="email"
-              placeholder="name@example.com"
-              type="email"
-              autoCapitalize="none"
-              autoComplete="email"
-              autoCorrect="off"
-              disabled={isLoading}
-            />
-          </div>
-          <div className="grid gap-1">
-            <Label className="sr-only" htmlFor="password">
-              Password
-            </Label>
-            <Input
-              id="password"
-              placeholder="Password"
-              type="password"
-              autoCapitalize="none"
-              autoComplete="new-password"
-              disabled={isLoading}
-            />
-          </div>
-          <Button disabled={isLoading}>
-            {isLoading && (
-                <div> LoAdInG ...................................</div>
-            //   <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Sign Up
-          </Button>
+    <form onSubmit={onSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+          Full Name
+        </Label>
+        <div className="relative">
+          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
+            id="name"
+            type="text"
+            placeholder="Enter your full name"
+            value={formData.name}
+            onChange={(e) => handleInputChange("name", e.target.value)}
+            className="pl-10 h-12 border-gray-200 focus:border-green-500 focus:ring-green-500"
+            disabled={isLoading}
+          />
         </div>
-      </form>
-    </div>
+        {errors.name && (
+          <p className="text-sm text-red-600">{errors.name}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+          Email Address
+        </Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
+            id="email"
+            type="email"
+            placeholder="Enter your email"
+            value={formData.email}
+            onChange={(e) => handleInputChange("email", e.target.value)}
+            className="pl-10 h-12 border-gray-200 focus:border-green-500 focus:ring-green-500"
+            disabled={isLoading}
+          />
+        </div>
+        {errors.email && (
+          <p className="text-sm text-red-600">{errors.email}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+          Password
+        </Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="Create a password"
+            value={formData.password}
+            onChange={(e) => handleInputChange("password", e.target.value)}
+            className="pl-10 pr-10 h-12 border-gray-200 focus:border-green-500 focus:ring-green-500"
+            disabled={isLoading}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        </div>
+        {errors.password && (
+          <p className="text-sm text-red-600">{errors.password}</p>
+        )}
+      </div>
+
+      <Button
+        type="submit"
+        disabled={isLoading}
+        className="w-full h-12 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
+      >
+        {isLoading ? (
+          <div className="flex items-center space-x-2">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Creating account...</span>
+          </div>
+        ) : (
+          "Create Account"
+        )}
+      </Button>
+
+      <div className="text-center">
+        <p className="text-xs text-gray-500">
+          By creating an account, you agree to our{" "}
+          <a href="#" className="text-green-600 hover:text-green-500">Terms of Service</a>{" "}
+          and{" "}
+          <a href="#" className="text-green-600 hover:text-green-500">Privacy Policy</a>
+        </p>
+      </div>
+    </form>
   )
 }
 

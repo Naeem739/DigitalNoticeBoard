@@ -80,7 +80,7 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
         <span className="text-2xl font-extrabold">Dashboard</span>
       </Link>
       <nav>
-        <MenuItem href="/dashboard" icon={Home}>
+        <MenuItem href="/" icon={Home}>
           Home
         </MenuItem>
 
