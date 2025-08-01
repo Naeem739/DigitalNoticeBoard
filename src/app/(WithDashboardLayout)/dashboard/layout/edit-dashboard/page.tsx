@@ -235,19 +235,33 @@ function EditDashboardDemo() {
   const [canCreateTemplate, setCanCreateTemplate] = useState(false)
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
+  
+  // Add state for confirmation dialog
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false)
+  const [pendingSavedState, setPendingSavedState] = useState<any>(null)
 
   // Add useEffect to load saved state on component mount
   useEffect(() => {
     const savedState = localStorage.getItem('dashboardState')
+    
     if (savedState) {
       try {
-        const { widgets: savedWidgets, layout: savedLayout, selectedRatio: savedRatio, widgetSettings: savedSettings } = JSON.parse(savedState)
-        setWidgets(savedWidgets)
-        setLayout(savedLayout)
-        setSelectedRatio(savedRatio)
-        setWidgetSettings(savedSettings)
+        const parsedState = JSON.parse(savedState)
+        const { selectedRatio: savedRatio, widgets: savedWidgets, layout: savedLayout } = parsedState
+        
+        // Check if there was previous content (widgets or layout)
+        if (savedWidgets && savedWidgets.length > 0 || savedLayout && savedLayout.length > 0) {
+          // Show confirmation dialog instead of clearing immediately
+          setPendingSavedState(parsedState)
+          setShowConfirmationDialog(true)
+        } else {
+          // No previous content, just load the ratio
+          setSelectedRatio(savedRatio)
+          localStorage.removeItem('dashboardState')
+        }
       } catch (error) {
         console.error('Error loading saved dashboard state:', error)
+        localStorage.removeItem('dashboardState')
       }
     }
   }, [])
@@ -262,12 +276,41 @@ function EditDashboardDemo() {
         widgetSettings
       }
       localStorage.setItem('dashboardState', JSON.stringify(stateToSave))
+    } else if (selectedRatio) {
+      // Only save the selected ratio if no widgets exist
+      const stateToSave = {
+        selectedRatio
+      }
+      localStorage.setItem('dashboardState', JSON.stringify(stateToSave))
     }
   }, [widgets, layout, selectedRatio, widgetSettings])
 
   // Add function to clear saved state
   const clearSavedState = () => {
     localStorage.removeItem('dashboardState')
+  }
+
+  // Handle confirmation dialog actions
+  const handleConfirmClear = () => {
+    if (pendingSavedState) {
+      // Load only the ratio, clear everything else
+      setSelectedRatio(pendingSavedState.selectedRatio)
+    }
+    localStorage.removeItem('dashboardState')
+    setShowConfirmationDialog(false)
+    setPendingSavedState(null)
+  }
+
+  const handleCancelClear = () => {
+    if (pendingSavedState) {
+      // Load the full saved state (including widgets)
+      setWidgets(pendingSavedState.widgets || [])
+      setLayout(pendingSavedState.layout || [])
+      setSelectedRatio(pendingSavedState.selectedRatio)
+      setWidgetSettings(pendingSavedState.widgetSettings || {})
+    }
+    setShowConfirmationDialog(false)
+    setPendingSavedState(null)
   }
 
   useEffect(() => {
@@ -834,6 +877,45 @@ function EditDashboardDemo() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
+      {/* Minimal Confirmation Dialog */}
+      {showConfirmationDialog && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full border border-gray-100">
+            <div className="p-6">
+              {/* Header */}
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  Unsaved Changes
+                </h3>
+                <p className="text-sm text-gray-500">
+                  You have a previous dashboard. What would you like to do?
+                </p>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <button
+                  onClick={handleConfirmClear}
+                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  Start Fresh
+                </button>
+                <button
+                  onClick={handleCancelClear}
+                  className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                >
+                  Restore Previous
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mb-6 flex flex-wrap gap-4">
         <div className="relative">
           <button

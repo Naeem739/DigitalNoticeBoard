@@ -2,7 +2,7 @@
 
 import { TDashboard2, TNotice, Category } from "@/types/types"
 import { useState, useEffect } from "react"
-import { Pencil, Trash2, X, Check, ChevronDown, Filter, AlertCircle, Search, Save, XCircle } from "lucide-react"
+import { Pencil, Trash2, X, Check, ChevronDown, Filter, AlertCircle, Search, Save, XCircle, Home, Star, Heart, Bell, User, Folder, File, Globe, Settings } from "lucide-react"
 import { toast, Toaster } from "react-hot-toast"
 
 interface WidgetContainerProps {
@@ -32,6 +32,59 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   const [isLoading, setIsLoading] = useState<{id: string, operation: string} | null>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
+
+  // Add state for editing category
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryEditName, setCategoryEditName] = useState<string>("");
+  const [categoryEditIcon, setCategoryEditIcon] = useState<string>("");
+  const [categoryEditLoading, setCategoryEditLoading] = useState(false);
+
+  // Lucide icon options
+  const iconOptions = [
+    { name: "Home", icon: <Home className="w-5 h-5" /> },
+    { name: "Star", icon: <Star className="w-5 h-5" /> },
+    { name: "Heart", icon: <Heart className="w-5 h-5" /> },
+    { name: "Bell", icon: <Bell className="w-5 h-5" /> },
+    { name: "User", icon: <User className="w-5 h-5" /> },
+    { name: "Folder", icon: <Folder className="w-5 h-5" /> },
+    { name: "File", icon: <File className="w-5 h-5" /> },
+    { name: "Globe", icon: <Globe className="w-5 h-5" /> },
+    { name: "Settings", icon: <Settings className="w-5 h-5" /> },
+  ];
+
+  // Edit category handler
+  const handleEditCategory = (cat: Category) => {
+    setEditingCategoryId(cat.id);
+    setCategoryEditName(cat.editedName || cat.name);
+    setCategoryEditIcon(cat.icon || "Home");
+  };
+
+  // Save category changes
+  const handleSaveCategoryEdit = async (catId: string) => {
+    setCategoryEditLoading(true);
+    try {
+      const response = await fetch(`/api/category/update?id=${catId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          editedName: categoryEditName,
+          icon: categoryEditIcon,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        toast.success("Category updated!");
+        setCategories((prev) => prev.map((cat) => cat.id === catId ? { ...cat, editedName: categoryEditName, icon: categoryEditIcon } : cat));
+        setEditingCategoryId(null);
+      } else {
+        toast.error(result.message || "Failed to update category");
+      }
+    } catch (e) {
+      toast.error("Error updating category");
+    } finally {
+      setCategoryEditLoading(false);
+    }
+  };
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -326,6 +379,69 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
         </div>
       </div>
       
+      {/* Draggable Categories UI (add edit and icon selection) */}
+      <div className="mb-6">
+        <div className="font-bold text-lg mb-2">Draggable Categories:</div>
+        <div className="flex flex-wrap gap-2">
+          {categories.map((cat) => (
+            <div key={cat.id} className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg shadow border">
+              {/* Icon */}
+              {cat.icon ? (
+                iconOptions.find((i) => i.name === cat.icon)?.icon || <Home className="w-5 h-5 text-gray-400" />
+              ) : (
+                <Home className="w-5 h-5 text-gray-400" />
+              )}
+              {/* Name or editedName */}
+              <span className="font-medium">
+                {cat.editedName || cat.name}
+              </span>
+              {/* Edit button */}
+              <button onClick={() => handleEditCategory(cat)} className="ml-1 text-blue-600 hover:text-blue-800"><Pencil className="w-4 h-4" /></button>
+              {/* Edit UI */}
+              {editingCategoryId === cat.id && (
+                <div className="absolute z-20 bg-white border rounded-lg shadow-lg p-4 mt-8 flex flex-col gap-2">
+                  <label className="text-xs font-semibold">Edit Name</label>
+                  <input
+                    className="border rounded px-2 py-1"
+                    value={categoryEditName}
+                    onChange={e => setCategoryEditName(e.target.value)}
+                    disabled={categoryEditLoading}
+                  />
+                  <label className="text-xs font-semibold mt-2">Select Icon</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {iconOptions.map(opt => (
+                      <button
+                        key={opt.name}
+                        className={`p-1 rounded ${categoryEditIcon === opt.name ? 'bg-indigo-200' : 'bg-gray-100'}`}
+                        onClick={() => setCategoryEditIcon(opt.name)}
+                        type="button"
+                        disabled={categoryEditLoading}
+                      >
+                        {opt.icon}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                      onClick={() => handleSaveCategoryEdit(cat.id)}
+                      disabled={categoryEditLoading || !categoryEditName.trim()}
+                    >
+                      {categoryEditLoading ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                      onClick={() => setEditingCategoryId(null)}
+                      disabled={categoryEditLoading}
+                    >Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {notices.length === 0 ? (
         <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg p-10 border border-gray-200">
           <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
