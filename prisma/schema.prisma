@@ -42,6 +42,8 @@ model Category {
   id      String @id @default(uuid())
   name    String @unique
   notices Notice[]
+  icon    String? // New: icon for the category
+  editedName String? // New: editable category name
   // noticeId
 }
 

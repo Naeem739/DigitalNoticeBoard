@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Category } from "@/types/types";
 import { createNotice } from "@/app/actions/notice.action";
-import { getCategoriesWithNotices } from "@/app/actions/category.action";
+import { getCategories } from "@/app/actions/category.action";
 import { toast } from "sonner";
 import { PenLine, Type, Bold, Italic, Underline, Palette, Save, ChevronDown } from "lucide-react";
 
@@ -52,9 +52,8 @@ export default function NoticeEditor() {
   useEffect(() => {
     const getData = async () => {
       try {
-        const categories = await getCategoriesWithNotices();
+        const categories = await getCategories();
         if (categories.success) {
-          console.log(categories);
           setCategories(categories.result as []);
         }
       } catch (error) {
@@ -125,7 +124,7 @@ export default function NoticeEditor() {
       content: content,
       category: selectedCategory,
       categoryId: specificCategory[0].id!,
-      createdAt: new Date().toISOString() 
+      createdAt: new Date()
     };
     
     try {
@@ -144,7 +143,11 @@ export default function NoticeEditor() {
           editor.innerHTML = "";
         }
       } else {
-        toast.error(newNotice.message || "Failed to save notice");
+        toast.error(
+          typeof newNotice.message === "string"
+            ? newNotice.message
+            : "Failed to save notice"
+        );
       }
     } catch (error) {
       console.error("Error creating notice:", error);

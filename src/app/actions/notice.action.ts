@@ -4,7 +4,7 @@ import { TNotice } from "@/types/types"
 
 
 
-export const createNotice = async(value: TNotice)=>{
+export const createNotice = async(value: Omit<TNotice, "id">)=>{
     try{
         const result = await prisma.notice.create({
             data:{

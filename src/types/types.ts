@@ -22,6 +22,8 @@ export type AspectRatio = '4:3' | '16:9' | '16:10';
 export type Category = {
   name: string;
   id: string;
+  icon?: string;
+  editedName?: string;
 };
 
 export type TNotice = {
@@ -31,6 +33,10 @@ export type TNotice = {
   category: string;
   categoryId: string;
   createdAt?: Date;
+  categoryRelation?: {
+    id: string;
+    name: string;
+  };
 };
 
 export type TDashboard = {

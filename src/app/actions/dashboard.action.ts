@@ -31,33 +31,47 @@ export const getDashboards = async() => {
             },
             take:1
         });
-        console.log(result);
 
-      const notices = await prisma.notice.findMany({
-        where:{
-            id:{
-                // @ts-expect-error hobe na
-                in:result[0].noticeIds
-            }
+        if (!result || result.length === 0) {
+            return {
+                success: true,
+                result: {
+                    notices: [],
+                    id: '',
+                    name: '',
+                    noticeIds: []
+                }
+            };
         }
-    });
 
-    console.log("notices", notices);
-    console.log("result", result);
+        const notices = await prisma.notice.findMany({
+            where:{
+                id:{
+                    in: result[0].noticeIds || []
+                }
+            },
+            include: {
+                categoryRelation: true,
+                container: true
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
 
         return {
             success: true,
-            result:{
+            result: {
                 notices,
                 ...result[0]
             }
         }
-
     }
     catch(err){
+        console.error("Error in getDashboards:", err);
         return {
-            success:false,
-            result : err        }
-
+            success: false,
+            result: err
+        }
     }
 }
