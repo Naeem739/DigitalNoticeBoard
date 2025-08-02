@@ -32,10 +32,12 @@ export type TNotice = {
   content: string;
   category: string;
   categoryId: string;
+  categoryName?: string;
   createdAt?: Date;
   categoryRelation?: {
     id: string;
     name: string;
+    editedName?: string;
   };
 };
 
@@ -56,9 +58,19 @@ export type TDashboard = {
   }[];
 };
 
+export type TImage = {
+  id: string;
+  title: string;
+  imageUrl: string;
+  imageData: string;
+  fileName: string;
+  createdAt?: Date;
+};
+
 export type TDashboard2 = {
   aspectRatio: string | null;
   notices: TNotice[];
+  images: TImage[];
   containers: {
     i: string;
     h: number;
@@ -68,7 +80,9 @@ export type TDashboard2 = {
     title: string | undefined;
     id: string;
     category: string | undefined;
-    noticeIds: string[];
+    type?: "notice" | "image";
+    noticeIds?: string[];
+    imageIds?: string[];
     width: string;
     height: string;
     leftPercent: string;
@@ -83,6 +97,13 @@ export type TDashboard2 = {
       noticeCount: number;
       backgroundColor: string;
       backgroundOpacity: number;
+      // Image-specific settings
+      imageFit?: string;
+      imageBorderRadius?: number;
+      showImageTitle?: boolean;
+      imageTitleColor?: string;
+      imageTitleFontSize?: number;
+      imageTitleFontWeight?: string;
     };
   }[];
 };

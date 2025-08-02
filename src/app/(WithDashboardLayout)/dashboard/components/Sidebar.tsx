@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
-import { Home, BarChart2, Users, FolderPlus, FilePenLine, ChevronDown, ChevronRight } from "lucide-react"
+import { Home, BarChart2, Users, FolderPlus, FilePenLine, ChevronDown, ChevronRight, Image, Layout } from "lucide-react"
 import * as Collapsible from "@radix-ui/react-collapsible"
 import type React from "react"
 import { Megaphone } from "lucide-react";
@@ -42,15 +42,15 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
       <Collapsible.Root open={openMenus.includes(title)} onOpenChange={() => toggleMenu(title)}>
         <Collapsible.Trigger className="flex items-center w-full py-2.5 px-4 rounded transition duration-200 hover:bg-gray-700 hover:text-white">
           {openMenus.includes(title) ? (
-            <ChevronDown className="w-5 h-5 mr-2 transition-transform duration-500 ease-spring" /> // Increased from 300ms to 500ms
+            <ChevronDown className="w-5 h-5 mr-2 transition-transform duration-500 ease-spring" />
           ) : (
-            <ChevronRight className="w-5 h-5 mr-2 transition-transform duration-500 ease-spring" /> // Increased from 300ms to 500ms
+            <ChevronRight className="w-5 h-5 mr-2 transition-transform duration-500 ease-spring" />
           )}
           {title}
         </Collapsible.Trigger>
         <Collapsible.Content
           ref={contentRef}
-          className="overflow-hidden transition-all duration-700 ease-in-out" // Increased from 500ms to 700ms, changed to ease-in-out
+          className="overflow-hidden transition-all duration-700 ease-in-out"
           style={{
             height: openMenus.includes(title) ? contentHeight : 0,
             opacity: openMenus.includes(title) ? 1 : 0,
@@ -73,7 +73,7 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
     <div
       className={`bg-gray-800 text-white w-64 space-y-6 py-7 px-2 fixed inset-y-0 left-0 transform ${
         isOpen ? "translate-x-0" : "-translate-x-full"
-      } md:relative md:translate-x-0 transition duration-500 ease-in-out z-50 overflow-y-auto`} // Increased from 200ms to 500ms
+      } md:relative md:translate-x-0 transition duration-500 ease-in-out z-50 overflow-y-auto border-r border-gray-700`}
     >
       <Link href="/dashboard" className="text-white flex items-center space-x-2 px-4">
         <BarChart2 className="w-8 h-8" />
@@ -84,19 +84,16 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
           Home
         </MenuItem>
 
-        <DropdownMenu
-          title="Category"
-          items={[
-            { href: "/dashboard/category/create-category", icon: FolderPlus, label: "Create a New Category" },
-           
-          ]}
-        />
+        <MenuItem href="/dashboard/category" icon={Users}>
+          Category
+        </MenuItem>
 
         <DropdownMenu
           title="Notice Content"
           items={[
             { href: "/dashboard/create-notice", icon: FilePenLine, label: "Add New Notice" },
-            {href: "/dashboard/showNotices", icon: Megaphone, label: "Show Notices" }
+            {href: "/dashboard/showNotices", icon: Megaphone, label: "Show Notices" },
+            {href: "/dashboard/showImageNotices", icon: Image, label: "Show ImageNotices" }
 
           ]}
         />
@@ -106,14 +103,16 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
         <DropdownMenu
           title="Admin"
           items={[
-            { href: "/dashboard/admin/make-admin", icon: Users, label: "Make Admin" }
+            { href: "/dashboard/admin/make-admin", icon: Users, label: "Make Admin" },
+            { href: "/dashboard/admin/showAllAdmin", icon: Users, label: "Show All Admin" }
           ]}
         />
 
         <DropdownMenu
           title="Layout"
           items={[
-            { href: "/dashboard/layout/edit-dashboard", icon: Users, label: "Edit Dashboard" }
+            { href: "/dashboard/layout/edit-dashboard", icon: Users, label: "Edit Dashboard" },
+            { href: "/dashboard/noticeInterfaces", icon: Layout, label: "NoticeInterfaces" }
           ]}
         />
 

@@ -2,7 +2,7 @@
 
 import { TDashboard2, TNotice, Category } from "@/types/types"
 import { useState, useEffect } from "react"
-import { Pencil, Trash2, X, Check, ChevronDown, Filter, AlertCircle, Search, Save, XCircle, Home, Star, Heart, Bell, User, Folder, File, Globe, Settings } from "lucide-react"
+import { Pencil, Trash2, X, Check, ChevronDown, Filter, AlertCircle, Search, Save, XCircle } from "lucide-react"
 import { toast, Toaster } from "react-hot-toast"
 
 interface WidgetContainerProps {
@@ -12,9 +12,14 @@ interface WidgetContainerProps {
 
 export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   // Deep clone data to make it mutable
-  const [localData, setLocalData] = useState<TDashboard2>(JSON.parse(JSON.stringify(data)));
-  const [notices, setNotices] = useState<TNotice[]>(data.notices || []);
-  const [loading, setLoading] = useState(false);
+  const [localData, setLocalData] = useState<TDashboard2>(() => {
+    if (typeof window === 'undefined') {
+      return data;
+    }
+    return JSON.parse(JSON.stringify(data));
+  });
+  const [notices, setNotices] = useState<TNotice[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // States for category filter
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -31,67 +36,21 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   // Loading states for operations
   const [isLoading, setIsLoading] = useState<{id: string, operation: string} | null>(null);
 
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  // Add state for editing category
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [categoryEditName, setCategoryEditName] = useState<string>("");
-  const [categoryEditIcon, setCategoryEditIcon] = useState<string>("");
-  const [categoryEditLoading, setCategoryEditLoading] = useState(false);
-
-  // Lucide icon options
-  const iconOptions = [
-    { name: "Home", icon: <Home className="w-5 h-5" /> },
-    { name: "Star", icon: <Star className="w-5 h-5" /> },
-    { name: "Heart", icon: <Heart className="w-5 h-5" /> },
-    { name: "Bell", icon: <Bell className="w-5 h-5" /> },
-    { name: "User", icon: <User className="w-5 h-5" /> },
-    { name: "Folder", icon: <Folder className="w-5 h-5" /> },
-    { name: "File", icon: <File className="w-5 h-5" /> },
-    { name: "Globe", icon: <Globe className="w-5 h-5" /> },
-    { name: "Settings", icon: <Settings className="w-5 h-5" /> },
-  ];
-
-  // Edit category handler
-  const handleEditCategory = (cat: Category) => {
-    setEditingCategoryId(cat.id);
-    setCategoryEditName(cat.editedName || cat.name);
-    setCategoryEditIcon(cat.icon || "Home");
-  };
-
-  // Save category changes
-  const handleSaveCategoryEdit = async (catId: string) => {
-    setCategoryEditLoading(true);
-    try {
-      const response = await fetch(`/api/category/update?id=${catId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          editedName: categoryEditName,
-          icon: categoryEditIcon,
-        }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        toast.success("Category updated!");
-        setCategories((prev) => prev.map((cat) => cat.id === catId ? { ...cat, editedName: categoryEditName, icon: categoryEditIcon } : cat));
-        setEditingCategoryId(null);
-      } else {
-        toast.error(result.message || "Failed to update category");
-      }
-    } catch (e) {
-      toast.error("Error updating category");
-    } finally {
-      setCategoryEditLoading(false);
-    }
-  };
+  const [isClient, setIsClient] = useState(false);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const noticesPerPage = 5;
 
+  // Set client-side flag
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   // Fetch all notices on component mount
   useEffect(() => {
+    if (!isClient) return;
+    
     const fetchNotices = async () => {
       try {
         console.log('Fetching notices...');
@@ -100,8 +59,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
         console.log('Fetch result:', result);
         
         if (result.success) {
-          setNotices(result.data);
-          console.log('Notices set:', result.data);
+          setNotices(result.result || []);
+          console.log('Notices set:', result.result);
         } else {
           console.error('Failed to fetch notices:', result.message);
           toast.error('Failed to fetch notices');
@@ -115,39 +74,19 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     };
 
     fetchNotices();
-  }, []);
+  }, [isClient]);
 
-  // Fetch categories from API on mount
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch('/api/category/get-all');
-        const result = await response.json();
-        if (result.success) {
-          setCategories(result.data);
-        } else {
-          toast.error('Failed to fetch categories');
-        }
-      } catch (error) {
-        toast.error('Failed to fetch categories');
-      }
-    };
-    fetchCategories();
-  }, []);
-
-  // Replace this:
-  // const categories = ["all", ...new Set(notices.map(notice => notice.categoryRelation?.name || 'Uncategorized'))];
-  // With this:
-  const categoryOptions = ["all", ...categories.map(cat => cat.name)];
+  // Get unique categories from notices for filter dropdown
+  const categoryOptions = ["all", ...new Set(notices.map(notice => notice.categoryName || 'Uncategorized'))];
   
   // Filter notices based on selected category and search term
   const filteredNotices = notices
     .filter(notice => notice.title && notice.title.trim() !== '')
-    .filter(notice => selectedCategory === "all" || notice.categoryRelation?.name === selectedCategory)
+    .filter(notice => selectedCategory === "all" || notice.categoryName === selectedCategory)
     .filter(notice => 
       !searchTerm || 
       notice.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (notice.categoryRelation?.name && notice.categoryRelation.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (notice.categoryName && notice.categoryName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (notice.content && notice.content.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   
@@ -268,16 +207,16 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     }
   };
 
-  if (loading) {
+  if (!isClient || loading) {
     return (
-      <div className="flex justify-center items-center h-64 w-full">
+      <div className="flex justify-center items-center h-64 w-full" suppressHydrationWarning>
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg p-6 transition-all duration-300">
+    <div className="w-full bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg p-6 transition-all duration-300" suppressHydrationWarning>
       {/* Toast configuration for top middle */}
       <Toaster
         position="top-center"
@@ -327,7 +266,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             </div>
             
             {showDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-60 overflow-auto">
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-60 overflow-auto" suppressHydrationWarning>
                 {categoryOptions.map((category) => (
                   <div 
                     key={category}
@@ -347,7 +286,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
           {/* Search bar - on right side */}
           <div className="relative w-full md:w-64 order-1 md:order-2">
             {showSearch ? (
-              <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+              <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden" suppressHydrationWarning>
                 <input
                   type="text"
                   value={searchTerm}
@@ -379,88 +318,27 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
         </div>
       </div>
       
-      {/* Draggable Categories UI (add edit and icon selection) */}
-      <div className="mb-6">
-        <div className="font-bold text-lg mb-2">Draggable Categories:</div>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <div key={cat.id} className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg shadow border">
-              {/* Icon */}
-              {cat.icon ? (
-                iconOptions.find((i) => i.name === cat.icon)?.icon || <Home className="w-5 h-5 text-gray-400" />
-              ) : (
-                <Home className="w-5 h-5 text-gray-400" />
-              )}
-              {/* Name or editedName */}
-              <span className="font-medium">
-                {cat.editedName || cat.name}
-              </span>
-              {/* Edit button */}
-              <button onClick={() => handleEditCategory(cat)} className="ml-1 text-blue-600 hover:text-blue-800"><Pencil className="w-4 h-4" /></button>
-              {/* Edit UI */}
-              {editingCategoryId === cat.id && (
-                <div className="absolute z-20 bg-white border rounded-lg shadow-lg p-4 mt-8 flex flex-col gap-2">
-                  <label className="text-xs font-semibold">Edit Name</label>
-                  <input
-                    className="border rounded px-2 py-1"
-                    value={categoryEditName}
-                    onChange={e => setCategoryEditName(e.target.value)}
-                    disabled={categoryEditLoading}
-                  />
-                  <label className="text-xs font-semibold mt-2">Select Icon</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {iconOptions.map(opt => (
-                      <button
-                        key={opt.name}
-                        className={`p-1 rounded ${categoryEditIcon === opt.name ? 'bg-indigo-200' : 'bg-gray-100'}`}
-                        onClick={() => setCategoryEditIcon(opt.name)}
-                        type="button"
-                        disabled={categoryEditLoading}
-                      >
-                        {opt.icon}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                      onClick={() => handleSaveCategoryEdit(cat.id)}
-                      disabled={categoryEditLoading || !categoryEditName.trim()}
-                    >
-                      {categoryEditLoading ? 'Saving...' : 'Save'}
-                    </button>
-                    <button
-                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                      onClick={() => setEditingCategoryId(null)}
-                      disabled={categoryEditLoading}
-                    >Cancel</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      
 
       {notices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg p-10 border border-gray-200">
+        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-10 border border-gray-200" suppressHydrationWarning>
           <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
           <p className="text-gray-600 text-lg font-medium">No notices found in the database</p>
         </div>
       ) : filteredNotices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg p-10 border border-gray-200">
+        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-10 border border-gray-200" suppressHydrationWarning>
           <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-gray-600 text-lg font-medium">
-            {searchTerm
-              ? "No notices match your search"
-              : selectedCategory === "all" 
-                ? "No notices found" 
-                : `No notices found in the "${selectedCategory}" category`}
-          </p>
+                                  <p className="text-gray-600 text-lg font-medium">
+              {searchTerm
+                ? "No notices match your search"
+                : selectedCategory === "all" 
+                  ? "No notices found" 
+                  : `No notices found in the "${selectedCategory}" category`}
+            </p>
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-xl shadow-md border border-gray-200">
+          <div className="overflow-hidden rounded-xl shadow-md border border-gray-200" suppressHydrationWarning>
             <div className="overflow-x-auto">
               <table className="min-w-full bg-white">
                 <thead>
@@ -478,7 +356,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                     >
                       <td className="py-4 px-6 whitespace-nowrap">
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                          {notice.categoryRelation?.name || 'Uncategorized'}
+                           {notice.categoryName || 'Uncategorized'}
                         </span>
                       </td>
                       <td className="py-4 px-6">
@@ -525,7 +403,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-2 mt-6">
+            <div className="flex justify-center items-center space-x-2 mt-6" suppressHydrationWarning>
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
@@ -560,7 +438,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
           {/* Page Info */}
           {filteredNotices.length > 0 && (
-            <div className="text-center text-gray-600 mt-4">
+            <div className="text-center text-gray-600 mt-4" suppressHydrationWarning>
               Showing {indexOfFirstNotice + 1} to {Math.min(indexOfLastNotice, filteredNotices.length)} of {filteredNotices.length} notices
             </div>
           )}
@@ -569,7 +447,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
       {/* Edit Notice Modal */}
       {editModalOpen && editingNotice && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" suppressHydrationWarning>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
@@ -590,8 +468,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Category
                   </label>
-                  <div className="bg-gray-100 px-4 py-2 rounded-lg text-gray-800">
-                    {editingNotice.categoryRelation?.name || 'Uncategorized'}
+                                     <div className="bg-gray-100 px-4 py-2 rounded-lg text-gray-800">
+                     {editingNotice.categoryName || 'Uncategorized'}
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
                     Category cannot be changed from this interface
@@ -608,7 +486,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                     type="text"
                     value={editingNotice.title}
                     onChange={(e) => setEditingNotice({...editingNotice, title: e.target.value})}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 bg-white text-gray-900"
                     placeholder="Enter notice title"
                   />
                 </div>
@@ -622,7 +500,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                     id="notice-content"
                     value={editingNotice.content || ''}
                     onChange={(e) => setEditingNotice({...editingNotice, content: e.target.value})}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 min-h-64"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 min-h-64 bg-white text-gray-900"
                     placeholder="Enter notice content (optional)"
                   />
                 </div>

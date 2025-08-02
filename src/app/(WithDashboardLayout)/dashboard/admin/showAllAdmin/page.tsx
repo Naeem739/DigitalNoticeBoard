@@ -1,0 +1,393 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Users, UserCheck, Calendar, Mail, User, Trash2, Edit, Search, Crown, Shield, Activity, Filter } from 'lucide-react'
+import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
+
+type TAdmin = {
+  id: string
+  name: string
+  email: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export default function ShowAllAdminPage() {
+  const [admins, setAdmins] = useState<TAdmin[]>([])
+  const [filteredAdmins, setFilteredAdmins] = useState<TAdmin[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortBy, setSortBy] = useState<'name' | 'email' | 'createdAt'>('createdAt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  useEffect(() => {
+    fetchAdmins()
+  }, [])
+
+  useEffect(() => {
+    // Filter and sort admins
+    let filtered = admins.filter(admin => 
+      admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      admin.email.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    // Sort admins
+    filtered.sort((a, b) => {
+      let aValue = a[sortBy]
+      let bValue = b[sortBy]
+      
+      if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
+        aValue = new Date(aValue).getTime()
+        bValue = new Date(bValue).getTime()
+      } else {
+        aValue = aValue.toLowerCase()
+        bValue = bValue.toLowerCase()
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+
+    setFilteredAdmins(filtered)
+  }, [admins, searchTerm, sortBy, sortOrder])
+
+  const fetchAdmins = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/admin/allAdmins')
+      const result = await response.json()
+      
+      if (response.ok) {
+        setAdmins(result.admins || [])
+      } else {
+        toast.error('Failed to fetch admin users')
+      }
+    } catch (error) {
+      console.error('Error fetching admins:', error)
+      toast.error('Error fetching admin users')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteAdmin = async (adminId: string, adminName: string) => {
+    if (!confirm(`Are you sure you want to delete admin "${adminName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      setDeletingId(adminId)
+      const response = await fetch(`/api/admin/delete/${adminId}`, {
+        method: 'DELETE',
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        setAdmins(prev => prev.filter(admin => admin.id !== adminId))
+        toast.success(`Admin "${adminName}" deleted successfully`)
+      } else {
+        toast.error(result.message || 'Failed to delete admin')
+      }
+    } catch (error) {
+      console.error('Error deleting admin:', error)
+      toast.error('Error deleting admin')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const getTimeAgo = (date: Date) => {
+    const now = new Date()
+    const diffInMs = now.getTime() - new Date(date).getTime()
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
+    
+    if (diffInDays === 0) return 'Today'
+    if (diffInDays === 1) return 'Yesterday'
+    if (diffInDays < 7) return `${diffInDays} days ago`
+    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`
+    if (diffInDays < 365) return `${Math.floor(diffInDays / 30)} months ago`
+    return `${Math.floor(diffInDays / 365)} years ago`
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading admin users...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Crown className="w-8 h-8 text-yellow-500" />
+            <Shield className="w-4 h-4 text-blue-600 absolute -top-1 -right-1" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              All Administrators
+            </h1>
+            <p className="text-gray-600 mt-1">Manage all administrative users in the system</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <UserCheck className="w-6 h-6 text-green-600" />
+          <Badge variant="secondary" className="text-lg font-semibold">
+            {filteredAdmins.length} {filteredAdmins.length === 1 ? 'Admin' : 'Admins'}
+          </Badge>
+        </div>
+      </motion.div>
+
+      {/* Search and Filter Section */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col md:flex-row gap-4"
+      >
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search admins by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 border-2 focus:border-blue-500"
+          />
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'name' | 'email' | 'createdAt')}
+            className="px-3 py-2 border-2 border-gray-300 rounded-md focus:border-blue-500 focus:outline-none"
+          >
+            <option value="createdAt">Sort by Date</option>
+            <option value="name">Sort by Name</option>
+            <option value="email">Sort by Email</option>
+          </select>
+          <Button
+            variant="outline"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="flex items-center gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* Stats Cards */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+      >
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Users className="w-8 h-8 text-blue-600" />
+              <div>
+                <div className="text-2xl font-bold text-blue-800">{admins.length}</div>
+                <div className="text-sm text-blue-600">Total Admins</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Activity className="w-8 h-8 text-green-600" />
+              <div>
+                <div className="text-2xl font-bold text-green-800">{filteredAdmins.length}</div>
+                <div className="text-sm text-green-600">Active Results</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Crown className="w-8 h-8 text-purple-600" />
+              <div>
+                <div className="text-2xl font-bold text-purple-800">∞</div>
+                <div className="text-sm text-purple-600">System Access</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {filteredAdmins.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Users className="w-16 h-16 text-gray-400 mb-4" />
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">
+                {searchTerm ? 'No matching admins found' : 'No Admin Users Found'}
+              </h3>
+              <p className="text-gray-500 text-center">
+                {searchTerm 
+                  ? 'Try adjusting your search terms or filters.'
+                  : 'No admin users have been created yet. Admin users will appear here once they are added to the system.'
+                }
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <AnimatePresence>
+            {filteredAdmins.map((admin, index) => (
+              <motion.div
+                key={admin.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className="hover:shadow-lg transition-all duration-300 border-2 hover:border-blue-200 group">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <div className="relative">
+                          <User className="w-5 h-5 text-blue-600" />
+                          <Crown className="w-3 h-3 text-yellow-500 absolute -top-1 -right-1" />
+                        </div>
+                        <span className="truncate">{admin.name}</span>
+                      </CardTitle>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            toast.info('Edit functionality coming soon')
+                          }}
+                          className="h-8 w-8 p-0 hover:bg-blue-50"
+                          title="Edit Admin"
+                        >
+                          <Edit className="w-4 h-4 text-blue-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteAdmin(admin.id, admin.name)}
+                          disabled={deletingId === admin.id}
+                          className="h-8 w-8 p-0 hover:bg-red-50"
+                          title="Delete Admin"
+                        >
+                          {deletingId === admin.id ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Mail className="w-4 h-4 text-gray-500" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{admin.email}</p>
+                          <p className="text-xs text-gray-500">Email Address</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{formatDate(admin.createdAt)}</p>
+                          <p className="text-xs text-gray-500">{getTimeAgo(admin.createdAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-3 border-t">
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>ID: {admin.id.slice(0, 8)}...</span>
+                        <Badge variant="outline" className="text-xs">
+                          Admin
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Last Updated: {getTimeAgo(admin.updatedAt)}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mt-8"
+      >
+        <Card className="bg-gradient-to-br from-gray-50 to-slate-50 border-gray-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-gray-800">
+              <Shield className="w-5 h-5" />
+              Administrative Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+              <p className="text-sm text-gray-600">
+                Admin users have full access to all system features and can manage other users.
+              </p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-red-600 rounded-full mt-2 flex-shrink-0"></div>
+              <p className="text-sm text-gray-600">
+                You can delete admin users, but be careful as this action cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
+              <p className="text-sm text-gray-600">
+                To add new admin users, use the "Make Admin" page in the Admin section.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  )
+} 

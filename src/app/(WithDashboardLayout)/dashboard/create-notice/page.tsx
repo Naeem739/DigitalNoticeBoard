@@ -386,20 +386,20 @@ export default function NoticeEditor() {
               >
                 <Bold size={18} />
               </button>
-              <div className="h-6 w-px bg-gray-200"></div>
-              <button 
-                type="button" 
-                onClick={() => applyFormatting('italic')}
-                className={`p-2 hover:bg-gray-100 transition-colors ${isItalic ? 'bg-blue-100 text-blue-700' : ''}`}
+                              <div className="h-6 w-px bg-gray-200"></div>
+                <button 
+                  type="button" 
+                  onClick={() => applyFormatting('italic')}
+                  className={`p-2 hover:bg-gray-100 transition-colors ${isItalic ? 'bg-blue-100 text-blue-700' : ''}`}
                 title="Italic"
               >
                 <Italic size={18} />
               </button>
-              <div className="h-6 w-px bg-gray-200"></div>
-              <button 
-                type="button" 
-                onClick={() => applyFormatting('underline')}
-                className={`p-2 hover:bg-gray-100 transition-colors ${isUnderline ? 'bg-blue-100 text-blue-700' : ''}`}
+                              <div className="h-6 w-px bg-gray-200"></div>
+                <button 
+                  type="button" 
+                  onClick={() => applyFormatting('underline')}
+                  className={`p-2 hover:bg-gray-100 transition-colors ${isUnderline ? 'bg-blue-100 text-blue-700' : ''}`}
                 title="Underline"
               >
                 <Underline size={18} />

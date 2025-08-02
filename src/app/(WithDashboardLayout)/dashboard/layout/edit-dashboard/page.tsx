@@ -15,6 +15,9 @@ import {
   GripVertical,
   Box,
   LayoutIcon,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
 } from "lucide-react"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
@@ -23,6 +26,7 @@ import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } 
 import { getCategoriesWithNotices } from "@/app/actions/category.action"
 import {  saveTemplate, getTemplates } from "@/app/actions/template.action"
 import { createDashboard } from "@/app/actions/dashboard.action"
+import { createImage, testImageConnection } from "@/app/actions/image.action"
 import { toast } from "sonner"
 
 type TCategoriesWithNotices = {
@@ -58,6 +62,13 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   categoryHeight: 40,
   categoryBorderColor: "#e2e8f0",
   categoryBorderWidth: 0,
+  // Image upload widget settings
+  imageFit: "cover",
+  imageBorderRadius: 8,
+  showImageTitle: true,
+  imageTitleColor: "#1e293b",
+  imageTitleFontSize: 14,
+  imageTitleFontWeight: "medium",
 }
 
 const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
@@ -75,7 +86,22 @@ const hexToRgba = (hex: string, opacity: number) => {
 }
 
 // Add this type for the settings tabs
-type SettingsTab = "style" | "typography" | "layout" | "content" | "category"
+type SettingsTab = "style" | "typography" | "layout" | "content" | "category" | "image"
+
+// Add widget type enum
+type WidgetType = "notice" | "image"
+
+// Extend Widget type to include widget type and image data
+interface ExtendedWidget extends Widget {
+  type?: WidgetType
+  images?: Array<{
+    id: string
+    url: string
+    title: string
+    file: File
+    dbId?: string // Database ID for reference
+  }>
+}
 
 // Add this before the EditDashboardDemo component
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
@@ -84,6 +110,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[]
   { id: "layout", label: "Layout", icon: <LayoutIcon size={16} /> },
   { id: "content", label: "Content", icon: <Box size={16} /> },
   { id: "category", label: "Category", icon: <ListFilter size={16} /> },
+  { id: "image", label: "Image", icon: <ImageIcon size={16} /> },
 ]
 
 // Define the template type
@@ -207,7 +234,7 @@ const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
 ]
 
 function EditDashboardDemo() {
-  const [widgets, setWidgets] = useState<Widget[]>([])
+  const [widgets, setWidgets] = useState<ExtendedWidget[]>([])
   const [layout, setLayout] = useState<Layout[]>([])
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>(null)
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false)
@@ -403,13 +430,15 @@ function EditDashboardDemo() {
     setStartPosition({ x: e.clientX, y: e.clientY })
   }
 
-  const addWidget = () => {
+  const addWidget = (type: WidgetType = "notice") => {
     if (!selectedRatio) return
 
     const newWidgetId = `widget-${Date.now()}`
-    const newWidget: Widget = {
+    const newWidget: ExtendedWidget = {
       id: newWidgetId,
-      title: `Widget ${widgets.length + 1}`,
+      title: type === "image" ? `Image Widget ${widgets.length + 1}` : `Widget ${widgets.length + 1}`,
+      type: type,
+      images: type === "image" ? [] : undefined,
     }
 
     const newLayout: Layout = {
@@ -429,7 +458,7 @@ function EditDashboardDemo() {
     setWidgets([...widgets, newWidget])
     setLayout([...layout, newLayout])
 
-    toast.success("Widget added successfully!")
+    toast.success(`${type === "image" ? "Image" : ""} Widget added successfully!`)
   }
 
   const removeWidget = (e: React.MouseEvent, id: string) => {
@@ -520,6 +549,91 @@ function EditDashboardDemo() {
     e.preventDefault()
   }
 
+  // Image upload functionality - Single image per widget
+  const handleImageUpload = async (widgetId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    const widget = widgets.find(w => w.id === widgetId)
+    if (!widget || widget.type !== "image") return
+
+    // Test database connection first
+    console.log("Testing database connection...")
+    const connectionTest = await testImageConnection()
+    console.log("Connection test result:", connectionTest)
+
+    // Take only the first file for single image widget
+    const file = files[0]
+    
+    // Convert file to base64 for database storage
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const imageData = e.target?.result as string
+      
+      try {
+        // Save image to database
+        const imagePayload = {
+          title: file.name,
+          imageUrl: imageData,
+          imageData: imageData, // Store base64 data
+          fileName: file.name,
+        }
+
+        console.log("Sending image payload to database:", {
+          title: imagePayload.title,
+          fileName: imagePayload.fileName,
+          dataLength: imagePayload.imageData?.length || 0
+        })
+
+        const result = await createImage(imagePayload)
+        
+        console.log("Database result:", result)
+        
+        if (result.success) {
+          const savedImage = result.message
+          const newImage = {
+            id: savedImage.id,
+            url: imageData,
+            title: file.name,
+            file: file,
+            dbId: savedImage.id // Store database ID for reference
+          }
+
+          setWidgets(widgets.map(w => 
+            w.id === widgetId 
+              ? { ...w, images: [newImage] } // Replace with single image
+              : w
+          ))
+
+          toast.success("Image uploaded and saved successfully!")
+        } else {
+          console.error("Failed to save image:", result.message)
+          toast.error(`Failed to save image to database: ${result.message}`)
+        }
+      } catch (error) {
+        console.error("Error saving image:", error)
+        toast.error("Failed to save image")
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeImage = (widgetId: string) => {
+    setWidgets(widgets.map(w => 
+      w.id === widgetId 
+        ? { ...w, images: [] } // Clear all images (single image widget)
+        : w
+    ))
+    toast.success("Image removed successfully!")
+  }
+
+  const handleImageDrop = (e: React.DragEvent, widgetId: string) => {
+    e.preventDefault()
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      handleImageUpload(widgetId, files)
+    }
+  }
+
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
     if (!selectedRatio) return { width: "0%", height: "0%" }
 
@@ -582,10 +696,63 @@ function EditDashboardDemo() {
         // Get complete widget settings or use defaults
         const settings = widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
 
-        // Select relevant notice IDs from the top notices
+        // Handle different widget types
+        if (widget.type === "image") {
+          // For image widgets, include image data
+          const imageData = widget.images && widget.images.length > 0 ? widget.images[0] : null
+          const imageIds = imageData ? [imageData.id] : []
+
+          return {
+            id: specificLayout.i,
+            x: specificLayout.x,
+            y: specificLayout.y,
+            w: specificLayout.w,
+            h: specificLayout.h,
+            leftPx: `${leftPx.toFixed(1)}px`,
+            topPx: `${topPx.toFixed(1)}px`,
+            leftPercent: `${leftPercent.toFixed(2)}%`,
+            topPercent: `${topPercent.toFixed(2)}%`,
+            width: `${widgetWidth.toFixed(2)}%`,
+            height: `${widgetHeight.toFixed(2)}%`,
+            title: widget.content || widget.title,
+            type: "image",
+            imageIds: imageIds,
+            settings: {
+              // Include all settings properties explicitly to ensure nothing is missed
+              backgroundColor: settings.backgroundColor,
+              backgroundOpacity: settings.backgroundOpacity,
+              cardOpacity: settings.cardOpacity,
+              borderColor: settings.borderColor,
+              borderWidth: settings.borderWidth,
+              fontColor: settings.fontColor,
+              noticeCount: settings.noticeCount,
+              fontFamily: settings.fontFamily,
+              fontSize: settings.fontSize,
+              fontWeight: settings.fontWeight,
+              autoScroll: settings.autoScroll,
+              showFullContent: settings.showFullContent,
+              // New category styling properties
+              categoryFont: settings.categoryFont,
+              categoryFontSize: settings.categoryFontSize,
+              categoryFontWeight: settings.categoryFontWeight,
+              categoryFontColor: settings.categoryFontColor,
+              categoryBackgroundColor: settings.categoryBackgroundColor,
+              categoryHeight: settings.categoryHeight,
+              categoryBorderColor: settings.categoryBorderColor,
+              categoryBorderWidth: settings.categoryBorderWidth,
+              // Image-specific settings
+              imageFit: settings.imageFit,
+              imageBorderRadius: settings.imageBorderRadius,
+              showImageTitle: settings.showImageTitle,
+              imageTitleColor: settings.imageTitleColor,
+              imageTitleFontSize: settings.imageTitleFontSize,
+              imageTitleFontWeight: settings.imageTitleFontWeight,
+            },
+          }
+        } else {
+          // For notice widgets, include notice data
         const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
 
-        // Ensure we're sending all settings properties to the database
         return {
           id: specificLayout.i,
           x: specificLayout.x,
@@ -600,6 +767,7 @@ function EditDashboardDemo() {
           height: `${widgetHeight.toFixed(2)}%`,
           title: widget.content || widget.title,
           category: widget.category,
+            type: "notice",
           noticeIds: noticeIds,
           settings: {
             // Include all settings properties explicitly to ensure nothing is missed
@@ -625,6 +793,7 @@ function EditDashboardDemo() {
             categoryBorderColor: settings.categoryBorderColor,
             categoryBorderWidth: settings.categoryBorderWidth,
           },
+          }
         }
       })
       .filter(Boolean)
@@ -785,15 +954,15 @@ function EditDashboardDemo() {
   }, [widgets, widgetSettings])
 
   // Calculate the maximum height for notices container based on widget size
-  const calculateNoticesContainerHeight = (widgetLayout: Layout | undefined) => {
+  const calculateNoticesContainerHeight = (widgetLayout: Layout | undefined, widgetType?: WidgetType) => {
     if (!widgetLayout) return 200 // Default height
 
     // Calculate based on widget height
     const rowHeight = 50 // Match the new rowHeight
     const widgetHeight = widgetLayout.h * rowHeight
 
-    // Reserve space for widget header and padding
-    const reservedSpace = 120 // Header + padding + margins
+    // For image widgets, reserve much less space for a very compact layout
+    const reservedSpace = widgetType === "image" ? 50 : 120 // Much reduced space for image widgets
 
     return Math.max(80, widgetHeight - reservedSpace) // Ensure minimum height of 80px
   }
@@ -941,15 +1110,29 @@ function EditDashboardDemo() {
             </div>
           )}
         </div>
+        <div className="relative">
         <button
-          onClick={addWidget}
+            onClick={() => addWidget("notice")}
           disabled={!selectedRatio}
           className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ${
             selectedRatio ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
           }`}
         >
-          <Plus size={20} /> Create Widget
+            <Plus size={20} /> Create Notice Widget
         </button>
+        </div>
+
+        <div className="relative">
+          <button
+            onClick={() => addWidget("image")}
+            disabled={!selectedRatio}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ${
+              selectedRatio ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            <ImageIcon size={20} /> Create Image Widget
+          </button>
+        </div>
 
         <div className="relative">
           <button
@@ -1101,7 +1284,7 @@ function EditDashboardDemo() {
                 settings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
 
               // Calculate the appropriate height for notices container
-              const noticesContainerHeight = calculateNoticesContainerHeight(widgetLayout)
+              const noticesContainerHeight = calculateNoticesContainerHeight(widgetLayout, widget.type)
 
               return (
                 <div
@@ -1119,7 +1302,7 @@ function EditDashboardDemo() {
                     height: "100%",
                     overflow: "hidden", // Prevent content from overflowing the widget
                   }}
-                  onDrop={(e) => handleDrop(e, widget.id)}
+                  onDrop={(e) => widget.type === "image" ? handleImageDrop(e, widget.id) : handleDrop(e, widget.id)}
                   onDragOver={handleDragOver}
                 >
                   <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md z-10">
@@ -1170,8 +1353,88 @@ function EditDashboardDemo() {
                   </div>
 
                   {/* Widget Content - Flex grow to fill available space */}
-                  <div className="p-2 flex-grow flex flex-col overflow-hidden">
-                    {widget.topNotices ? (
+                  <div className={`${widget.type === "image" ? "p-0" : "p-2"} flex-grow flex flex-col overflow-hidden`}>
+                    {widget.type === "image" ? (
+                      // Single Image Widget Content - More compact like Notice widget
+                      <div className="flex flex-col h-full relative group">
+                        <div
+                          className="image-container flex-grow relative rounded-lg overflow-hidden shadow-inner"
+                          style={{
+                            height: `${noticesContainerHeight}px`,
+                            maxHeight: `${noticesContainerHeight}px`,
+                            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                          }}
+                        >
+                          {widget.images && widget.images.length > 0 ? (
+                            <div className="w-full h-full relative">
+                              <img
+                                src={widget.images[0].url}
+                                alt={widget.images[0].title}
+                                className="w-full h-full object-cover rounded-lg transition-transform duration-300 hover:scale-105"
+                                style={{
+                                  objectFit: settings.imageFit as any,
+                                  borderRadius: `${settings.imageBorderRadius}px`,
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                }}
+                              />
+                              {settings.showImageTitle && (
+                                <div 
+                                  className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black via-black/70 to-transparent rounded-b"
+                                  style={{
+                                    borderBottomLeftRadius: `${settings.imageBorderRadius}px`,
+                                    borderBottomRightRadius: `${settings.imageBorderRadius}px`,
+                                  }}
+                                >
+                                  <p
+                                    className="text-sm font-semibold text-white truncate drop-shadow-lg"
+                                    style={{
+                                      color: settings.imageTitleColor,
+                                      fontSize: `${settings.imageTitleFontSize}px`,
+                                      fontWeight: settings.imageTitleFontWeight,
+                                      fontFamily: settings.fontFamily,
+                                    }}
+                                    title={widget.images[0].title}
+                                  >
+                                    {widget.images[0].title}
+                                  </p>
+                                </div>
+                              )}
+                              <button
+                                onClick={() => removeImage(widget.id)}
+                                className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all duration-200 hover:scale-110 shadow-lg backdrop-blur-sm bg-opacity-90"
+                                style={{ fontSize: '8px' }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div
+                              className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300"
+                              style={{
+                                borderColor: settings.fontColor,
+                                opacity: 0.8,
+                                fontFamily: settings.fontFamily,
+                              }}
+                            >
+                              <div className="bg-white p-3 rounded-full shadow-lg mb-3">
+                                <Upload size={32} style={{ color: '#3b82f6', opacity: 0.8 }} />
+                              </div>
+                              <p style={{ color: settings.fontColor, marginTop: '8px', fontWeight: '500' }}>
+                                Drag & drop an image here or click to upload
+                              </p>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(widget.id, e.target.files)}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      // Notice Widget Content (existing logic)
+                      widget.topNotices ? (
                       <div className="flex flex-col h-full">
                         <div className="bg-indigo-50 py-1 px-2 rounded mb-2 text-center flex-shrink-0">
                           <span className="text-sm font-medium text-indigo-600">
@@ -1244,6 +1507,7 @@ function EditDashboardDemo() {
                       >
                         <p style={{ color: settings.fontColor }}>Drag a category here</p>
                       </div>
+                      )
                     )}
                   </div>
                 </div>
@@ -1847,6 +2111,152 @@ function EditDashboardDemo() {
                       </span>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Image Tab - New tab for image widget settings */}
+            {activeSettingsTab === "image" && (
+              <div className="space-y-4">
+                {/* Image Fit */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <ImageIcon size={14} /> Image Fit
+                  </label>
+                  <select
+                    value={widgetSettings[activeSettingsWidget]?.imageFit || DEFAULT_WIDGET_SETTINGS.imageFit}
+                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageFit", e.target.value)}
+                    className="w-full text-sm border rounded-md p-2"
+                  >
+                    <option value="cover">Cover</option>
+                    <option value="contain">Contain</option>
+                    <option value="fill">Fill</option>
+                    <option value="scale-down">Scale Down</option>
+                  </select>
+                </div>
+
+                {/* Image Border Radius */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Box size={14} /> Border Radius
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="20"
+                      value={widgetSettings[activeSettingsWidget]?.imageBorderRadius || DEFAULT_WIDGET_SETTINGS.imageBorderRadius}
+                      onChange={(e) =>
+                        updateWidgetSetting(activeSettingsWidget, "imageBorderRadius", Number.parseInt(e.target.value))
+                      }
+                      className="flex-1"
+                    />
+                    <span className="text-sm w-12 text-right">
+                      {widgetSettings[activeSettingsWidget]?.imageBorderRadius || DEFAULT_WIDGET_SETTINGS.imageBorderRadius}px
+                    </span>
+                  </div>
+                </div>
+
+                {/* Show Image Title Toggle */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Show Image Title
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        updateWidgetSetting(
+                          activeSettingsWidget,
+                          "showImageTitle",
+                          !(widgetSettings[activeSettingsWidget]?.showImageTitle || true),
+                        )
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                        widgetSettings[activeSettingsWidget]?.showImageTitle !== false ? "bg-blue-600" : "bg-gray-200"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          widgetSettings[activeSettingsWidget]?.showImageTitle !== false ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-sm text-gray-600">
+                      {widgetSettings[activeSettingsWidget]?.showImageTitle !== false ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Image Title Color */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Title Color
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {getPresetColors().map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => updateWidgetSetting(activeSettingsWidget, "imageTitleColor", color)}
+                        className="w-6 h-6 rounded-full border border-gray-300"
+                        style={{
+                          backgroundColor: color,
+                          outline:
+                            widgetSettings[activeSettingsWidget]?.imageTitleColor === color
+                              ? "2px solid #3b82f6"
+                              : "none",
+                        }}
+                        title={color}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={
+                        widgetSettings[activeSettingsWidget]?.imageTitleColor ||
+                        DEFAULT_WIDGET_SETTINGS.imageTitleColor
+                      }
+                      onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageTitleColor", e.target.value)}
+                      className="w-6 h-6 p-0 rounded-full ml-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Image Title Font Size */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Title Font Size
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="10"
+                      max="20"
+                      value={widgetSettings[activeSettingsWidget]?.imageTitleFontSize || DEFAULT_WIDGET_SETTINGS.imageTitleFontSize}
+                      onChange={(e) =>
+                        updateWidgetSetting(activeSettingsWidget, "imageTitleFontSize", Number.parseInt(e.target.value))
+                      }
+                      className="flex-1"
+                    />
+                    <span className="text-sm w-12 text-right">
+                      {widgetSettings[activeSettingsWidget]?.imageTitleFontSize || DEFAULT_WIDGET_SETTINGS.imageTitleFontSize}px
+                    </span>
+                  </div>
+                </div>
+
+                {/* Image Title Font Weight */}
+                <div>
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                    <Type size={14} /> Title Font Weight
+                  </label>
+                  <select
+                    value={widgetSettings[activeSettingsWidget]?.imageTitleFontWeight || DEFAULT_WIDGET_SETTINGS.imageTitleFontWeight}
+                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageTitleFontWeight", e.target.value)}
+                    className="w-full text-sm border rounded-md p-2"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="medium">Medium</option>
+                    <option value="semibold">Semibold</option>
+                    <option value="bold">Bold</option>
+                  </select>
                 </div>
               </div>
             )}

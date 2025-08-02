@@ -41,6 +41,13 @@ export type WidgetSettings = {
   categoryHeight: number
   categoryBorderColor: string
   categoryBorderWidth: number
+  // Image widget settings
+  imageFit: string
+  imageBorderRadius: number
+  showImageTitle: boolean
+  imageTitleColor: string
+  imageTitleFontSize: number
+  imageTitleFontWeight: string
 }
 
 // Add the Layout type from react-grid-layout
