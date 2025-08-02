@@ -1,21 +1,32 @@
-import { prisma } from "@/db/prisma"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/db/prisma'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-   
+    const admins = await prisma.user.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    })
 
-    const user = await prisma.user.findMany();
-    console.log(user);
-
-    return NextResponse.json(user);
- 
-  } catch (error: unknown) {
-    return new NextResponse(
-      JSON.stringify({
-        status: "error",
-        message: error,
-      }),
+    return NextResponse.json({
+      success: true,
+      admins: admins
+    })
+  } catch (error) {
+    console.error('Error fetching admins:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Failed to fetch admin users'
+      },
       { status: 500 }
     )
   }

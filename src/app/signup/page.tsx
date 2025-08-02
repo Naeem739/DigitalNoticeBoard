@@ -61,8 +61,8 @@ export default function SignUpPage() {
           {/* Signup Form */}
           <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign Up</h2>
-              <p className="text-gray-600">Create your account to get started</p>
+                              <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign Up</h2>
+                <p className="text-gray-600">Create your account to get started</p>
             </div>
             
             <SignUpForm />

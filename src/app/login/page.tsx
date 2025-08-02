@@ -105,8 +105,8 @@ const LoginPage = () => {
           {/* Login Form */}
           <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign In</h2>
-              <p className="text-gray-600">Enter your credentials to continue</p>
+                              <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign In</h2>
+                <p className="text-gray-600">Enter your credentials to continue</p>
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

@@ -22,14 +22,12 @@ export default function DashboardLayout({
   if (status === "loading") return <Loading></Loading>;
   if (!session) return <p>Access Denied</p>;
 
-  // console.log(session)
-
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-white overflow-hidden">
       <Sidebar isOpen={isSidebarOpen} />
       <div className="flex flex-col flex-1">
         <Header toggleSidebar={toggleSidebar} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-white">
           {children}
         </main>
       </div>

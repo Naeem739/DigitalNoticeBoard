@@ -5,10 +5,29 @@ export async function GET() {
   try {
     const categories = await prisma.category.findMany({
       orderBy: { name: "asc" },
+      include: {
+        notices: {
+          select: {
+            id: true
+          }
+        }
+      }
     });
+
+    // Transform the data to include notice count
+    const categoriesWithCount = categories.map(category => ({
+      id: category.id,
+      name: category.name,
+      icon: category.icon,
+      editedName: category.editedName,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
+      noticeCount: category.notices.length
+    }));
+
     return NextResponse.json({
       success: true,
-      data: categories,
+      result: categoriesWithCount,
     });
   } catch (error) {
     console.error("Error fetching categories:", error);

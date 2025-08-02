@@ -9,9 +9,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 
 const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
+  const { data: session } = useSession()
 
   const handleLogout = async () => {
     console.log("Attempting to sign out...");
@@ -22,10 +23,8 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
     console.log("Signed out.");
   };
 
-
-
   return (
-    <header className="bg-white shadow-md py-4 px-4 flex items-center justify-between">
+    <header className="bg-white shadow-md py-4 px-4 flex items-center justify-between border-b border-gray-200">
       <div className="flex items-center">
         <Button variant="ghost" size="icon" className="md:hidden mr-2 z-50" onClick={toggleSidebar}>
           <Menu className="h-5 w-5" />
@@ -47,9 +46,11 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">John Doe</p>
+                <p className="text-sm font-medium leading-none">
+                  {session?.user?.name || 'Administrator'}
+                </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  john.doe@example.com
+                  {session?.user?.email || 'admin@smartnoticeboard.com'}
                 </p>
               </div>
             </DropdownMenuLabel>
@@ -60,9 +61,8 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
             <DropdownMenuItem>
               Settings
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Button onClick={()=> handleLogout()}>  Log out </Button>
-             
+            <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+              Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

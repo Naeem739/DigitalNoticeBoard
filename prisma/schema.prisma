@@ -27,6 +27,16 @@ model Notice {
   container   Container?
 }
 
+model Image {
+  id          String @id @default(uuid()) 
+  title       String
+  imageUrl    String
+  imageData   String // Base64 encoded image data
+  fileName    String
+  createdAt   DateTime? @default(now())
+  container   ImageContainer?
+}
+
 model Container{
   id       String     @id @default(uuid())
   type     String
@@ -38,15 +48,27 @@ model Container{
   noticeId  String @unique
 }
 
+model ImageContainer{
+  id       String     @id @default(uuid())
+  type     String
+  height   Float
+  width    Float
+  top      Float
+  left     Float 
+  ImageRelation Image @relation(fields: [imageId], references: [id])
+  imageId  String @unique
+}
+
 model Category {
   id      String @id @default(uuid())
   name    String @unique
   notices Notice[]
   icon    String? // New: icon for the category
   editedName String? // New: editable category name
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   // noticeId
 }
-
 
 model Dashboard {
   id           String @id @default(uuid())
@@ -54,8 +76,6 @@ model Dashboard {
   containers   Json
   createdAt   DateTime? @default(now())
 }
-
-
 
 model Template {
   id             String   @id @default(cuid())
