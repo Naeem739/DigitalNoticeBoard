@@ -218,26 +218,14 @@ export const getDashboardByIndex = async(index: number) => {
             }
         });
 
-        // Fetch images
-        const images = await prisma.image.findMany({
-            where:{
-                id:{
-                    in: imageIds
-                }
-            },
-            include: {
-                container: true
-            },
-            orderBy: {
-                createdAt: 'desc'
-            }
-        });
+        // Remove image fetching from prisma.image
+        // const images = await prisma.image.findMany({ ... });
 
         return {
             success: true,
             result: {
                 notices,
-                images,
+                // images: [], // Optionally return an empty array if frontend expects it
                 ...dashboard
             }
         }

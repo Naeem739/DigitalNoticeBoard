@@ -20,16 +20,19 @@ import {
   BarChart3,
   Zap,
   Shield,
-  Crown
+  Crown,
+  X
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { BellLoader, DashboardLoader, ContentSkeleton } from '@/components/ui/loader'
 
 type TDashboardStats = {
   totalNotices: number
   totalCategories: number
   totalImages: number
+  totalPDFs: number
   totalNoticeInterfaces: number
   recentNotices: Array<{
     id: string
@@ -41,6 +44,13 @@ type TDashboardStats = {
   recentImages: Array<{
     id: string
     title: string
+    imageFileName?: string
+    createdAt: Date
+  }>
+  recentPDFs: Array<{
+    id: string
+    title: string
+    pdfFileName?: string
     createdAt: Date
   }>
   recentNoticeInterfaces: Array<{
@@ -56,12 +66,18 @@ export default function DashboardPage() {
     totalNotices: 0,
     totalCategories: 0,
     totalImages: 0,
+    totalPDFs: 0,
     totalNoticeInterfaces: 0,
     recentNotices: [],
     recentImages: [],
+    recentPDFs: [],
     recentNoticeInterfaces: []
   })
   const [loading, setLoading] = useState(true)
+  const [selectedImage, setSelectedImage] = useState<any>(null)
+  const [showImageModal, setShowImageModal] = useState(false)
+  const [selectedPDF, setSelectedPDF] = useState<any>(null)
+  const [showPDFModal, setShowPDFModal] = useState(false)
 
   useEffect(() => {
     fetchDashboardStats()
@@ -86,21 +102,29 @@ export default function DashboardPage() {
       const categoriesResponse = await fetch('/api/category/get-all')
       const categoriesData = await categoriesResponse.json()
       
-      // Fetch images from Image table
-      const imagesResponse = await fetch('/api/image/get-all')
-      const imagesData = await imagesResponse.json()
-      
       // Fetch dashboards from Dashboard table
       const dashboardsResponse = await fetch('/api/dashboard/get-all')
       const dashboardsData = await dashboardsResponse.json()
 
+      // Filter notices that have imageData for recent images
+      const noticesWithImages = noticesData.success 
+        ? noticesData.result.filter((notice: any) => notice.imageData) 
+        : []
+
+      // Filter notices that have pdfData for recent PDFs
+      const noticesWithPDFs = noticesData.success 
+        ? noticesData.result.filter((notice: any) => notice.pdfData) 
+        : []
+
       setStats({
         totalNotices: noticesData.success ? noticesData.result?.length || 0 : 0,
         totalCategories: categoriesData.success ? categoriesData.result?.length || 0 : 0,
-        totalImages: imagesData.success ? imagesData.result?.length || 0 : 0,
+        totalImages: noticesWithImages.length,
+        totalPDFs: noticesWithPDFs.length,
         totalNoticeInterfaces: dashboardsData.success ? dashboardsData.result?.length || 0 : 0,
         recentNotices: noticesData.success ? noticesData.result?.slice(0, 5) || [] : [],
-        recentImages: imagesData.success ? imagesData.result?.slice(0, 3) || [] : [],
+        recentImages: noticesWithImages.slice(0, 3),
+        recentPDFs: noticesWithPDFs.slice(0, 3),
         recentNoticeInterfaces: dashboardsData.success ? dashboardsData.result?.slice(0, 3) || [] : []
       })
     } catch (error) {
@@ -120,6 +144,8 @@ export default function DashboardPage() {
   }
 
   const getTimeAgo = (date: Date) => {
+    if (typeof window === 'undefined') return 'Loading...';
+    
     const now = new Date()
     const diffInMs = now.getTime() - new Date(date).getTime()
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
@@ -133,10 +159,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
+        <DashboardLoader />
       </div>
     )
   }
@@ -173,7 +196,7 @@ export default function DashboardPage() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
       >
         <Link href="/dashboard/showNotices">
           <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 hover:shadow-lg transition-shadow cursor-pointer">
@@ -223,6 +246,22 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
+        <Link href="/dashboard/showPDFNotices">
+          <Card className="bg-gradient-to-br from-red-50 to-pink-50 border-red-200 hover:shadow-lg transition-shadow cursor-pointer">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-red-100 rounded-lg">
+                  <FileText className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-800">{stats.totalPDFs}</div>
+                  <div className="text-sm text-red-600">PDFs</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
         <Link href="/dashboard/noticeInterfaces">
           <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-orange-200 hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-6">
@@ -264,8 +303,8 @@ export default function DashboardPage() {
               <div className="p-3 bg-green-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-green-200 transition-colors">
                 <Layout className="w-6 h-6 text-green-600" />
               </div>
-              <h3 className="font-semibold text-gray-800">Edit Dashboard</h3>
-              <p className="text-xs text-gray-500 mt-1">Customize layout</p>
+              <h3 className="font-semibold text-gray-800">New Interface</h3>
+              <p className="text-xs text-gray-500 mt-1">Create or customize a dashboard interface</p>
             </CardContent>
           </Card>
         </Link>
@@ -296,7 +335,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Notices */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
@@ -337,7 +376,7 @@ export default function DashboardPage() {
                     
                     return (
                       <div key={notice.id} className="flex items-start justify-between p-3 bg-white rounded-lg border border-gray-200">
-                        <div className="flex-1 min-w-0 pr-3 max-w-[calc(100%-80px)]">
+                        <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-gray-900 truncate mb-1">{notice.title}</h4>
                           <p className="text-sm text-gray-600 text-truncate-1 leading-tight">
                             {truncatedContent}
@@ -346,18 +385,6 @@ export default function DashboardPage() {
                           <Badge variant="outline" className="text-xs">{notice.category}</Badge>
                           <span>{getTimeAgo(notice.createdAt)}</span>
                         </div>
-                      </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                        <Link href={`/dashboard/showNotices`}>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                        <Link href={`/dashboard/create-notice`}>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </Link>
                       </div>
                     </div>
                     );
@@ -403,26 +430,24 @@ export default function DashboardPage() {
                 <div className="space-y-3">
                   {stats.recentImages.map((image, index) => (
                     <div key={image.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                          <Image className="w-5 h-5 text-purple-600" />
+                      <div className="flex items-center gap-3 flex-1">
+                        <div 
+                          className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => {
+                            setSelectedImage(image)
+                            setShowImageModal(true)
+                          }}
+                        >
+                          <img 
+                            src={`data:image/jpeg;base64,${image.imageData}`}
+                            alt={image.title}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900 truncate">{image.title}</h4>
-                          <p className="text-xs text-gray-500">{getTimeAgo(image.createdAt)}</p>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 truncate">{image.imageFileName || image.title}</h4>
+                          <p className="text-xs text-gray-500">{formatDate(image.createdAt)}</p>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Link href="/dashboard/showImageNotices">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                        <Link href="/dashboard/showImageNotices">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </Link>
                       </div>
                     </div>
                   ))}
@@ -430,6 +455,64 @@ export default function DashboardPage() {
                     <Link href="/dashboard/showImageNotices">
                       <Button variant="outline" size="sm">
                         View All Images
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Recent PDFs */}
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+        >
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-red-600" />
+                Recent PDFs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stats.recentPDFs.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No PDFs uploaded yet</p>
+                  <Link href="/dashboard/create-notice">
+                    <Button variant="outline" size="sm" className="mt-2">
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add PDFs
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {stats.recentPDFs.map((pdf, index) => (
+                    <div key={pdf.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div 
+                          className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => {
+                            setSelectedPDF(pdf)
+                            setShowPDFModal(true)
+                          }}
+                        >
+                          <FileText className="w-6 h-6 text-red-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 truncate">{pdf.pdfFileName || pdf.title}</h4>
+                          <p className="text-xs text-gray-500">{formatDate(pdf.createdAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="text-center pt-2">
+                    <Link href="/dashboard/showPDFNotices">
+                      <Button variant="outline" size="sm">
+                        View All PDFs
                       </Button>
                     </Link>
                   </div>
@@ -481,6 +564,65 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Image Modal */}
+      {showImageModal && selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg overflow-hidden">
+            <div className="absolute top-4 right-4 z-10">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowImageModal(false)}
+                className="bg-white/90 hover:bg-white text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedImage.title}</h3>
+              <div className="overflow-auto max-h-[70vh]">
+                <img
+                  src={`data:image/jpeg;base64,${selectedImage.imageData}`}
+                  alt={selectedImage.title}
+                  className="w-full h-auto object-contain rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Modal */}
+      {showPDFModal && selectedPDF && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-2">
+          <div 
+            className="relative bg-white rounded-lg overflow-hidden shadow-2xl"
+            style={{ width: '95vw', height: '95vh' }}
+          >
+            <div className="absolute top-4 right-4 z-10">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPDFModal(false)}
+                className="bg-white/90 hover:bg-white text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            <div className="p-2 h-full flex flex-col">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedPDF.title}</h3>
+              <div className="flex-1 overflow-auto">
+                <embed
+                  src={`data:application/pdf;base64,${selectedPDF.pdfData}`}
+                  type="application/pdf"
+                  className="w-full h-full rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

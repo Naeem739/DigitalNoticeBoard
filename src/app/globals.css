@@ -20,6 +20,27 @@
     }
   }
 
+  .animate-rainfall {
+    animation: rainfall 3s linear infinite;
+  }
+
+  @keyframes rainfall {
+    0% {
+      transform: translateY(-100px) scale(0.8);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100vh) scale(1.2);
+      opacity: 0;
+    }
+  }
+
   .text-truncate-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -108,4 +129,81 @@
   :root {
         --radius: 0.5rem;
     }
+}
+
+/* Custom slider styling */
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+}
+
+.slider::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.slider::-moz-range-thumb:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+}
+
+/* Widget Settings Panel Enhancements */
+.widget-settings-panel {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Color picker enhancements */
+.color-picker-button {
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.color-picker-button:hover {
+  transform: scale(1.1);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.color-picker-button.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Toggle switch enhancements */
+.toggle-switch {
+  transition: all 0.3s ease;
+}
+
+.toggle-switch:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Select dropdown enhancements */
+.select-enhanced {
+  transition: all 0.2s ease;
+}
+
+.select-enhanced:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }

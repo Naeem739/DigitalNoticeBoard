@@ -117,6 +117,8 @@ export default function ShowAllAdminPage() {
   }
 
   const getTimeAgo = (date: Date) => {
+    if (typeof window === 'undefined') return 'Loading...';
+    
     const now = new Date()
     const diffInMs = now.getTime() - new Date(date).getTime()
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))

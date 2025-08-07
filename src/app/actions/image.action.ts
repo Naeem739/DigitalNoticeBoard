@@ -1,4 +1,4 @@
-'use server'
+/*'use server'
 
 import { prisma } from "@/db/prisma"
 
@@ -74,4 +74,4 @@ export const testImageConnection = async () => {
     console.error("Database connection test failed:", error)
     return { success: false, error }
   }
-} 
+} */

@@ -2,10 +2,34 @@
 
 import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
-import { Home, BarChart2, Users, FolderPlus, FilePenLine, ChevronDown, ChevronRight, Image, Layout } from "lucide-react"
+import { 
+  Home, 
+  BarChart2, 
+  Users, 
+  FolderPlus, 
+  FilePenLine, 
+  ChevronDown, 
+  ChevronRight, 
+  Image, 
+  Layout,
+  Megaphone,
+  Bell,
+  Settings,
+  Palette,
+  Grid3X3,
+  Eye,
+  Plus,
+  List,
+  Shield,
+  UserCheck,
+  UserPlus,
+  LayoutDashboard,
+  Monitor,
+  Smartphone,
+  QrCode
+} from "lucide-react"
 import * as Collapsible from "@radix-ui/react-collapsible"
 import type React from "react"
-import { Megaphone } from "lucide-react";
 
 
 export default function Sidebar({ isOpen }: { isOpen: boolean }) {
@@ -76,50 +100,47 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
       } md:relative md:translate-x-0 transition duration-500 ease-in-out z-50 overflow-y-auto border-r border-gray-700`}
     >
       <Link href="/dashboard" className="text-white flex items-center space-x-2 px-4">
-        <BarChart2 className="w-8 h-8" />
-        <span className="text-2xl font-extrabold">Dashboard</span>
+        <Bell className="w-8 h-8 text-yellow-400" />
+        <span className="text-2xl font-extrabold">Smart Notice Board</span>
       </Link>
-      <nav>
+      <nav className="space-y-2">
         <MenuItem href="/" icon={Home}>
           Home
         </MenuItem>
-
-        <MenuItem href="/dashboard/category" icon={Users}>
-          Category
+        <MenuItem href="/dashboard" icon={LayoutDashboard}>
+          Dashboard
         </MenuItem>
-
+        <MenuItem href="/notice" icon={Bell}>
+          Public Notices
+        </MenuItem>
+        <MenuItem href="/dashboard/manage-public-notice" icon={Settings}>
+          Notice Board Settings
+        </MenuItem>
+        <MenuItem href="/dashboard/category" icon={FolderPlus}>
+          Notice Categories
+        </MenuItem>
         <DropdownMenu
-          title="Notice Content"
+          title="Manage Notices"
           items={[
-            { href: "/dashboard/create-notice", icon: FilePenLine, label: "Add New Notice" },
-            {href: "/dashboard/showNotices", icon: Megaphone, label: "Show Notices" },
-            {href: "/dashboard/showImageNotices", icon: Image, label: "Show ImageNotices" }
-
+            { href: "/dashboard/create-notice", icon: Plus, label: "New Notice" },
+            { href: "/dashboard/showNotices", icon: List, label: "All Notices" },
+            { href: "/dashboard/showImageNotices", icon: Image, label: "Image-Based Notices" }
           ]}
         />
-    
-
-        
         <DropdownMenu
-          title="Admin"
+          title="Interface Management"
           items={[
-            { href: "/dashboard/admin/make-admin", icon: Users, label: "Make Admin" },
-            { href: "/dashboard/admin/showAllAdmin", icon: Users, label: "Show All Admin" }
+            { href: "/dashboard/layout/edit-dashboard", icon: LayoutDashboard, label: "New Interface" },
+            { href: "/dashboard/noticeInterfaces", icon: Grid3X3, label: "All Interfaces" }
           ]}
         />
-
         <DropdownMenu
-          title="Layout"
+          title="Manage Users"
           items={[
-            { href: "/dashboard/layout/edit-dashboard", icon: Users, label: "Edit Dashboard" },
-            { href: "/dashboard/noticeInterfaces", icon: Layout, label: "NoticeInterfaces" }
+            { href: "/dashboard/admin/make-admin", icon: UserPlus, label: "Add Administrator" },
+            { href: "/dashboard/admin/showAllAdmin", icon: UserCheck, label: "Administrators" }
           ]}
         />
-
-
-        {/* <MenuItem href="/dashboard/settings" icon={Settings}>
-          Settings
-        </MenuItem> */}
       </nav>
     </div>
   )

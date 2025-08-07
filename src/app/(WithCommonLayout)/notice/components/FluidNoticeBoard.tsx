@@ -116,7 +116,7 @@ export default function FluidNoticeLayout() {
   ]
 
   return (
-    <div className="w-full bg-gray-50 min-h-screen" style={{ padding: "2vw" }}>
+    <div className="w-full" style={{ padding: "2vw" }}>
       {/* Top row - larger cards */}
       <div
         className="grid gap-6 mb-6"

@@ -31,6 +31,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { createCategory } from "@/app/actions/category.action"
+import { BellLoader } from "@/components/ui/loader"
 
 type TCategory = {
   id: string
@@ -177,6 +178,8 @@ export default function CategoryPage() {
   }
 
   const getTimeAgo = (date: Date) => {
+    if (typeof window === 'undefined') return 'Loading...';
+    
     const now = new Date()
     const diffInMs = now.getTime() - new Date(date).getTime()
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
@@ -190,10 +193,7 @@ export default function CategoryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading categories...</p>
-        </div>
+        <BellLoader size="lg" />
       </div>
     )
   }

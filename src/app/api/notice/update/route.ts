@@ -6,7 +6,7 @@ export async function PUT(request: Request) {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
         const body = await request.json();
-        const { title, content, category, categoryId } = body;
+        const { title, content, category, categoryId, imageData, imageFileName, imageUrl } = body;
 
         if (!id) {
             return NextResponse.json(
@@ -16,16 +16,25 @@ export async function PUT(request: Request) {
         }
 
         // Update the notice
+        const updateData: any = {
+            title: title,
+            category: category,
+            categoryId: categoryId,
+            imageData: imageData,
+            imageFileName: imageFileName,
+            imageUrl: imageUrl
+        };
+
+        // Only include content if it's provided
+        if (content !== undefined) {
+            updateData.content = content;
+        }
+
         const updatedNotice = await prisma.notice.update({
             where: {
                 id: id
             },
-            data: {
-                title: title,
-                content: content,
-                category: category,
-                categoryId: categoryId
-            }
+            data: updateData
         });
 
         return NextResponse.json({

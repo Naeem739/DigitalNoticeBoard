@@ -18,16 +18,42 @@ import {
   Upload,
   Image as ImageIcon,
   Trash2,
+  Edit,
+  ArrowLeft,
+  AlertTriangle,
 } from "lucide-react"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import "./edit-dashboard.css"
 import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } from "@/types/template-types"
 import { getCategoriesWithNotices } from "@/app/actions/category.action"
-import {  saveTemplate, getTemplates } from "@/app/actions/template.action"
-import { createDashboard } from "@/app/actions/dashboard.action"
-import { createImage, testImageConnection } from "@/app/actions/image.action"
+import { getAllTemplates, createTemplate, getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
+import { createDashboard, getAllDashboards } from "@/app/actions/dashboard.action"
+// import { createImage, testImageConnection } from "@/app/actions/image.action"
 import { toast } from "sonner"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { SpinningBellLoader, WaveLoader } from "@/components/ui/loader"
+import { localStorageUtils } from "@/lib/utils"
+
+// Client-only wrapper for GridLayout to prevent hydration issues
+const ClientOnlyGridLayout = ({ children, ...props }: any) => {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="layout flex items-center justify-center" style={{ height: '400px' }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
+      </div>
+    );
+  }
+
+  return <GridLayout {...props}>{children}</GridLayout>;
+};
 
 type TCategoriesWithNotices = {
   id: string
@@ -41,28 +67,35 @@ type TResult = {
 }
 
 const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
+  // Appearance Settings
   backgroundColor: "#ffffff",
-  backgroundOpacity: 0.3,
-  cardOpacity: 0.9,
+  backgroundOpacity: 0.95,
+  cardOpacity: 1.0,
   borderColor: "#e2e8f0",
   borderWidth: 1,
+  
+  // Typography Settings
   fontColor: "#1e293b",
-  noticeCount: 3,
   fontFamily: "Inter",
   fontSize: 14,
   fontWeight: "normal",
-  autoScroll: false,
+  
+  // Content Settings
+  noticeCount: 5,
+  autoScroll: true,
   showFullContent: false,
-  // Default values for new category styling options
+  
+  // Category Settings
   categoryFont: "Inter",
-  categoryFontSize: 16,
+  categoryFontSize: 14,
   categoryFontWeight: "semibold",
-  categoryFontColor: "#1e293b",
-  categoryBackgroundColor: "#f8fafc",
-  categoryHeight: 40,
-  categoryBorderColor: "#e2e8f0",
-  categoryBorderWidth: 0,
-  // Image upload widget settings
+  categoryFontColor: "#374151",
+  categoryBackgroundColor: "#f9fafb",
+  categoryHeight: 36,
+  categoryBorderColor: "#d1d5db",
+  categoryBorderWidth: 1,
+  
+  // Image widget settings (kept for type compatibility)
   imageFit: "cover",
   imageBorderRadius: 8,
   showImageTitle: true,
@@ -75,6 +108,7 @@ const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> =
   "4:3": { width: 800, height: 600 },
   "16:9": { width: 960, height: 540 },
   "16:10": { width: 960, height: 600 },
+  "21:9": { width: 1050, height: 450 },
 }
 
 // Helper function to convert hex color to rgba
@@ -86,152 +120,27 @@ const hexToRgba = (hex: string, opacity: number) => {
 }
 
 // Add this type for the settings tabs
-type SettingsTab = "style" | "typography" | "layout" | "content" | "category" | "image"
+type SettingsTab = "style" | "typography" | "content" | "category"
 
 // Add widget type enum
-type WidgetType = "notice" | "image"
+type WidgetType = "notice"
 
-// Extend Widget type to include widget type and image data
+// Extend Widget type to include widget type
 interface ExtendedWidget extends Widget {
   type?: WidgetType
-  images?: Array<{
-    id: string
-    url: string
-    title: string
-    file: File
-    dbId?: string // Database ID for reference
-  }>
 }
 
 // Add this before the EditDashboardDemo component
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-  { id: "style", label: "Style", icon: <Palette size={16} /> },
-  { id: "typography", label: "Text", icon: <Type size={16} /> },
-  { id: "layout", label: "Layout", icon: <LayoutIcon size={16} /> },
+  { id: "style", label: "Appearance", icon: <Palette size={16} /> },
+  { id: "typography", label: "Typography", icon: <Type size={16} /> },
   { id: "content", label: "Content", icon: <Box size={16} /> },
   { id: "category", label: "Category", icon: <ListFilter size={16} /> },
-  { id: "image", label: "Image", icon: <ImageIcon size={16} /> },
 ]
 
 // Define the template type
 
-// Define the dashboard templates
-const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
-  {
-    id: "template-1",
-    name: "Simple Overview",
-    description: "A basic dashboard with key metrics.",
-    widgets: [
-      { id: "widget-1", title: "Total Revenue" },
-      { id: "widget-2", title: "New Users" },
-    ],
-    layout: [
-      { i: "widget-1", x: 0, y: 0, w: 5, h: 4 },
-      { i: "widget-2", x: 6, y: 0, w: 5, h: 4 },
-    ],
-    widgetSettings: {
-      "widget-1": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#f0fdfa" },
-      "widget-2": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#ecfdf5" },
-    },
-  },
-  {
-    id: "template-2",
-    name: "Marketing Dashboard",
-    description: "Dashboard focused on marketing performance.",
-    widgets: [
-      { id: "widget-3", title: "Website Traffic" },
-      { id: "widget-4", title: "Lead Generation" },
-    ],
-    layout: [
-      { i: "widget-3", x: 0, y: 0, w: 6, h: 4 },
-      { i: "widget-4", x: 6, y: 0, w: 6, h: 4 },
-    ],
-    widgetSettings: {
-      "widget-3": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#f0f9ff" },
-      "widget-4": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#e0f2fe" },
-    },
-  },
-  {
-    id: "template-3",
-    name: "Left-Dominant Split",
-    description: "One large widget on left, two smaller on right.",
-    widgets: [
-      { id: "widget-5", title: "Main Content" },
-      { id: "widget-6", title: "Secondary Info" },
-      { id: "widget-7", title: "Additional Details" },
-    ],
-    layout: [
-      { i: "widget-5", x: 0, y: 0, w: 6, h: 8 }, // Left widget takes half width, full height
-      { i: "widget-6", x: 6, y: 0, w: 6, h: 4 }, // Top-right widget
-      { i: "widget-7", x: 6, y: 4, w: 6, h: 4 }, // Bottom-right widget
-    ],
-    widgetSettings: {
-      "widget-5": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#f5f3ff", borderColor: "#c4b5fd" },
-      "widget-6": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#faf5ff", borderColor: "#d8b4fe" },
-      "widget-7": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#f3e8ff", borderColor: "#c084fc" },
-    },
-  },
-  {
-    id: "template-4",
-    name: "Right-Dominant Split",
-    description: "Two smaller widgets on left, one large on right.",
-    widgets: [
-      { id: "widget-8", title: "Quick Stats" },
-      { id: "widget-9", title: "Recent Activity" },
-      { id: "widget-10", title: "Detailed Overview" },
-    ],
-    layout: [
-      { i: "widget-8", x: 0, y: 0, w: 6, h: 4 }, // Top-left widget
-      { i: "widget-9", x: 0, y: 4, w: 6, h: 4 }, // Bottom-left widget
-      { i: "widget-10", x: 6, y: 0, w: 6, h: 8 }, // Right widget takes half width, full height
-    ],
-    widgetSettings: {
-      "widget-8": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#eff6ff", borderColor: "#93c5fd" },
-      "widget-9": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#dbeafe", borderColor: "#60a5fa" },
-      "widget-10": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#bfdbfe", borderColor: "#3b82f6" },
-    },
-  },
-  {
-    id: "template-5",
-    name: "Horizontal Stack",
-    description: "Three widgets stacked horizontally, equal height.",
-    widgets: [
-      { id: "widget-11", title: "Top Section" },
-      { id: "widget-12", title: "Middle Section" },
-      { id: "widget-13", title: "Bottom Section" },
-    ],
-    layout: [
-      { i: "widget-11", x: 0, y: 0, w: 12, h: 3 }, // Top widget, full width
-      { i: "widget-12", x: 0, y: 3, w: 12, h: 3 }, // Middle widget, full width
-      { i: "widget-13", x: 0, y: 6, w: 12, h: 3 }, // Bottom widget, full width
-    ],
-    widgetSettings: {
-      "widget-11": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#ecfdf5", borderColor: "#6ee7b7" },
-      "widget-12": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#d1fae5", borderColor: "#34d399" },
-      "widget-13": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#a7f3d0", borderColor: "#10b981" },
-    },
-  },
-  {
-    id: "template-6",
-    name: "Vertical Columns",
-    description: "Three widgets as vertical columns, equal width.",
-    widgets: [
-      { id: "widget-14", title: "Left Column" },
-      { id: "widget-15", title: "Middle Column" },
-      { id: "widget-16", title: "Right Column" },
-    ],
-    layout: [
-      { i: "widget-14", x: 0, y: 0, w: 4, h: 8 }, // Left column, 1/3 width, full height
-      { i: "widget-15", x: 4, y: 0, w: 4, h: 8 }, // Middle column, 1/3 width, full height
-      { i: "widget-16", x: 8, y: 0, w: 4, h: 8 }, // Right column, 1/3 width, full height
-    ],
-    widgetSettings: {
-      "widget-14": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#eff6ff", borderColor: "#93c5fd" },
-      "widget-15": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#dbeafe", borderColor: "#60a5fa" },
-      "widget-16": { ...DEFAULT_WIDGET_SETTINGS, backgroundColor: "#bfdbfe", borderColor: "#3b82f6" },
-    },
-  },
-]
+// Dynamic template loading - no hardcoded templates
 
 function EditDashboardDemo() {
   const [widgets, setWidgets] = useState<ExtendedWidget[]>([])
@@ -266,55 +175,84 @@ function EditDashboardDemo() {
   // Add state for confirmation dialog
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false)
   const [pendingSavedState, setPendingSavedState] = useState<any>(null)
+  
+  // Add state for loading existing dashboard
+  const [isLoadingExistingDashboard, setIsLoadingExistingDashboard] = useState(false)
 
   // Add useEffect to load saved state on component mount
   useEffect(() => {
-    const savedState = localStorage.getItem('dashboardState')
+    // Only run on client side
+    if (typeof window === 'undefined') return
+    
+    const urlParams = new URLSearchParams(window.location.search)
+    const dashboardId = urlParams.get('id')
+    
+    // Don't show confirmation dialog if we're loading an existing dashboard
+    if (dashboardId) {
+      return
+    }
+    
+    const savedState = localStorageUtils.getItem('dashboardState')
     
     if (savedState) {
       try {
-        const parsedState = JSON.parse(savedState)
-        const { selectedRatio: savedRatio, widgets: savedWidgets, layout: savedLayout } = parsedState
+        const { selectedRatio: savedRatio, widgets: savedWidgets, layout: savedLayout } = savedState
         
         // Check if there was previous content (widgets or layout)
         if (savedWidgets && savedWidgets.length > 0 || savedLayout && savedLayout.length > 0) {
           // Show confirmation dialog instead of clearing immediately
-          setPendingSavedState(parsedState)
+          setPendingSavedState(savedState)
           setShowConfirmationDialog(true)
         } else {
           // No previous content, just load the ratio
           setSelectedRatio(savedRatio)
-          localStorage.removeItem('dashboardState')
+          localStorageUtils.removeItem('dashboardState')
         }
       } catch (error) {
         console.error('Error loading saved dashboard state:', error)
-        localStorage.removeItem('dashboardState')
+        localStorageUtils.removeItem('dashboardState')
       }
     }
   }, [])
 
   // Add useEffect to save state whenever it changes
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return
+    
     if (widgets.length > 0 || layout.length > 0) {
+      // Create a lightweight version of widgets without large file data
+      const lightweightWidgets = widgets.map(widget => ({
+        ...widget,
+          // Don't include file, url (base64 data), or other large properties
+      }))
+      
       const stateToSave = {
-        widgets,
+        widgets: lightweightWidgets,
         layout,
         selectedRatio,
         widgetSettings
       }
-      localStorage.setItem('dashboardState', JSON.stringify(stateToSave))
+      
+      const success = localStorageUtils.setItem('dashboardState', stateToSave)
+      if (!success) {
+        console.warn('Failed to save dashboard state to localStorage (quota exceeded or data too large)')
+      }
     } else if (selectedRatio) {
       // Only save the selected ratio if no widgets exist
       const stateToSave = {
         selectedRatio
       }
-      localStorage.setItem('dashboardState', JSON.stringify(stateToSave))
+      const success = localStorageUtils.setItem('dashboardState', stateToSave)
+      if (!success) {
+        console.warn('Failed to save dashboard state to localStorage')
+      }
     }
   }, [widgets, layout, selectedRatio, widgetSettings])
 
   // Add function to clear saved state
   const clearSavedState = () => {
-    localStorage.removeItem('dashboardState')
+    localStorageUtils.removeItem('dashboardState')
   }
 
   // Handle confirmation dialog actions
@@ -323,18 +261,29 @@ function EditDashboardDemo() {
       // Load only the ratio, clear everything else
       setSelectedRatio(pendingSavedState.selectedRatio)
     }
-    localStorage.removeItem('dashboardState')
+    localStorageUtils.removeItem('dashboardState')
     setShowConfirmationDialog(false)
     setPendingSavedState(null)
   }
 
   const handleCancelClear = () => {
     if (pendingSavedState) {
-      // Load the full saved state (including widgets)
+      // Load the saved state (widgets will be lightweight version)
       setWidgets(pendingSavedState.widgets || [])
       setLayout(pendingSavedState.layout || [])
       setSelectedRatio(pendingSavedState.selectedRatio)
       setWidgetSettings(pendingSavedState.widgetSettings || {})
+      
+      // Check if there are image widgets that need to be re-uploaded
+      const hasImageWidgets = pendingSavedState.widgets?.some((widget: any) => 
+        widget.type === 'image' && widget.images?.length > 0
+      )
+      
+      if (hasImageWidgets) {
+        toast.info("Dashboard restored! Note: Image widgets need to be re-uploaded due to storage limitations.")
+      } else {
+        toast.success("Dashboard restored successfully!")
+      }
     }
     setShowConfirmationDialog(false)
     setPendingSavedState(null)
@@ -349,6 +298,134 @@ function EditDashboardDemo() {
     }
 
     getData()
+  }, [])
+
+  // Load existing dashboard data if ID is provided in URL
+  useEffect(() => {
+    const loadExistingDashboard = async () => {
+      // Only run on client side
+      if (typeof window === 'undefined') return
+      
+      const urlParams = new URLSearchParams(window.location.search)
+      const dashboardId = urlParams.get('id')
+      
+      if (dashboardId) {
+        try {
+          setIsLoadingExistingDashboard(true)
+          const response = await fetch('/api/dashboard/get-by-id/' + dashboardId)
+          const data = await response.json()
+          
+          if (data.success && data.result) {
+            const dashboard = data.result
+            
+            // Set the aspect ratio
+            setSelectedRatio(dashboard.aspectRatio as AspectRatio)
+            
+            // Convert containers to widgets and layout
+            const newWidgets: ExtendedWidget[] = []
+            const newLayout: Layout[] = []
+            const newWidgetSettings: Record<string, WidgetSettings> = {}
+            
+            // First, collect all notice and image IDs from containers
+            const allNoticeIds: string[] = []
+            const allImageIds: string[] = []
+            
+            dashboard.containers.forEach((container: any) => {
+              if (container.type === "image" && container.imageIds) {
+                allImageIds.push(...container.imageIds)
+              } else if (container.noticeIds) {
+                allNoticeIds.push(...container.noticeIds)
+              }
+            })
+            
+            // Fetch all notices and images in parallel
+            const [noticesResponse, imagesResponse] = await Promise.all([
+              allNoticeIds.length > 0 ? fetch('/api/notice/get-all') : Promise.resolve(null),
+              allImageIds.length > 0 ? fetch('/api/image/get-all') : Promise.resolve(null)
+            ])
+            
+            const noticesData = noticesResponse ? await noticesResponse.json() : { success: false, result: [] }
+            const imagesData = imagesResponse ? await imagesResponse.json() : { success: false, result: [] }
+            
+            const allNotices = noticesData.success ? noticesData.result : []
+            const allImages = imagesData.success ? imagesData.result : []
+            
+            dashboard.containers.forEach((container: any, index: number) => {
+              const widgetId = container.id
+              
+              // Get notices for this widget
+              const widgetNotices = container.noticeIds 
+                ? allNotices.filter((notice: any) => container.noticeIds.includes(notice.id))
+                : []
+              
+              // Get images for this widget
+              const widgetImages = container.type === 'image' && container.imageIds
+                ? allImages.filter((image: any) => container.imageIds.includes(image.id))
+                : []
+              
+              // Create widget with actual content
+              const widget: ExtendedWidget = {
+                id: widgetId,
+                title: container.title || `Widget ${index + 1}`,
+                type: container.type || 'notice',
+                content: container.title,
+                category: container.category,
+                categoryId: container.categoryId,
+                notices: widgetNotices,
+                topNotices: widgetNotices.slice(0, container.settings?.noticeCount || 3),
+                images: container.type === 'image' ? widgetImages.map((img: any) => ({
+                  id: img.id,
+                  url: img.imageUrl,
+                  title: img.title,
+                  file: new File([], img.title), // Placeholder file object
+                  dbId: img.id
+                })) : undefined
+              }
+              
+              newWidgets.push(widget)
+              
+              // Create layout item
+              const layoutItem: Layout = {
+                i: widgetId,
+                x: container.x,
+                y: container.y,
+                w: container.w,
+                h: container.h
+              }
+              
+              newLayout.push(layoutItem)
+              
+              // Set widget settings
+              if (container.settings) {
+                newWidgetSettings[widgetId] = {
+                  ...DEFAULT_WIDGET_SETTINGS,
+                  ...container.settings
+                }
+              } else {
+                newWidgetSettings[widgetId] = { ...DEFAULT_WIDGET_SETTINGS }
+              }
+            })
+            
+            setWidgets(newWidgets)
+            setLayout(newLayout)
+            setWidgetSettings(newWidgetSettings)
+            
+            toast.success('Existing dashboard loaded successfully!')
+          }
+        } catch (error) {
+          console.error('Error loading existing dashboard:', error)
+          toast.error('Failed to load existing dashboard')
+          // Redirect back to view page if dashboard not found
+          setTimeout(() => {
+            window.location.href = `/dashboard/view-dashboard/${dashboardId}`
+          }, 2000)
+        } finally {
+          setIsLoadingExistingDashboard(false)
+        }
+      }
+    }
+
+    loadExistingDashboard()
   }, [])
 
   // Add event handlers for dragging the settings panel
@@ -404,26 +481,106 @@ function EditDashboardDemo() {
     setCanCreateTemplate(widgets.length > 0)
   }, [widgets, layout])
 
-  // Add this after the existing useEffect hooks
+  // Load templates from database
   useEffect(() => {
     const loadTemplates = async () => {
-      setIsLoadingTemplates(true)
       try {
-        const result = await getTemplates()
-        if (result.success) {
-          setCustomTemplates(result?.templates)
-        } else {
-          toast.error("Failed to load templates")
-        }
+        const templates = await getAllDashboardTemplates()
+        setTemplates(templates || [])
       } catch (error) {
         console.error("Error loading templates:", error)
-      } finally {
-        setIsLoadingTemplates(false)
+        toast.error("Failed to load templates")
       }
     }
 
     loadTemplates()
   }, [])
+
+  // Database template saving function
+  const saveTemplate = async (template: DashboardTemplate) => {
+    try {
+      const result = await createDashboardTemplate(template)
+      if (result) {
+        setTemplates(prev => [...prev, result])
+        return { success: true }
+      } else {
+        return { success: false, message: "Failed to save template" }
+      }
+    } catch (error) {
+      console.error("Error saving template:", error)
+      return { success: false, message: error }
+    }
+  }
+
+  // Template management functions
+  const handleEditTemplate = (template: DashboardTemplate) => {
+    setEditingTemplate(template)
+    setTemplateName(template.name)
+    setTemplateDescription(template.description || "")
+    setShowEditModal(true)
+  }
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    if (confirm("Are you sure you want to delete this template?")) {
+      try {
+        const success = await deleteDashboardTemplate(templateId)
+        if (success) {
+          setTemplates(prev => prev.filter(t => t.id !== templateId))
+          toast.success("Template deleted successfully!")
+        } else {
+          toast.error("Failed to delete template")
+        }
+      } catch (error) {
+        console.error("Error deleting template:", error)
+        toast.error("Error deleting template")
+      }
+    }
+  }
+
+  const handleViewTemplate = (template: DashboardTemplate) => {
+    setSelectedTemplate(template)
+    setShowViewModal(true)
+  }
+
+  const handleViewAllTemplates = () => {
+    setShowViewAllModal(true)
+  }
+
+  const handleUpdateTemplate = async () => {
+    if (!editingTemplate || !templateName.trim()) {
+      toast.error("Please enter a template name")
+      return
+    }
+
+    try {
+      const updatedTemplate: DashboardTemplate = {
+        ...editingTemplate,
+        name: templateName,
+        description: templateDescription,
+        widgets: [...widgets],
+        layout: [...layout],
+        widgetSettings: { ...widgetSettings }
+      }
+
+      const result = await updateDashboardTemplate(editingTemplate.id, updatedTemplate)
+      if (result) {
+        setTemplates(prev => prev.map(t => 
+          t.id === editingTemplate.id ? result : t
+        ))
+        
+        setShowEditModal(false)
+        setEditingTemplate(null)
+        setTemplateName("")
+        setTemplateDescription("")
+        toast.success("Template updated successfully!")
+      } else {
+        toast.error("Failed to update template")
+      }
+    } catch (error) {
+      console.error("Error updating template:", error)
+      toast.error("Error updating template")
+    }
+  }
 
   const handleDragStart = (e: React.MouseEvent) => {
     setIsDragging(true)
@@ -433,12 +590,11 @@ function EditDashboardDemo() {
   const addWidget = (type: WidgetType = "notice") => {
     if (!selectedRatio) return
 
-    const newWidgetId = `widget-${Date.now()}`
+    const newWidgetId = `widget-${Date.now()}-${Math.floor(Math.random() * 1000)}`
     const newWidget: ExtendedWidget = {
       id: newWidgetId,
-      title: type === "image" ? `Image Widget ${widgets.length + 1}` : `Widget ${widgets.length + 1}`,
+      title: `Widget ${widgets.length + 1}`,
       type: type,
-      images: type === "image" ? [] : undefined,
     }
 
     const newLayout: Layout = {
@@ -549,90 +705,7 @@ function EditDashboardDemo() {
     e.preventDefault()
   }
 
-  // Image upload functionality - Single image per widget
-  const handleImageUpload = async (widgetId: string, files: FileList | null) => {
-    if (!files || files.length === 0) return
 
-    const widget = widgets.find(w => w.id === widgetId)
-    if (!widget || widget.type !== "image") return
-
-    // Test database connection first
-    console.log("Testing database connection...")
-    const connectionTest = await testImageConnection()
-    console.log("Connection test result:", connectionTest)
-
-    // Take only the first file for single image widget
-    const file = files[0]
-    
-    // Convert file to base64 for database storage
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      const imageData = e.target?.result as string
-      
-      try {
-        // Save image to database
-        const imagePayload = {
-          title: file.name,
-          imageUrl: imageData,
-          imageData: imageData, // Store base64 data
-          fileName: file.name,
-        }
-
-        console.log("Sending image payload to database:", {
-          title: imagePayload.title,
-          fileName: imagePayload.fileName,
-          dataLength: imagePayload.imageData?.length || 0
-        })
-
-        const result = await createImage(imagePayload)
-        
-        console.log("Database result:", result)
-        
-        if (result.success) {
-          const savedImage = result.message
-          const newImage = {
-            id: savedImage.id,
-            url: imageData,
-            title: file.name,
-            file: file,
-            dbId: savedImage.id // Store database ID for reference
-          }
-
-          setWidgets(widgets.map(w => 
-            w.id === widgetId 
-              ? { ...w, images: [newImage] } // Replace with single image
-              : w
-          ))
-
-          toast.success("Image uploaded and saved successfully!")
-        } else {
-          console.error("Failed to save image:", result.message)
-          toast.error(`Failed to save image to database: ${result.message}`)
-        }
-      } catch (error) {
-        console.error("Error saving image:", error)
-        toast.error("Failed to save image")
-      }
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const removeImage = (widgetId: string) => {
-    setWidgets(widgets.map(w => 
-      w.id === widgetId 
-        ? { ...w, images: [] } // Clear all images (single image widget)
-        : w
-    ))
-    toast.success("Image removed successfully!")
-  }
-
-  const handleImageDrop = (e: React.DragEvent, widgetId: string) => {
-    e.preventDefault()
-    const files = e.dataTransfer.files
-    if (files.length > 0) {
-      handleImageUpload(widgetId, files)
-    }
-  }
 
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
     if (!selectedRatio) return { width: "0%", height: "0%" }
@@ -654,18 +727,41 @@ function EditDashboardDemo() {
 
   const handleSave = async () => {
     const positions = calculatePercentagePositions()
+    const urlParams = new URLSearchParams(window.location.search)
+    const dashboardId = urlParams.get('id')
+    
     const dashboard = {
       aspectRatio: selectedRatio,
       containers: [...positions],
     }
 
     try {
-      const result = await createDashboard(dashboard)
+      let result
+      if (dashboardId) {
+        // Update existing dashboard
+        result = await fetch(`/api/dashboard/update/${dashboardId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(dashboard)
+        })
+        const data = await result.json()
+        if (data.success) {
+          clearSavedState() // Clear saved state after successful save
+          toast.success("Dashboard Updated Successfully!")
+        } else {
+          toast.error("Failed to update dashboard!")
+        }
+      } else {
+        // Create new dashboard
+        result = await createDashboard(dashboard)
       if (result.success) {
         clearSavedState() // Clear saved state after successful save
         toast.success("Dashboard Created Successfully!")
       } else {
         toast.error("Something went wrong!")
+        }
       }
     } catch (error) {
       toast.error(`${error}`)
@@ -696,60 +792,6 @@ function EditDashboardDemo() {
         // Get complete widget settings or use defaults
         const settings = widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
 
-        // Handle different widget types
-        if (widget.type === "image") {
-          // For image widgets, include image data
-          const imageData = widget.images && widget.images.length > 0 ? widget.images[0] : null
-          const imageIds = imageData ? [imageData.id] : []
-
-          return {
-            id: specificLayout.i,
-            x: specificLayout.x,
-            y: specificLayout.y,
-            w: specificLayout.w,
-            h: specificLayout.h,
-            leftPx: `${leftPx.toFixed(1)}px`,
-            topPx: `${topPx.toFixed(1)}px`,
-            leftPercent: `${leftPercent.toFixed(2)}%`,
-            topPercent: `${topPercent.toFixed(2)}%`,
-            width: `${widgetWidth.toFixed(2)}%`,
-            height: `${widgetHeight.toFixed(2)}%`,
-            title: widget.content || widget.title,
-            type: "image",
-            imageIds: imageIds,
-            settings: {
-              // Include all settings properties explicitly to ensure nothing is missed
-              backgroundColor: settings.backgroundColor,
-              backgroundOpacity: settings.backgroundOpacity,
-              cardOpacity: settings.cardOpacity,
-              borderColor: settings.borderColor,
-              borderWidth: settings.borderWidth,
-              fontColor: settings.fontColor,
-              noticeCount: settings.noticeCount,
-              fontFamily: settings.fontFamily,
-              fontSize: settings.fontSize,
-              fontWeight: settings.fontWeight,
-              autoScroll: settings.autoScroll,
-              showFullContent: settings.showFullContent,
-              // New category styling properties
-              categoryFont: settings.categoryFont,
-              categoryFontSize: settings.categoryFontSize,
-              categoryFontWeight: settings.categoryFontWeight,
-              categoryFontColor: settings.categoryFontColor,
-              categoryBackgroundColor: settings.categoryBackgroundColor,
-              categoryHeight: settings.categoryHeight,
-              categoryBorderColor: settings.categoryBorderColor,
-              categoryBorderWidth: settings.categoryBorderWidth,
-              // Image-specific settings
-              imageFit: settings.imageFit,
-              imageBorderRadius: settings.imageBorderRadius,
-              showImageTitle: settings.showImageTitle,
-              imageTitleColor: settings.imageTitleColor,
-              imageTitleFontSize: settings.imageTitleFontSize,
-              imageTitleFontWeight: settings.imageTitleFontWeight,
-            },
-          }
-        } else {
           // For notice widgets, include notice data
         const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
 
@@ -793,7 +835,6 @@ function EditDashboardDemo() {
             categoryBorderColor: settings.categoryBorderColor,
             categoryBorderWidth: settings.categoryBorderWidth,
           },
-          }
         }
       })
       .filter(Boolean)
@@ -872,7 +913,7 @@ function EditDashboardDemo() {
       return
     }
 
-    const newTemplateId = `custom-template-${Date.now()}`
+    const newTemplateId = `custom-template-${Date.now()}-${Math.floor(Math.random() * 1000)}`
 
     // Create a deep copy of the current widgets and settings
     const templateWidgets = JSON.parse(JSON.stringify(widgets))
@@ -1044,8 +1085,91 @@ function EditDashboardDemo() {
     }, 500)
   }
 
+  const isEditing = new URLSearchParams(window.location.search).get('id') !== null
+
+  // Get localStorage usage info
+  const [storageUsage, setStorageUsage] = useState<{ used: number; available: number; total: number } | null>(null)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const usage = localStorageUtils.getUsageInfo()
+      setStorageUsage(usage)
+    }
+  }, [])
+
+  // Template management state
+  const [templates, setTemplates] = useState<DashboardTemplate[]>([])
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState("")
+  const [templateDescription, setTemplateDescription] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterType, setFilterType] = useState("all")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list")
+  
+  // Enhanced template management state
+  const [showViewAllModal, setShowViewAllModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<DashboardTemplate | null>(null)
+  const [editingTemplate, setEditingTemplate] = useState<DashboardTemplate | null>(null)
+
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen w-full bg-white">
+      {/* Header for editing mode */}
+      {isEditing && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Edit className="w-5 h-5 text-yellow-600" />
+            <h2 className="text-lg font-semibold text-yellow-800">Editing Existing Dashboard</h2>
+          </div>
+          <p className="text-sm text-yellow-700 mt-1">
+            You are editing an existing dashboard. Make your changes and click "Update Dashboard" to save.
+          </p>
+          {isLoadingExistingDashboard && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-yellow-700">
+              <SpinningBellLoader size="sm" />
+              <span>Loading dashboard content...</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* localStorage Usage Indicator */}
+      {storageUsage && (
+        <div className={`mb-4 p-3 rounded-lg border ${
+          storageUsage.used / storageUsage.total > 0.8 
+            ? 'bg-red-50 border-red-200' 
+            : storageUsage.used / storageUsage.total > 0.6 
+            ? 'bg-yellow-50 border-yellow-200' 
+            : 'bg-green-50 border-green-200'
+        }`}>
+          <div className="flex items-center justify-between text-sm">
+            <span className={`font-medium ${
+              storageUsage.used / storageUsage.total > 0.8 
+                ? 'text-red-700' 
+                : storageUsage.used / storageUsage.total > 0.6 
+                ? 'text-yellow-700' 
+                : 'text-green-700'
+            }`}>
+              Local Storage Usage: {((storageUsage.used / storageUsage.total) * 100).toFixed(1)}%
+            </span>
+            <span className={`text-xs ${
+              storageUsage.used / storageUsage.total > 0.8 
+                ? 'text-red-600' 
+                : storageUsage.used / storageUsage.total > 0.6 
+                ? 'text-yellow-600' 
+                : 'text-green-600'
+            }`}>
+              {((storageUsage.used / 1024 / 1024)).toFixed(2)}MB / {((storageUsage.total / 1024 / 1024)).toFixed(2)}MB
+            </span>
+          </div>
+          {storageUsage.used / storageUsage.total > 0.8 && (
+            <p className="text-xs text-red-600 mt-1">
+              ⚠️ Storage is nearly full. Consider removing some widgets or clearing saved data.
+            </p>
+          )}
+        </div>
+      )}
       {/* Minimal Confirmation Dialog */}
       {showConfirmationDialog && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1086,6 +1210,14 @@ function EditDashboardDemo() {
         </div>
       )}
       <div className="mb-6 flex flex-wrap gap-4">
+        {isEditing && (
+          <Link href={`/dashboard/view-dashboard/${new URLSearchParams(window.location.search).get('id')}`}>
+            <Button variant="outline" size="sm" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to View
+            </Button>
+          </Link>
+        )}
         <div className="relative">
           <button
             onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)}
@@ -1098,7 +1230,7 @@ function EditDashboardDemo() {
           </button>
           {isRatioDropdownOpen && (
             <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-              {(["4:3", "16:9", "16:10"] as AspectRatio[]).map((ratio) => (
+              {(["4:3", "16:9", "16:10", "21:9"] as AspectRatio[]).map((ratio) => (
                 <button
                   key={ratio}
                   onClick={() => handleRatioSelect(ratio)}
@@ -1122,104 +1254,11 @@ function EditDashboardDemo() {
         </button>
         </div>
 
-        <div className="relative">
-          <button
-            onClick={() => addWidget("image")}
-            disabled={!selectedRatio}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ${
-              selectedRatio ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            <ImageIcon size={20} /> Create Image Widget
-          </button>
-        </div>
+        
 
-        <div className="relative">
-          <button
-            onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
-            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center gap-2 transition-all shadow hover:shadow-md"
-          >
-            <span className="flex items-center gap-2">
-              Use Template
-              <ChevronDown size={16} />
-            </span>
-          </button>
-          {isTemplateDropdownOpen && (
-            <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10 w-64">
-              {/* Built-in Templates */}
-              <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50">Built-in Templates</div>
-              {DASHBOARD_TEMPLATES.map((template) => (
-                <div
-                  key={template.id}
-                  className="block w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-gray-100"
-                >
-                  <div className="font-medium">{template.name}</div>
-                  <div className="text-xs text-gray-500 mt-1">{template.description}</div>
-                  <div className="text-xs text-purple-600 mt-1">{template.widgets.length} widgets</div>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => applyTemplate(template)}
-                      className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200"
-                    >
-                      Apply Template
-                    </button>
-                    <button
-                      onClick={() => createDashboardFromTemplate(template)}
-                      className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
-                    >
-                      Create Dashboard
-                    </button>
-                  </div>
-                </div>
-              ))}
+        
 
-              {/* Custom Templates */}
-              <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50">Custom Templates</div>
-              {isLoadingTemplates ? (
-                <div className="p-4 text-center text-sm text-gray-500">Loading templates...</div>
-              ) : customTemplates.length > 0 ? (
-                customTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="block w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors border-b border-gray-100 last:border-0"
-                  >
-                    <div className="font-medium">{template.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">{template.description}</div>
-                    <div className="text-xs text-purple-600 mt-1">{template.widgets.length} widgets</div>
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => applyTemplate(template)}
-                        className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200"
-                      >
-                        Apply Template
-                      </button>
-                      <button
-                        onClick={() => createDashboardFromTemplate(template)}
-                        className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
-                      >
-                        Create Dashboard
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-4 text-center text-sm text-gray-500">No custom templates yet</div>
-              )}
-            </div>
-          )}
-        </div>
 
-        <button
-          onClick={handleSaveTemplate}
-          disabled={!canCreateTemplate}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ${
-            canCreateTemplate
-              ? "bg-purple-600 text-white hover:bg-purple-700"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-          }`}
-        >
-          Create Template
-        </button>
 
         <button
           onClick={handleSave}
@@ -1230,7 +1269,7 @@ function EditDashboardDemo() {
               : "bg-gray-300 text-gray-500 cursor-not-allowed"
           }`}
         >
-          Save Dashboard
+          {new URLSearchParams(window.location.search).get('id') ? 'Update Dashboard' : 'Save Dashboard'}
         </button>
       </div>
 
@@ -1250,6 +1289,9 @@ function EditDashboardDemo() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* Main Dashboard Area - Left Side (3/4 width) */}
+        <div className="xl:col-span-3">
       {selectedRatio && (
         <div
           className="border-4 border-dashed border-gray-300 rounded-lg mx-auto overflow-hidden bg-white p-4"
@@ -1258,13 +1300,13 @@ function EditDashboardDemo() {
             height: RATIO_DIMENSIONS[selectedRatio].height,
           }}
         >
-          <GridLayout
+          <ClientOnlyGridLayout
             className="layout"
             layout={layout}
             cols={12}
             rowHeight={50}
             width={RATIO_DIMENSIONS[selectedRatio].width - 32}
-            onLayoutChange={(newLayout) => setLayout(newLayout)}
+            onLayoutChange={(newLayout: Layout[]) => setLayout(newLayout)}
             margin={[12, 12]}
             draggableHandle=".widget-drag-handle"
           >
@@ -1302,7 +1344,7 @@ function EditDashboardDemo() {
                     height: "100%",
                     overflow: "hidden", // Prevent content from overflowing the widget
                   }}
-                  onDrop={(e) => widget.type === "image" ? handleImageDrop(e, widget.id) : handleDrop(e, widget.id)}
+                  onDrop={(e) => handleDrop(e, widget.id)}
                   onDragOver={handleDragOver}
                 >
                   <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md z-10">
@@ -1349,92 +1391,23 @@ function EditDashboardDemo() {
                       }}
                     >
                       {widget.content || widget.title}
+                      {widget.topNotices && widget.topNotices.length > 0 && (
+                        <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                          {widget.topNotices.length} notices
+                        </span>
+                      )}
+                      {widget.images && widget.images.length > 0 && (
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                          {widget.images.length} image{widget.images.length > 1 ? 's' : ''}
+                        </span>
+                      )}
                     </h3>
                   </div>
 
                   {/* Widget Content - Flex grow to fill available space */}
-                  <div className={`${widget.type === "image" ? "p-0" : "p-2"} flex-grow flex flex-col overflow-hidden`}>
-                    {widget.type === "image" ? (
-                      // Single Image Widget Content - More compact like Notice widget
-                      <div className="flex flex-col h-full relative group">
-                        <div
-                          className="image-container flex-grow relative rounded-lg overflow-hidden shadow-inner"
-                          style={{
-                            height: `${noticesContainerHeight}px`,
-                            maxHeight: `${noticesContainerHeight}px`,
-                            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                          }}
-                        >
-                          {widget.images && widget.images.length > 0 ? (
-                            <div className="w-full h-full relative">
-                              <img
-                                src={widget.images[0].url}
-                                alt={widget.images[0].title}
-                                className="w-full h-full object-cover rounded-lg transition-transform duration-300 hover:scale-105"
-                                style={{
-                                  objectFit: settings.imageFit as any,
-                                  borderRadius: `${settings.imageBorderRadius}px`,
-                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                }}
-                              />
-                              {settings.showImageTitle && (
-                                <div 
-                                  className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black via-black/70 to-transparent rounded-b"
-                                  style={{
-                                    borderBottomLeftRadius: `${settings.imageBorderRadius}px`,
-                                    borderBottomRightRadius: `${settings.imageBorderRadius}px`,
-                                  }}
-                                >
-                                  <p
-                                    className="text-sm font-semibold text-white truncate drop-shadow-lg"
-                                    style={{
-                                      color: settings.imageTitleColor,
-                                      fontSize: `${settings.imageTitleFontSize}px`,
-                                      fontWeight: settings.imageTitleFontWeight,
-                                      fontFamily: settings.fontFamily,
-                                    }}
-                                    title={widget.images[0].title}
-                                  >
-                                    {widget.images[0].title}
-                                  </p>
-                                </div>
-                              )}
-                              <button
-                                onClick={() => removeImage(widget.id)}
-                                className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all duration-200 hover:scale-110 shadow-lg backdrop-blur-sm bg-opacity-90"
-                                style={{ fontSize: '8px' }}
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          ) : (
-                            <div
-                              className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300"
-                              style={{
-                                borderColor: settings.fontColor,
-                                opacity: 0.8,
-                                fontFamily: settings.fontFamily,
-                              }}
-                            >
-                              <div className="bg-white p-3 rounded-full shadow-lg mb-3">
-                                <Upload size={32} style={{ color: '#3b82f6', opacity: 0.8 }} />
-                              </div>
-                              <p style={{ color: settings.fontColor, marginTop: '8px', fontWeight: '500' }}>
-                                Drag & drop an image here or click to upload
-                              </p>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(widget.id, e.target.files)}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      // Notice Widget Content (existing logic)
-                      widget.topNotices ? (
+                  <div className="p-2 flex-grow flex flex-col overflow-hidden">
+                    {/* Notice Widget Content */}
+                    {widget.topNotices ? (
                       <div className="flex flex-col h-full">
                         <div className="bg-indigo-50 py-1 px-2 rounded mb-2 text-center flex-shrink-0">
                           <span className="text-sm font-medium text-indigo-600">
@@ -1507,15 +1480,153 @@ function EditDashboardDemo() {
                       >
                         <p style={{ color: settings.fontColor }}>Drag a category here</p>
                       </div>
-                      )
                     )}
                   </div>
                 </div>
               )
             })}
-          </GridLayout>
+                      </ClientOnlyGridLayout>
         </div>
       )}
+        </div>
+
+        {/* Template Section - Right Side (1/4 width) */}
+        <div className="xl:col-span-1">
+          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Templates</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleViewAllTemplates}
+                  className="bg-gray-600 text-white px-2 py-1 rounded text-xs hover:bg-gray-700 transition-colors"
+                >
+                  View All
+                </button>
+                <button
+                  onClick={() => setShowTemplateModal(true)}
+                  className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 transition-colors"
+                >
+                  Save Current
+                </button>
+              </div>
+            </div>
+
+            {/* Search and Filter */}
+            <div className="space-y-2 mb-4">
+              <input
+                type="text"
+                placeholder="Search templates..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="flex items-center gap-2">
+                {/* Removed Types dropdown menu */}
+                <button
+                  onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
+                  className="p-1 border border-gray-300 rounded text-xs"
+                >
+                  {viewMode === "list" ? "Grid" : "List"}
+                </button>
+              </div>
+            </div>
+
+            {/* Templates List */}
+            <div className="space-y-2">
+              {isLoadingTemplates ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm">No templates available</p>
+                  <p className="text-xs text-gray-400 mt-1">Create your first template</p>
+                </div>
+              ) : (
+                <div className={`space-y-2 max-h-96 overflow-y-auto ${
+                  viewMode === "grid" ? "grid grid-cols-1 gap-2" : ""
+                }`}>
+                  {templates
+                    .filter(template => 
+                      template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      template.description?.toLowerCase().includes(searchTerm.toLowerCase())
+                    )
+                    .map((template) => (
+                      <div
+                        key={template.id}
+                        className={`border border-gray-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-sm transition-all ${
+                          viewMode === "grid" ? "text-center" : ""
+                        }`}
+                      >
+                        {viewMode === "grid" ? (
+                          <div className="space-y-2">
+                            <div className="w-full h-16 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg mb-2"></div>
+                            <h4 className="font-medium text-gray-900 text-sm truncate">{template.name}</h4>
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => applyTemplate(template)}
+                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                              >
+                                Apply
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-gray-900 text-sm">{template.name}</h4>
+                              {template.description && (
+                                <p className="text-xs text-gray-600 mt-1">{template.description}</p>
+                              )}
+                              <div className="text-xs text-gray-500 mt-1">
+                                {template.widgets.length} widgets
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleViewTemplate(template)}
+                                className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
+                                title="View Template"
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={() => applyTemplate(template)}
+                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                                title="Apply Template"
+                              >
+                                Apply
+                              </button>
+                              <button
+                                onClick={() => handleEditTemplate(template)}
+                                className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
+                                title="Edit Template"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTemplate(template.id)}
+                                className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                                title="Delete Template"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Draggable Settings Modal */}
       {activeSettingsWidget && (
@@ -1567,18 +1678,22 @@ function EditDashboardDemo() {
           <div className="p-4 overflow-y-auto flex-1">
             {/* Style Tab */}
             {activeSettingsTab === "style" && (
-              <div className="space-y-4">
-                {/* Background Color */}
+              <div className="space-y-6">
+                {/* Background Settings */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Palette size={14} /> Background Color
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Palette size={16} /> Background
                   </label>
+                  <div className="space-y-3">
+                    {/* Background Color */}
+                    <div>
+                      <span className="text-xs text-gray-500 block mb-2">Color</span>
                   <div className="flex flex-wrap gap-1">
                     {getPresetColors().map((color) => (
                       <button
                         key={color}
                         onClick={() => updateWidgetSetting(activeSettingsWidget, "backgroundColor", color)}
-                        className="w-6 h-6 rounded-full border border-gray-300"
+                            className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
                         style={{
                           backgroundColor: color,
                           outline:
@@ -1595,24 +1710,28 @@ function EditDashboardDemo() {
                         widgetSettings[activeSettingsWidget]?.backgroundColor || DEFAULT_WIDGET_SETTINGS.backgroundColor
                       }
                       onChange={(e) => updateWidgetSetting(activeSettingsWidget, "backgroundColor", e.target.value)}
-                      className="w-6 h-6 p-0 rounded-full ml-1"
+                          className="w-6 h-6 p-0 rounded-full ml-1 hover:scale-110 transition-transform"
                     />
                   </div>
                 </div>
 
-                {/* Background & Card Opacity */}
+                    {/* Background Opacity */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Layers size={14} /> Opacity Settings
-                  </label>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-20">Background:</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Opacity</span>
+                        <span className="text-xs text-gray-600">
+                          {Math.round(
+                            (widgetSettings[activeSettingsWidget]?.backgroundOpacity ||
+                              DEFAULT_WIDGET_SETTINGS.backgroundOpacity) * 100,
+                          )}
+                          %
+                        </span>
+                      </div>
                       <input
                         type="range"
                         min="0.1"
                         max="1"
-                        step="0.1"
+                        step="0.05"
                         value={
                           widgetSettings[activeSettingsWidget]?.backgroundOpacity ||
                           DEFAULT_WIDGET_SETTINGS.backgroundOpacity
@@ -1624,52 +1743,27 @@ function EditDashboardDemo() {
                             Number.parseFloat(e.target.value),
                           )
                         }
-                        className="flex-1"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                       />
-                      <span className="text-sm w-12 text-right">
-                        {Math.round(
-                          (widgetSettings[activeSettingsWidget]?.backgroundOpacity ||
-                            DEFAULT_WIDGET_SETTINGS.backgroundOpacity) * 100,
-                        )}
-                        %
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-20">Card:</span>
-                      <input
-                        type="range"
-                        min="0.1"
-                        max="1"
-                        step="0.1"
-                        value={widgetSettings[activeSettingsWidget]?.cardOpacity || DEFAULT_WIDGET_SETTINGS.cardOpacity}
-                        onChange={(e) =>
-                          updateWidgetSetting(activeSettingsWidget, "cardOpacity", Number.parseFloat(e.target.value))
-                        }
-                        className="flex-1"
-                      />
-                      <span className="text-sm w-12 text-right">
-                        {Math.round(
-                          (widgetSettings[activeSettingsWidget]?.cardOpacity || DEFAULT_WIDGET_SETTINGS.cardOpacity) *
-                            100,
-                        )}
-                        %
-                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Border Settings */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Box size={14} /> Border Settings
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Box size={16} /> Border
                   </label>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    {/* Border Color */}
+                    <div>
+                      <span className="text-xs text-gray-500 block mb-2">Color</span>
                     <div className="flex flex-wrap gap-1">
                       {getPresetColors().map((color) => (
                         <button
                           key={color}
                           onClick={() => updateWidgetSetting(activeSettingsWidget, "borderColor", color)}
-                          className="w-6 h-6 rounded-full border border-gray-300"
+                            className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
                           style={{
                             backgroundColor: color,
                             outline:
@@ -1680,42 +1774,83 @@ function EditDashboardDemo() {
                           title={color}
                         />
                       ))}
+                        <input
+                          type="color"
+                          value={
+                            widgetSettings[activeSettingsWidget]?.borderColor || DEFAULT_WIDGET_SETTINGS.borderColor
+                          }
+                          onChange={(e) => updateWidgetSetting(activeSettingsWidget, "borderColor", e.target.value)}
+                          className="w-6 h-6 p-0 rounded-full ml-1 hover:scale-110 transition-transform"
+                        />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-20">Width:</span>
+                    </div>
+
+                    {/* Border Width */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Width</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}px
+                        </span>
+                      </div>
                       <input
                         type="range"
                         min="0"
-                        max="5"
+                        max="8"
                         value={widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}
                         onChange={(e) =>
                           updateWidgetSetting(activeSettingsWidget, "borderWidth", Number.parseInt(e.target.value))
                         }
-                        className="flex-1"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                       />
-                      <span className="text-sm w-12 text-right">
-                        {widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}px
-                      </span>
                     </div>
                   </div>
+                </div>
+
+                {/* Card Opacity */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Layers size={16} /> Card Opacity
+                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-500">Transparency</span>
+                    <span className="text-xs text-gray-600">
+                      {Math.round(
+                        (widgetSettings[activeSettingsWidget]?.cardOpacity || DEFAULT_WIDGET_SETTINGS.cardOpacity) *
+                          100,
+                      )}
+                      %
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.05"
+                    value={widgetSettings[activeSettingsWidget]?.cardOpacity || DEFAULT_WIDGET_SETTINGS.cardOpacity}
+                    onChange={(e) =>
+                      updateWidgetSetting(activeSettingsWidget, "cardOpacity", Number.parseFloat(e.target.value))
+                    }
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                  />
                 </div>
               </div>
             )}
 
             {/* Typography Tab */}
             {activeSettingsTab === "typography" && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Font Color */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Font Color
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Type size={16} /> Text Color
                   </label>
                   <div className="flex flex-wrap gap-1">
                     {getPresetColors().map((color) => (
                       <button
                         key={color}
                         onClick={() => updateWidgetSetting(activeSettingsWidget, "fontColor", color)}
-                        className="w-6 h-6 rounded-full border border-gray-300"
+                        className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
                         style={{
                           backgroundColor: color,
                           outline:
@@ -1724,93 +1859,94 @@ function EditDashboardDemo() {
                         title={color}
                       />
                     ))}
+                    <input
+                      type="color"
+                      value={widgetSettings[activeSettingsWidget]?.fontColor || DEFAULT_WIDGET_SETTINGS.fontColor}
+                      onChange={(e) => updateWidgetSetting(activeSettingsWidget, "fontColor", e.target.value)}
+                      className="w-6 h-6 p-0 rounded-full ml-1 hover:scale-110 transition-transform"
+                    />
                   </div>
                 </div>
 
                 {/* Font Family */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Font Family
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Type size={16} /> Font Family
                   </label>
                   <select
                     value={widgetSettings[activeSettingsWidget]?.fontFamily || DEFAULT_WIDGET_SETTINGS.fontFamily}
                     onChange={(e) => updateWidgetSetting(activeSettingsWidget, "fontFamily", e.target.value)}
-                    className="w-full text-sm border rounded-md p-2"
+                    className="w-full text-sm border border-gray-300 rounded-md p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   >
-                    <option value="Inter">Inter</option>
-                    <option value="Arial">Arial</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="system-ui">System UI</option>
+                    <option value="Inter">Inter (Modern)</option>
+                    <option value="Arial">Arial (Classic)</option>
+                    <option value="Helvetica">Helvetica (Clean)</option>
+                    <option value="Times New Roman">Times New Roman (Traditional)</option>
+                    <option value="Georgia">Georgia (Elegant)</option>
+                    <option value="Verdana">Verdana (Readable)</option>
+                    <option value="system-ui">System UI (Native)</option>
                   </select>
                 </div>
 
                 {/* Font Size */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Font Size
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Type size={16} /> Font Size
                   </label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-500">Size</span>
+                    <span className="text-xs text-gray-600">
+                      {widgetSettings[activeSettingsWidget]?.fontSize || DEFAULT_WIDGET_SETTINGS.fontSize}px
+                    </span>
+                  </div>
                     <input
                       type="range"
-                      min="12"
+                    min="10"
                       max="24"
                       value={widgetSettings[activeSettingsWidget]?.fontSize || DEFAULT_WIDGET_SETTINGS.fontSize}
                       onChange={(e) =>
                         updateWidgetSetting(activeSettingsWidget, "fontSize", Number.parseInt(e.target.value))
                       }
-                      className="flex-1"
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     />
-                    <span className="text-sm w-12 text-right">
-                      {widgetSettings[activeSettingsWidget]?.fontSize || DEFAULT_WIDGET_SETTINGS.fontSize}px
-                    </span>
-                  </div>
                 </div>
 
                 {/* Font Weight */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Font Weight
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Type size={16} /> Font Weight
                   </label>
                   <select
                     value={widgetSettings[activeSettingsWidget]?.fontWeight || DEFAULT_WIDGET_SETTINGS.fontWeight}
                     onChange={(e) => updateWidgetSetting(activeSettingsWidget, "fontWeight", e.target.value)}
-                    className="w-full text-sm border rounded-md p-2"
+                    className="w-full text-sm border border-gray-300 rounded-md p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   >
-                    <option value="normal">Normal</option>
-                    <option value="medium">Medium</option>
-                    <option value="semibold">Semibold</option>
-                    <option value="bold">Bold</option>
+                    <option value="normal">Normal (400)</option>
+                    <option value="medium">Medium (500)</option>
+                    <option value="semibold">Semibold (600)</option>
+                    <option value="bold">Bold (700)</option>
                   </select>
                 </div>
               </div>
             )}
 
-            {/* Layout Tab */}
-            {activeSettingsTab === "layout" && (
-              <div className="space-y-4">
-                {/* Add layout-specific settings here */}
-                <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <LayoutIcon size={14} /> Padding
-                  </label>
-                  {/* Add padding controls */}
-                </div>
-                {/* Add more layout settings as needed */}
-              </div>
-            )}
-
             {/* Content Tab */}
             {activeSettingsTab === "content" && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Notice Count */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <ListFilter size={14} /> Number of Notices
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <ListFilter size={16} /> Display Settings
                   </label>
-                  <div className="flex items-center gap-2">
+                  <div className="space-y-4">
+                    {/* Number of Notices */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Number of Notices</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount}
+                        </span>
+                      </div>
                     <input
                       type="range"
                       min="1"
@@ -1819,20 +1955,14 @@ function EditDashboardDemo() {
                       onChange={(e) =>
                         updateWidgetSetting(activeSettingsWidget, "noticeCount", Number.parseInt(e.target.value))
                       }
-                      className="flex-1"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     />
-                    <span className="text-sm w-12 text-right">
-                      {widgetSettings[activeSettingsWidget]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount}
-                    </span>
-                  </div>
                 </div>
 
                 {/* Auto Scroll Toggle */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <ListFilter size={14} /> Auto Scroll
-                  </label>
-                  <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Auto Scroll</span>
                     <button
                       onClick={() =>
                         updateWidgetSetting(
@@ -1851,18 +1981,16 @@ function EditDashboardDemo() {
                         }`}
                       />
                     </button>
-                    <span className="text-sm text-gray-600">
-                      {widgetSettings[activeSettingsWidget]?.autoScroll ? "Enabled" : "Disabled"}
-                    </span>
                   </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Automatically scroll through notices when content overflows
+                      </p>
                 </div>
 
                 {/* Show Full Content Toggle */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <ListFilter size={14} /> Show Full Content
-                  </label>
-                  <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Show Full Content</span>
                     <button
                       onClick={() =>
                         updateWidgetSetting(
@@ -1881,28 +2009,36 @@ function EditDashboardDemo() {
                         }`}
                       />
                     </button>
-                    <span className="text-sm text-gray-600">
-                      {widgetSettings[activeSettingsWidget]?.showFullContent ? "Enabled" : "Disabled"}
-                    </span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Display complete notice content instead of truncated text
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Category Tab - New tab for category styling */}
+            {/* Category Tab */}
             {activeSettingsTab === "category" && (
+              <div className="space-y-6">
+                {/* Category Styling */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <ListFilter size={16} /> Category Styling
+                  </label>
               <div className="space-y-4">
                 {/* Category Background Color */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Palette size={14} /> Category Background
-                  </label>
+                      <span className="text-xs text-gray-500 block mb-2">Background Color</span>
                   <div className="flex flex-wrap gap-1">
                     {getPresetColors().map((color) => (
                       <button
                         key={color}
-                        onClick={() => updateWidgetSetting(activeSettingsWidget, "categoryBackgroundColor", color)}
-                        className="w-6 h-6 rounded-full border border-gray-300"
+                            onClick={() =>
+                              updateWidgetSetting(activeSettingsWidget, "categoryBackgroundColor", color)
+                            }
+                            className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
                         style={{
                           backgroundColor: color,
                           outline:
@@ -1922,46 +2058,48 @@ function EditDashboardDemo() {
                       onChange={(e) =>
                         updateWidgetSetting(activeSettingsWidget, "categoryBackgroundColor", e.target.value)
                       }
-                      className="w-6 h-6 p-0 rounded-full ml-1"
+                          className="w-6 h-6 p-0 rounded-full ml-1 hover:scale-110 transition-transform"
                     />
                   </div>
                 </div>
 
                 {/* Category Height */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Box size={14} /> Category Height
-                  </label>
-                  <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Height</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.categoryHeight || DEFAULT_WIDGET_SETTINGS.categoryHeight}px
+                        </span>
+                      </div>
                     <input
                       type="range"
-                      min="30"
-                      max="80"
-                      value={
-                        widgetSettings[activeSettingsWidget]?.categoryHeight || DEFAULT_WIDGET_SETTINGS.categoryHeight
-                      }
+                        min="24"
+                        max="60"
+                        value={widgetSettings[activeSettingsWidget]?.categoryHeight || DEFAULT_WIDGET_SETTINGS.categoryHeight}
                       onChange={(e) =>
                         updateWidgetSetting(activeSettingsWidget, "categoryHeight", Number.parseInt(e.target.value))
                       }
-                      className="flex-1"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     />
-                    <span className="text-sm w-12 text-right">
-                      {widgetSettings[activeSettingsWidget]?.categoryHeight || DEFAULT_WIDGET_SETTINGS.categoryHeight}px
-                    </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Category Font Color */}
+                {/* Category Typography */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Category Font Color
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Type size={16} /> Category Typography
                   </label>
+                  <div className="space-y-4">
+                    {/* Category Font Color */}
+                    <div>
+                      <span className="text-xs text-gray-500 block mb-2">Text Color</span>
                   <div className="flex flex-wrap gap-1">
                     {getPresetColors().map((color) => (
                       <button
                         key={color}
                         onClick={() => updateWidgetSetting(activeSettingsWidget, "categoryFontColor", color)}
-                        className="w-6 h-6 rounded-full border border-gray-300"
+                            className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
                         style={{
                           backgroundColor: color,
                           outline:
@@ -1978,42 +2116,46 @@ function EditDashboardDemo() {
                         widgetSettings[activeSettingsWidget]?.categoryFontColor ||
                         DEFAULT_WIDGET_SETTINGS.categoryFontColor
                       }
-                      onChange={(e) => updateWidgetSetting(activeSettingsWidget, "categoryFontColor", e.target.value)}
-                      className="w-6 h-6 p-0 rounded-full ml-1"
+                          onChange={(e) =>
+                            updateWidgetSetting(activeSettingsWidget, "categoryFontColor", e.target.value)
+                          }
+                          className="w-6 h-6 p-0 rounded-full ml-1 hover:scale-110 transition-transform"
                     />
                   </div>
                 </div>
 
                 {/* Category Font Family */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Category Font
-                  </label>
+                      <span className="text-xs text-gray-500 block mb-2">Font Family</span>
                   <select
                     value={widgetSettings[activeSettingsWidget]?.categoryFont || DEFAULT_WIDGET_SETTINGS.categoryFont}
                     onChange={(e) => updateWidgetSetting(activeSettingsWidget, "categoryFont", e.target.value)}
-                    className="w-full text-sm border rounded-md p-2"
-                  >
-                    <option value="Inter">Inter</option>
-                    <option value="Arial">Arial</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="system-ui">System UI</option>
+                        className="w-full text-sm border border-gray-300 rounded-md p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      >
+                        <option value="Inter">Inter (Modern)</option>
+                        <option value="Arial">Arial (Classic)</option>
+                        <option value="Helvetica">Helvetica (Clean)</option>
+                        <option value="Times New Roman">Times New Roman (Traditional)</option>
+                        <option value="Georgia">Georgia (Elegant)</option>
+                        <option value="Verdana">Verdana (Readable)</option>
+                        <option value="system-ui">System UI (Native)</option>
                   </select>
                 </div>
 
                 {/* Category Font Size */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Category Font Size
-                  </label>
-                  <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Font Size</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.categoryFontSize ||
+                            DEFAULT_WIDGET_SETTINGS.categoryFontSize}
+                          px
+                        </span>
+                      </div>
                     <input
                       type="range"
-                      min="12"
-                      max="28"
+                        min="10"
+                        max="20"
                       value={
                         widgetSettings[activeSettingsWidget]?.categoryFontSize ||
                         DEFAULT_WIDGET_SETTINGS.categoryFontSize
@@ -2021,48 +2163,49 @@ function EditDashboardDemo() {
                       onChange={(e) =>
                         updateWidgetSetting(activeSettingsWidget, "categoryFontSize", Number.parseInt(e.target.value))
                       }
-                      className="flex-1"
-                    />
-                    <span className="text-sm w-12 text-right">
-                      {widgetSettings[activeSettingsWidget]?.categoryFontSize ||
-                        DEFAULT_WIDGET_SETTINGS.categoryFontSize}
-                      px
-                    </span>
-                  </div>
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
                 </div>
 
                 {/* Category Font Weight */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Category Font Weight
-                  </label>
+                      <span className="text-xs text-gray-500 block mb-2">Font Weight</span>
                   <select
                     value={
                       widgetSettings[activeSettingsWidget]?.categoryFontWeight ||
                       DEFAULT_WIDGET_SETTINGS.categoryFontWeight
                     }
-                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, "categoryFontWeight", e.target.value)}
-                    className="w-full text-sm border rounded-md p-2"
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="medium">Medium</option>
-                    <option value="semibold">Semibold</option>
-                    <option value="bold">Bold</option>
+                        onChange={(e) =>
+                          updateWidgetSetting(activeSettingsWidget, "categoryFontWeight", e.target.value)
+                        }
+                        className="w-full text-sm border border-gray-300 rounded-md p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      >
+                        <option value="normal">Normal (400)</option>
+                        <option value="medium">Medium (500)</option>
+                        <option value="semibold">Semibold (600)</option>
+                        <option value="bold">Bold (700)</option>
                   </select>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Category Border */}
                 <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Box size={14} /> Category Border
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Box size={16} /> Category Border
                   </label>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    {/* Category Border Color */}
+                    <div>
+                      <span className="text-xs text-gray-500 block mb-2">Border Color</span>
                     <div className="flex flex-wrap gap-1">
                       {getPresetColors().map((color) => (
                         <button
                           key={color}
-                          onClick={() => updateWidgetSetting(activeSettingsWidget, "categoryBorderColor", color)}
-                          className="w-6 h-6 rounded-full border border-gray-300"
+                            onClick={() =>
+                              updateWidgetSetting(activeSettingsWidget, "categoryBorderColor", color)
+                            }
+                            className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
                           style={{
                             backgroundColor: color,
                             outline:
@@ -2082,11 +2225,21 @@ function EditDashboardDemo() {
                         onChange={(e) =>
                           updateWidgetSetting(activeSettingsWidget, "categoryBorderColor", e.target.value)
                         }
-                        className="w-6 h-6 p-0 rounded-full ml-1"
+                          className="w-6 h-6 p-0 rounded-full ml-1 hover:scale-110 transition-transform"
                       />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-20">Width:</span>
+                    </div>
+
+                    {/* Category Border Width */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Border Width</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.categoryBorderWidth ||
+                            DEFAULT_WIDGET_SETTINGS.categoryBorderWidth}
+                          px
+                        </span>
+                      </div>
                       <input
                         type="range"
                         min="0"
@@ -2102,165 +2255,16 @@ function EditDashboardDemo() {
                             Number.parseInt(e.target.value),
                           )
                         }
-                        className="flex-1"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                       />
-                      <span className="text-sm w-12 text-right">
-                        {widgetSettings[activeSettingsWidget]?.categoryBorderWidth ||
-                          DEFAULT_WIDGET_SETTINGS.categoryBorderWidth}
-                        px
-                      </span>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Image Tab - New tab for image widget settings */}
-            {activeSettingsTab === "image" && (
-              <div className="space-y-4">
-                {/* Image Fit */}
-                <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <ImageIcon size={14} /> Image Fit
-                  </label>
-                  <select
-                    value={widgetSettings[activeSettingsWidget]?.imageFit || DEFAULT_WIDGET_SETTINGS.imageFit}
-                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageFit", e.target.value)}
-                    className="w-full text-sm border rounded-md p-2"
-                  >
-                    <option value="cover">Cover</option>
-                    <option value="contain">Contain</option>
-                    <option value="fill">Fill</option>
-                    <option value="scale-down">Scale Down</option>
-                  </select>
-                </div>
 
-                {/* Image Border Radius */}
-                <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Box size={14} /> Border Radius
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="20"
-                      value={widgetSettings[activeSettingsWidget]?.imageBorderRadius || DEFAULT_WIDGET_SETTINGS.imageBorderRadius}
-                      onChange={(e) =>
-                        updateWidgetSetting(activeSettingsWidget, "imageBorderRadius", Number.parseInt(e.target.value))
-                      }
-                      className="flex-1"
-                    />
-                    <span className="text-sm w-12 text-right">
-                      {widgetSettings[activeSettingsWidget]?.imageBorderRadius || DEFAULT_WIDGET_SETTINGS.imageBorderRadius}px
-                    </span>
-                  </div>
                 </div>
-
-                {/* Show Image Title Toggle */}
-                <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Show Image Title
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        updateWidgetSetting(
-                          activeSettingsWidget,
-                          "showImageTitle",
-                          !(widgetSettings[activeSettingsWidget]?.showImageTitle || true),
-                        )
-                      }
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                        widgetSettings[activeSettingsWidget]?.showImageTitle !== false ? "bg-blue-600" : "bg-gray-200"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          widgetSettings[activeSettingsWidget]?.showImageTitle !== false ? "translate-x-6" : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                    <span className="text-sm text-gray-600">
-                      {widgetSettings[activeSettingsWidget]?.showImageTitle !== false ? "Enabled" : "Disabled"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Image Title Color */}
-                <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Title Color
-                  </label>
-                  <div className="flex flex-wrap gap-1">
-                    {getPresetColors().map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => updateWidgetSetting(activeSettingsWidget, "imageTitleColor", color)}
-                        className="w-6 h-6 rounded-full border border-gray-300"
-                        style={{
-                          backgroundColor: color,
-                          outline:
-                            widgetSettings[activeSettingsWidget]?.imageTitleColor === color
-                              ? "2px solid #3b82f6"
-                              : "none",
-                        }}
-                        title={color}
-                      />
-                    ))}
-                    <input
-                      type="color"
-                      value={
-                        widgetSettings[activeSettingsWidget]?.imageTitleColor ||
-                        DEFAULT_WIDGET_SETTINGS.imageTitleColor
-                      }
-                      onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageTitleColor", e.target.value)}
-                      className="w-6 h-6 p-0 rounded-full ml-1"
-                    />
-                  </div>
-                </div>
-
-                {/* Image Title Font Size */}
-                <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Title Font Size
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="10"
-                      max="20"
-                      value={widgetSettings[activeSettingsWidget]?.imageTitleFontSize || DEFAULT_WIDGET_SETTINGS.imageTitleFontSize}
-                      onChange={(e) =>
-                        updateWidgetSetting(activeSettingsWidget, "imageTitleFontSize", Number.parseInt(e.target.value))
-                      }
-                      className="flex-1"
-                    />
-                    <span className="text-sm w-12 text-right">
-                      {widgetSettings[activeSettingsWidget]?.imageTitleFontSize || DEFAULT_WIDGET_SETTINGS.imageTitleFontSize}px
-                    </span>
-                  </div>
-                </div>
-
-                {/* Image Title Font Weight */}
-                <div>
-                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                    <Type size={14} /> Title Font Weight
-                  </label>
-                  <select
-                    value={widgetSettings[activeSettingsWidget]?.imageTitleFontWeight || DEFAULT_WIDGET_SETTINGS.imageTitleFontWeight}
-                    onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageTitleFontWeight", e.target.value)}
-                    className="w-full text-sm border rounded-md p-2"
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="medium">Medium</option>
-                    <option value="semibold">Semibold</option>
-                    <option value="bold">Bold</option>
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
 
           {/* Update the button in the settings panel to use the new function */}
           {/* Find the button at the end of the settings panel (around line 1300) */}
@@ -2285,71 +2289,489 @@ function EditDashboardDemo() {
             >
               Save as Template
             </button>
+                  </div>
+                </div>
+      )}
+
+      {/* Template Save Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Save as Template</h3>
+                    <button
+                  onClick={() => setShowTemplateModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={20} />
+                    </button>
+                </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Template Name
+                  </label>
+                    <input
+                    type="text"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder="Enter template name..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    value={templateDescription}
+                    onChange={(e) => setTemplateDescription(e.target.value)}
+                    placeholder="Describe your template..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="text-sm text-blue-700">
+                      <p className="font-medium">Template Preview</p>
+                      <p className="text-blue-600 mt-1">
+                        {widgets.length} widgets • {layout.length} layout items
+                      </p>
+                </div>
+              </div>
+                </div>
+          </div>
+
+              <div className="flex gap-3 mt-6">
+          <button
+                  onClick={() => setShowTemplateModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!templateName.trim()) {
+                      toast.error("Please enter a template name");
+                      return;
+                    }
+                    
+                    try {
+                      const newTemplate: DashboardTemplate = {
+                        id: `template-${Date.now()}`,
+                        name: templateName,
+                        description: templateDescription,
+                        widgets: [...widgets],
+                        layout: [...layout],
+                        widgetSettings: { ...widgetSettings }
+                      };
+                      
+                      const result = await saveTemplate(newTemplate);
+                      if (result.success) {
+                        setTemplates([...templates, newTemplate]);
+                        setShowTemplateModal(false);
+                        setTemplateName("");
+                        setTemplateDescription("");
+                        toast.success("Template saved successfully!");
+                      } else {
+                        toast.error("Failed to save template");
+                      }
+                    } catch (error) {
+                      toast.error("Error saving template");
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Save Template
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Add the template modal at the end of the component, just before the final closing div */}
-      {/* Add this before the final </div> (around line 1310) */}
+      {/* View All Templates Modal */}
+      {showViewAllModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full border border-gray-200 max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-900">All Templates</h3>
+            <button
+                  onClick={() => setShowViewAllModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+                  <X size={24} />
+            </button>
+          </div>
+        </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+              {templates.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">No Templates Found</h4>
+                  <p className="text-gray-500">Create your first template to get started.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {templates.map((template) => (
+                    <div key={template.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <h4 className="font-medium text-gray-900">{template.name}</h4>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleViewTemplate(template)}
+                            className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleEditTemplate(template)}
+                            className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTemplate(template.id)}
+                            className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {template.description && (
+                        <p className="text-sm text-gray-600 mb-3">{template.description}</p>
+                      )}
+                      
+                      {/* Template Preview - Same structure as View modal */}
+                      <div className="w-full flex justify-center mb-3">
+                        <div className="bg-white border border-gray-200 rounded-lg p-2" style={{ width: 240, minHeight: 160 }}>
+                          <div className="relative w-full h-full">
+                            {template.layout.map((layoutItem) => {
+                              const widget = template.widgets.find(w => w.id === layoutItem.i)
+                              const settings = template.widgetSettings?.[widget?.id] || DEFAULT_WIDGET_SETTINGS
+                              if (!widget) return null
+                              
+                              // Generate background colors
+                              const bgColor = hexToRgba(settings.backgroundColor, settings.backgroundOpacity)
+                              const cardBgColor = hexToRgba(settings.backgroundColor, settings.cardOpacity)
+                              const categoryBgColor = settings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
+                              
+                              return (
+                                <div
+                                  key={widget.id}
+                                  className="rounded-lg shadow-md absolute"
+                                  style={{
+                                    left: `${(layoutItem.x / 12) * 100}%`,
+                                    top: `${layoutItem.y * 4}px`,
+                                    width: `${(layoutItem.w / 12) * 100}%`,
+                                    height: `${layoutItem.h * 25}px`,
+                                    backgroundColor: bgColor,
+                                    borderColor: settings.borderColor,
+                                    borderWidth: `${settings.borderWidth}px`,
+                                    borderStyle: "solid",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    height: "100%",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {/* Widget Header */}
+                                  <div
+                                    className="p-1 flex-shrink-0"
+                                    style={{
+                                      backgroundColor: categoryBgColor,
+                                      height: `${Math.min(settings.categoryHeight, 20)}px`,
+                                      borderBottom: settings.categoryBorderWidth > 0
+                                        ? `${settings.categoryBorderWidth}px solid ${settings.categoryBorderColor}`
+                                        : "none",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    <div
+                                      className="text-xs font-semibold text-center"
+                                      style={{
+                                        color: settings.categoryFontColor,
+                                        fontFamily: settings.categoryFont,
+                                        fontSize: `${Math.min(settings.categoryFontSize, 10)}px`,
+                                        fontWeight: settings.categoryFontWeight,
+                                      }}
+                                    >
+                                      {/* Empty title - just structure */}
+                                    </div>
+                                  </div>
 
-      {/* Template Creation Modal */}
-      {isTemplateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-full">
-            <h3 className="text-lg font-semibold mb-4">Save as Template</h3>
+                                  {/* Widget Content */}
+                                  <div className="p-1 flex-grow flex flex-col overflow-hidden">
+                                    <div className="space-y-1 flex-grow overflow-y-auto">
+                                      {/* Render empty notice placeholders */}
+                                      {Array.from({ length: 2 }).map((_, index) => (
+                                        <div
+                                          key={index}
+                                          className="rounded shadow p-1"
+                                          style={{
+                                            backgroundColor: cardBgColor,
+                                            borderLeft: `2px solid ${settings.borderColor}`,
+                                            fontFamily: settings.fontFamily,
+                                            height: '20px', // Smaller height for preview
+                                          }}
+                                        >
+                                          {/* Empty notice - just structure */}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      {/* End Template Preview */}
+                      
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>{template.widgets.length} widgets</span>
+                        <span>{template.layout.length} layout items</span>
+                      </div>
+                      
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => applyTemplate(template)}
+                          className="flex-1 text-xs bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors"
+                        >
+                          Apply Template
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Template Modal */}
+      {showEditModal && editingTemplate && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Edit Template</h3>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setEditingTemplate(null)
+                    setTemplateName("")
+                    setTemplateDescription("")
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
             <div className="space-y-4">
               <div>
-                <label htmlFor="template-name" className="block text-sm font-medium text-gray-700 mb-1">
-                  Template Name *
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Template Name
                 </label>
                 <input
-                  id="template-name"
                   type="text"
-                  value={newTemplateName}
-                  onChange={(e) => setNewTemplateName(e.target.value)}
-                  placeholder="My Custom Template"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  required
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder="Enter template name..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label htmlFor="template-description" className="block text-sm font-medium text-gray-700 mb-1">
-                  Description (optional)
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
                 </label>
                 <textarea
-                  id="template-description"
-                  value={newTemplateDescription}
-                  onChange={(e) => setNewTemplateDescription(e.target.value)}
+                    value={templateDescription}
+                    onChange={(e) => setTemplateDescription(e.target.value)}
                   placeholder="Describe your template..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+                <div className="bg-yellow-50 p-3 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div className="text-sm text-yellow-700">
+                      <p className="font-medium">Update Current Dashboard</p>
+                      <p className="text-yellow-600 mt-1">
+                        This will update the template with your current dashboard layout and settings.
+                      </p>
+                    </div>
+                  </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+              <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setIsTemplateModalOpen(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setEditingTemplate(null)
+                    setTemplateName("")
+                    setTemplateDescription("")
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={saveCustomTemplate}
-                disabled={isSavingTemplate}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed"
+                  onClick={handleUpdateTemplate}
+                  className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
               >
-                {isSavingTemplate ? "Saving..." : "Save Template"}
+                  Update Template
               </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Update the template dropdown to include custom templates */}
-      {/* Find the template dropdown section (around line 520) and modify it: */}
+      {/* View Template Modal */}
+      {showViewModal && selectedTemplate && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full border border-gray-200 max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-900">Template Details</h3>
+                <button
+                  onClick={() => {
+                    setShowViewModal(false)
+                    setSelectedTemplate(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">{selectedTemplate.name}</h4>
+                  {selectedTemplate.description && (
+                    <p className="text-gray-600">{selectedTemplate.description}</p>
+                  )}
+                </div>
+                {/* Render real widgets preview */}
+                <div className="w-full flex justify-center">
+                  <div className="bg-white border border-gray-200 rounded-lg p-2" style={{ width: 480, minHeight: 320 }}>
+                    <div className="relative w-full h-full">
+                      {selectedTemplate.layout.map((layoutItem) => {
+                        const widget = selectedTemplate.widgets.find(w => w.id === layoutItem.i)
+                        const settings = selectedTemplate.widgetSettings?.[widget?.id] || DEFAULT_WIDGET_SETTINGS
+                        if (!widget) return null
+                        
+                        // Generate background colors
+                        const bgColor = hexToRgba(settings.backgroundColor, settings.backgroundOpacity)
+                        const cardBgColor = hexToRgba(settings.backgroundColor, settings.cardOpacity)
+                        const categoryBgColor = settings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
+                        
+                        return (
+                          <div
+                            key={widget.id}
+                            className="rounded-lg shadow-md absolute"
+                            style={{
+                              left: `${(layoutItem.x / 12) * 100}%`,
+                              top: `${layoutItem.y * 8}px`,
+                              width: `${(layoutItem.w / 12) * 100}%`,
+                              height: `${layoutItem.h * 50}px`,
+                              backgroundColor: bgColor,
+                              borderColor: settings.borderColor,
+                              borderWidth: `${settings.borderWidth}px`,
+                              borderStyle: "solid",
+                              display: "flex",
+                              flexDirection: "column",
+                              height: "100%",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {/* Widget Header */}
+                            <div
+                              className="p-2 flex-shrink-0"
+                              style={{
+                                backgroundColor: categoryBgColor,
+                                height: `${settings.categoryHeight}px`,
+                                borderBottom: settings.categoryBorderWidth > 0
+                                  ? `${settings.categoryBorderWidth}px solid ${settings.categoryBorderColor}`
+                                  : "none",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <div
+                                className="text-lg font-semibold text-center"
+                                style={{
+                                  color: settings.categoryFontColor,
+                                  fontFamily: settings.categoryFont,
+                                  fontSize: `${settings.categoryFontSize}px`,
+                                  fontWeight: settings.categoryFontWeight,
+                                }}
+                              >
+                                {/* Empty title - just structure */}
+                  </div>
+                </div>
+                
+                            {/* Widget Content */}
+                            <div className="p-2 flex-grow flex flex-col overflow-hidden">
+                              <div className="space-y-2 flex-grow overflow-y-auto">
+                                {/* Render empty notice placeholders */}
+                                {Array.from({ length: 4 }).map((_, index) => (
+                                  <div
+                                    key={index}
+                                    className="rounded shadow p-2"
+                                    style={{
+                                      backgroundColor: cardBgColor,
+                                      borderLeft: `3px solid ${settings.borderColor}`,
+                                      fontFamily: settings.fontFamily,
+                                      height: '40px', // Fixed height for placeholder
+                                    }}
+                                  >
+                                    {/* Empty notice - just structure */}
+                        </div>
+                                ))}
+                        </div>
+                      </div>
+                  </div>
+                        )
+                      })}
+                </div>
+                </div>
+                </div>
+                {/* End real widgets preview */}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
