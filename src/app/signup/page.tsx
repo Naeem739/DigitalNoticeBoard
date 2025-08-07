@@ -1,78 +1,45 @@
-import { Metadata } from "next"
+"use client"
+
 import Link from "next/link"
 import SignUpForm from "./signup-form"
-
-export const metadata: Metadata = {
-  title: "Sign Up - Smart Notice Board",
-  description: "Create a new account for Smart Notice Board",
-}
+import { motion } from "framer-motion"
+import { UserPlus, Shield } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export default function SignUpPage() {
-  return (
-    <div className="min-h-screen flex">
-      {/* Left Side - Background with Content */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-green-600 via-teal-600 to-cyan-800 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
-          <div className="text-center max-w-md">
-            <div className="mb-8">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden">
+        <div className="w-full max-w-md mx-auto p-8">
+          <div className="bg-gray-900/80 backdrop-blur-md rounded-3xl shadow-2xl p-8 border border-gray-800">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <UserPlus className="w-10 h-10 text-white" />
               </div>
-              <h1 className="text-4xl font-bold mb-4">Join Smart Notice Board</h1>
-              <p className="text-lg text-green-100 leading-relaxed">
-                Create your account and start managing notices, categories, and more with our intelligent notice board system.
+              <h2 className="text-3xl font-bold text-white mb-2">
+                Create Account
+              </h2>
+              <p className="text-gray-300">
+                Join Smart Notice Board today
               </p>
             </div>
             
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span className="text-green-100">Easy notice management</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span className="text-green-100">Secure and reliable</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span className="text-green-100">24/7 access</span>
-              </div>
+            <div className="">
+              <SignUpForm />
             </div>
-          </div>
-        </div>
-        
-        {/* Decorative elements */}
-        <div className="absolute top-20 left-20 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-        <div className="absolute bottom-20 right-20 w-40 h-40 bg-white/10 rounded-full blur-xl"></div>
-      </div>
 
-      {/* Right Side - Signup Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md space-y-8">
-          {/* Header for mobile */}
-          <div className="lg:hidden text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-            <p className="text-gray-600">Join Smart Notice Board today</p>
-          </div>
-
-          {/* Signup Form */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-            <div className="text-center mb-8">
-                              <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign Up</h2>
-                <p className="text-gray-600">Create your account to get started</p>
-            </div>
-            
-            <SignUpForm />
-            
             <div className="mt-8 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-300">
                 Already have an account?{" "}
                 <Link 
                   href="/login" 
-                  className="font-medium text-green-600 hover:text-green-500 transition-colors duration-200"
+                  className="font-medium text-blue-400 hover:text-blue-300 transition-colors duration-200"
                 >
                   Sign in here
                 </Link>
@@ -81,6 +48,95 @@ export default function SignUpPage() {
           </div>
         </div>
       </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute top-20 left-20 w-32 h-32 bg-purple-500/20 rounded-full blur-xl animate-pulse"></div>
+      <div className="absolute bottom-20 right-20 w-40 h-40 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+      
+      {/* Centered Signup Form */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full max-w-md mx-auto p-8"
+        suppressHydrationWarning={true}
+      >
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="bg-gray-900/80 backdrop-blur-md rounded-3xl shadow-2xl p-8 border border-gray-800"
+          suppressHydrationWarning={true}
+        >
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="text-center mb-8"
+            suppressHydrationWarning={true}
+          >
+            <motion.div 
+              initial={{ rotate: -180, scale: 0 }}
+              animate={{ rotate: 0, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.6 }}
+              className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg"
+              suppressHydrationWarning={true}
+            >
+              <UserPlus className="w-10 h-10 text-white" />
+            </motion.div>
+            <motion.h2 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.8 }}
+              className="text-3xl font-bold text-white mb-2"
+              suppressHydrationWarning={true}
+            >
+              Create Account
+            </motion.h2>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 1 }}
+              className="text-gray-300"
+              suppressHydrationWarning={true}
+            >
+              Join Smart Notice Board today
+            </motion.p>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.2 }}
+            suppressHydrationWarning={true}
+          >
+            <SignUpForm />
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 2 }}
+            className="mt-8 text-center"
+            suppressHydrationWarning={true}
+          >
+            <p className="text-sm text-gray-300">
+              Already have an account?{" "}
+              <Link 
+                href="/login" 
+                className="font-medium text-blue-400 hover:text-blue-300 transition-colors duration-200"
+              >
+                Sign in here
+              </Link>
+            </p>
+          </motion.div>
+        </motion.div>
+      </motion.div>
     </div>
   )
 }

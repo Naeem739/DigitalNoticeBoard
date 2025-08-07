@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getImages, deleteImage } from '@/app/actions/image.action'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Trash2, Image as ImageIcon, Download, Eye } from 'lucide-react'
@@ -11,10 +10,11 @@ import Image from 'next/image'
 type TImage = {
   id: string
   title: string
-  imageUrl: string
   imageData: string
-  fileName: string
+  imageFileName?: string
   createdAt?: Date
+  category?: string
+  categoryName?: string
 }
 
 export default function ShowImageNotices() {
@@ -29,11 +29,14 @@ export default function ShowImageNotices() {
   const fetchImages = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/image/get-all')
+      // Fetch from Notice model instead of Image model
+      const response = await fetch('/api/notice/get-all')
       const data = await response.json()
       
       if (data.success) {
-        setImages(data.result || [])
+        // Filter notices that have imageData
+        const noticesWithImages = data.result.filter((notice: any) => notice.imageData)
+        setImages(noticesWithImages || [])
       } else {
         toast.error('Failed to fetch images')
       }
@@ -52,7 +55,11 @@ export default function ShowImageNotices() {
 
     try {
       setDeletingId(imageId)
-      const result = await deleteImage(imageId)
+      // Delete from notice instead of image
+      const response = await fetch(`/api/notice/delete?id=${imageId}`, {
+        method: 'DELETE'
+      })
+      const result = await response.json()
       
       if (result.success) {
         setImages(prev => prev.filter(img => img.id !== imageId))
@@ -71,19 +78,19 @@ export default function ShowImageNotices() {
   const handleDownloadImage = (image: TImage) => {
     try {
       // Create a blob from the base64 data
-      const byteCharacters = atob(image.imageData.split(',')[1])
+      const byteCharacters = atob(image.imageData)
       const byteNumbers = new Array(byteCharacters.length)
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i)
       }
       const byteArray = new Uint8Array(byteNumbers)
-      const blob = new Blob([byteArray], { type: 'image/png' })
+      const blob = new Blob([byteArray], { type: 'image/jpeg' })
       
       // Create download link
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = image.fileName
+      link.download = image.imageFileName || `${image.title}.jpg`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -151,11 +158,11 @@ export default function ShowImageNotices() {
             </head>
             <body>
               <div class="image-container">
-                <img src="${image.imageUrl}" alt="${image.title}" />
+                <img src="data:image/jpeg;base64,${image.imageData}" alt="${image.title}" />
                 <div class="image-info">
                   <div class="image-title">${image.title}</div>
                   <div class="image-details">
-                    File: ${image.fileName} | ID: ${image.id}
+                    Category: ${image.categoryName || image.category || 'N/A'} | ID: ${image.id}
                     ${image.createdAt ? ` | Created: ${new Date(image.createdAt).toLocaleDateString()}` : ''}
                   </div>
                 </div>
@@ -201,7 +208,7 @@ export default function ShowImageNotices() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Image Notices</h1>
-          <p className="text-gray-600 mt-2">Manage all uploaded images</p>
+          <p className="text-gray-600 mt-2">Manage all notices with images</p>
         </div>
         <div className="flex items-center gap-2">
           <ImageIcon className="w-6 h-6 text-blue-600" />
@@ -215,7 +222,7 @@ export default function ShowImageNotices() {
             <ImageIcon className="w-16 h-16 text-gray-400 mb-4" />
             <h3 className="text-xl font-semibold text-gray-600 mb-2">No Images Found</h3>
             <p className="text-gray-500 text-center">
-              No images have been uploaded yet. Images will appear here once they are added to the system.
+              No notices with images have been created yet. Images will appear here once notices with images are added.
             </p>
           </CardContent>
         </Card>
@@ -226,7 +233,7 @@ export default function ShowImageNotices() {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium truncate" title={image.title}>
-                    {image.title}
+                    {image.imageFileName || image.title}
                   </CardTitle>
                   <div className="flex items-center gap-1">
                     <Button
@@ -266,21 +273,16 @@ export default function ShowImageNotices() {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden mb-3">
-                  <Image
-                    src={image.imageUrl}
+                  <img
+                    src={`data:image/jpeg;base64,${image.imageData}`}
                     alt={image.title}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>File: {image.fileName}</span>
+                    <span>Category: {image.categoryName || image.category || 'N/A'}</span>
                     <span>{formatDate(image.createdAt)}</span>
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    ID: {image.id}
                   </div>
                 </div>
               </CardContent>

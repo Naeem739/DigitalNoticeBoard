@@ -1,4 +1,4 @@
-"use client"
+/*"use client"
 
 import React from 'react'
 import { ImageIcon, Upload } from 'lucide-react'
@@ -100,4 +100,4 @@ const ImageWidgetDemo: React.FC = () => {
   )
 }
 
-export default ImageWidgetDemo 
+export default ImageWidgetDemo */

@@ -100,7 +100,7 @@ export default function SignUpForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+        <Label htmlFor="name" className="text-sm font-medium text-gray-200">
           Full Name
         </Label>
         <div className="relative">
@@ -111,17 +111,17 @@ export default function SignUpForm() {
             placeholder="Enter your full name"
             value={formData.name}
             onChange={(e) => handleInputChange("name", e.target.value)}
-            className="pl-10 h-12 border-gray-200 focus:border-green-500 focus:ring-green-500"
+            className="pl-10 h-12 border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
             disabled={isLoading}
           />
         </div>
         {errors.name && (
-          <p className="text-sm text-red-600">{errors.name}</p>
+          <p className="text-sm text-red-400">{errors.name}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+        <Label htmlFor="email" className="text-sm font-medium text-gray-200">
           Email Address
         </Label>
         <div className="relative">
@@ -132,17 +132,17 @@ export default function SignUpForm() {
             placeholder="Enter your email"
             value={formData.email}
             onChange={(e) => handleInputChange("email", e.target.value)}
-            className="pl-10 h-12 border-gray-200 focus:border-green-500 focus:ring-green-500"
+            className="pl-10 h-12 border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
             disabled={isLoading}
           />
         </div>
         {errors.email && (
-          <p className="text-sm text-red-600">{errors.email}</p>
+          <p className="text-sm text-red-400">{errors.email}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+        <Label htmlFor="password" className="text-sm font-medium text-gray-200">
           Password
         </Label>
         <div className="relative">
@@ -153,26 +153,26 @@ export default function SignUpForm() {
             placeholder="Create a password"
             value={formData.password}
             onChange={(e) => handleInputChange("password", e.target.value)}
-            className="pl-10 pr-10 h-12 border-gray-200 focus:border-green-500 focus:ring-green-500"
+            className="pl-10 pr-10 h-12 border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
             disabled={isLoading}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
           >
             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
         </div>
         {errors.password && (
-          <p className="text-sm text-red-600">{errors.password}</p>
+          <p className="text-sm text-red-400">{errors.password}</p>
         )}
       </div>
 
       <Button
         type="submit"
         disabled={isLoading}
-        className="w-full h-12 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
+        className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-lg"
       >
         {isLoading ? (
           <div className="flex items-center space-x-2">
@@ -185,11 +185,11 @@ export default function SignUpForm() {
       </Button>
 
       <div className="text-center">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-400">
           By creating an account, you agree to our{" "}
-          <a href="#" className="text-green-600 hover:text-green-500">Terms of Service</a>{" "}
+          <a href="#" className="text-blue-400 hover:text-blue-300">Terms of Service</a>{" "}
           and{" "}
-          <a href="#" className="text-green-600 hover:text-green-500">Privacy Policy</a>
+          <a href="#" className="text-blue-400 hover:text-blue-300">Privacy Policy</a>
         </p>
       </div>
     </form>

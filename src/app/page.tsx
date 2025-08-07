@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BellLoader } from '@/components/ui/loader';
 import { 
   Bell, 
   ChevronRight,  
@@ -124,6 +125,8 @@ export default function Home() {
   };
 
   const handleGetStarted = () => {
+    if (typeof window === 'undefined') return
+    
     if (session) {
       window.open('/dashboard', '_blank');
     } else {
@@ -302,7 +305,11 @@ export default function Home() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => window.open('/dashboard', '_blank')}
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.open('/dashboard', '_blank')
+                    }
+                  }}
                   className="bg-yellow-500 text-black px-6 py-3 rounded-md hover:bg-yellow-600 transition"
                 >
                   Go to Dashboard
@@ -310,7 +317,11 @@ export default function Home() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => window.open('/notice', '_blank')}
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.open('/notice', '_blank')
+                    }
+                  }}
                   className="bg-transparent border border-yellow-500 text-yellow-500 px-6 py-3 rounded-md hover:bg-yellow-500 hover:text-black transition"
                 >
                   View Notice Board

@@ -16,13 +16,19 @@ export async function GET() {
       }
     });
 
-    // Transform the data to include category name
+    // Transform the data to include category name and image data
     const noticesWithCategory = notices.map(notice => ({
       id: notice.id,
       title: notice.title,
       content: notice.content,
       category: notice.category,
       categoryId: notice.categoryId,
+      pdfUrl: notice.pdfUrl,
+      pdfFileName: notice.pdfFileName,
+      pdfData: notice.pdfData,
+      imageUrl: notice.imageUrl,
+      imageFileName: notice.imageFileName,
+      imageData: notice.imageData,
       categoryName: notice.categoryRelation?.editedName || notice.categoryRelation?.name || 'Uncategorized',
       categoryRelation: notice.categoryRelation,
       createdAt: notice.createdAt

@@ -6,14 +6,41 @@ import GridLayout from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
+// Client-only wrapper for GridLayout to prevent hydration issues
+const ClientOnlyGridLayout = ({ children, ...props }: any) => {
+  const [isClient, setIsClient] = useState(false);
 
-export  const Dashboard = ({ data }:{data:TDashboard | null}) => {
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="grid-container border border-lime-500 w-full h-[90vh]">
+        <div className="relative bg-gray-100 rounded-lg shadow-lg overflow-hidden h-full border border-red-600 mx-auto flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return <GridLayout {...props}>{children}</GridLayout>;
+};
+
+export const Dashboard = ({ data }:{data:TDashboard | null}) => {
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const [isClient, setIsClient] = useState(false);
   
     // Calculate aspect ratio (default to 4:3 if null)
     const [widthRatio, heightRatio] = data?.aspectRatio?.split(':').map(Number) || [4, 3];
     
     useEffect(() => {
+      setIsClient(true);
+    }, []);
+
+    useEffect(() => {
+      if (!isClient) return;
+      
       const updateDimensions = () => {
         // Use the window width instead of container width for larger dimensions
         const viewportHeight = window.innerHeight - 50; // Reduced padding for more space
@@ -45,7 +72,7 @@ export  const Dashboard = ({ data }:{data:TDashboard | null}) => {
       // Update on window resize
       window.addEventListener('resize', updateDimensions);
       return () => window.removeEventListener('resize', updateDimensions);
-    }, [widthRatio, heightRatio]);
+    }, [widthRatio, heightRatio, isClient]);
   
     // Convert containers to layout items
     const layout = data?.containers.map(container => ({
@@ -63,6 +90,16 @@ export  const Dashboard = ({ data }:{data:TDashboard | null}) => {
     // const maxGridHeight = 100;
     const rowHeight = dimensions.height / (maxGridHeight);
   
+    if (!isClient) {
+      return (
+        <div className="grid-container border border-lime-500 w-full h-[90vh]">
+          <div className="relative bg-gray-100 rounded-lg shadow-lg overflow-hidden h-full border border-red-600 mx-auto flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="grid-container border  border-lime-500 w-full h-[90vh] ">
         <div 
@@ -74,7 +111,7 @@ export  const Dashboard = ({ data }:{data:TDashboard | null}) => {
           // }}
         >
           {dimensions.width > 0 && (
-            <GridLayout
+            <ClientOnlyGridLayout
               className="layout border border-sky-500 pb-10 "
               layout={layout}
               cols={6}
@@ -107,7 +144,7 @@ export  const Dashboard = ({ data }:{data:TDashboard | null}) => {
                   
                 </div>
               ))}
-            </GridLayout>
+            </ClientOnlyGridLayout>
           )}
         </div>
       </div>

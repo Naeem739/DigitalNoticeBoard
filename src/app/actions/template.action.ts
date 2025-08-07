@@ -1,63 +1,311 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
-// import { db } from "@/lib/db"
-// import type { DashboardTemplate } from "@/types/types"
-import { prisma } from "@/db/prisma"
+import { prisma as db } from "@/db/prisma"
+import { PublicNoticeTemplate } from "@/types/types"
 import { DashboardTemplate } from "@/types/template-types"
 
-// Existing createDashboard function...
-
-/**
- * Save a template to the database
- */
-export async function saveTemplate(template: DashboardTemplate) {
+export async function getAllTemplates(): Promise<PublicNoticeTemplate[]> {
   try {
-    // Save template to database
-    await prisma.template.create({
-      data: {
-        id: template.id,
-        name: template.name,
-        description: template.description,
-        // Store the complex objects as JSON strings
-        widgets: JSON.stringify(template.widgets),
-        layout: JSON.stringify(template.layout),
-        widgetSettings: JSON.stringify(template.widgetSettings),
-      },
+    const templates = await db.publicNoticeTemplate.findMany({
+      orderBy: { createdAt: 'desc' }
     })
-
-    revalidatePath("/dashboard")
-    return { success: true }
+    
+    return templates.map(template => ({
+      ...template,
+      backgroundType: template.backgroundType as 'solid' | 'gradient' | 'image',
+      logo: template.logo ?? undefined,
+      logoFileName: template.logoFileName ?? undefined,
+      backgroundColor: template.backgroundColor ?? undefined,
+      gradientColors: Array.isArray(template.gradientColors) ? template.gradientColors as string[] : undefined,
+      backgroundImage: template.backgroundImage ?? undefined,
+      backgroundImageFileName: template.backgroundImageFileName ?? undefined,
+    }))
   } catch (error) {
-    console.error("Error saving template:", error)
-    return { success: false, error }
+    console.error("Error fetching templates:", error)
+    return []
   }
 }
 
-/**
- * Get all templates from the database
- */
-export async function getTemplates() {
+export async function getTemplateById(id: string): Promise<PublicNoticeTemplate | null> {
   try {
-    const dbTemplates = await prisma.template.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
+    const template = await db.publicNoticeTemplate.findUnique({
+      where: { id }
     })
+    
+    if (!template) return null
+    
+    return {
+      ...template,
+      backgroundType: template.backgroundType as 'solid' | 'gradient' | 'image',
+      logo: template.logo ?? undefined,
+      logoFileName: template.logoFileName ?? undefined,
+      backgroundColor: template.backgroundColor ?? undefined,
+      gradientColors: Array.isArray(template.gradientColors) ? template.gradientColors as string[] : undefined,
+      backgroundImage: template.backgroundImage ?? undefined,
+      backgroundImageFileName: template.backgroundImageFileName ?? undefined,
+    }
+  } catch (error) {
+    console.error("Error fetching template:", error)
+    return null
+  }
+}
 
-    // Convert the JSON strings back to objects
-    const templates = dbTemplates.map((template) => ({
+export async function createTemplate(data: Omit<PublicNoticeTemplate, 'id' | 'createdAt' | 'updatedAt'>): Promise<PublicNoticeTemplate | null> {
+  try {
+    const template = await db.publicNoticeTemplate.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        logo: data.logo,
+        logoFileName: data.logoFileName,
+        title: data.title,
+        subtitle: data.subtitle,
+        emergencyNumber: data.emergencyNumber,
+        emergencyContact: data.emergencyContact,
+        departmentName: data.departmentName,
+        backgroundType: data.backgroundType,
+        backgroundColor: data.backgroundColor,
+        gradientColors: data.gradientColors,
+        backgroundImage: data.backgroundImage,
+        backgroundImageFileName: data.backgroundImageFileName,
+        headerBackgroundColor: data.headerBackgroundColor,
+        footerBackgroundColor: data.footerBackgroundColor,
+        accentColor: data.accentColor,
+      }
+    })
+    
+    return {
+      ...template,
+      backgroundType: template.backgroundType as 'solid' | 'gradient' | 'image',
+      logo: template.logo ?? undefined,
+      logoFileName: template.logoFileName ?? undefined,
+      backgroundColor: template.backgroundColor ?? undefined,
+      gradientColors: Array.isArray(template.gradientColors) ? template.gradientColors as string[] : undefined,
+      backgroundImage: template.backgroundImage ?? undefined,
+      backgroundImageFileName: template.backgroundImageFileName ?? undefined,
+    }
+  } catch (error) {
+    console.error("Error creating template:", error)
+    return null
+  }
+}
+
+export async function updateTemplate(id: string, data: Partial<PublicNoticeTemplate>): Promise<PublicNoticeTemplate | null> {
+  try {
+    const updateData: any = {}
+    
+    if (data.name !== undefined) updateData.name = data.name
+    if (data.description !== undefined) updateData.description = data.description
+    if (data.logo !== undefined) updateData.logo = data.logo
+    if (data.logoFileName !== undefined) updateData.logoFileName = data.logoFileName
+    if (data.title !== undefined) updateData.title = data.title
+    if (data.subtitle !== undefined) updateData.subtitle = data.subtitle
+    if (data.emergencyNumber !== undefined) updateData.emergencyNumber = data.emergencyNumber
+    if (data.emergencyContact !== undefined) updateData.emergencyContact = data.emergencyContact
+    if (data.departmentName !== undefined) updateData.departmentName = data.departmentName
+    if (data.backgroundType !== undefined) updateData.backgroundType = data.backgroundType
+    if (data.backgroundColor !== undefined) updateData.backgroundColor = data.backgroundColor
+    if (data.gradientColors !== undefined) updateData.gradientColors = data.gradientColors
+    if (data.backgroundImage !== undefined) updateData.backgroundImage = data.backgroundImage
+    if (data.backgroundImageFileName !== undefined) updateData.backgroundImageFileName = data.backgroundImageFileName
+    if (data.headerBackgroundColor !== undefined) updateData.headerBackgroundColor = data.headerBackgroundColor
+    if (data.footerBackgroundColor !== undefined) updateData.footerBackgroundColor = data.footerBackgroundColor
+    if (data.accentColor !== undefined) updateData.accentColor = data.accentColor
+
+    const template = await db.publicNoticeTemplate.update({
+      where: { id },
+      data: updateData
+    })
+    
+    return {
+      ...template,
+      backgroundType: template.backgroundType as 'solid' | 'gradient' | 'image',
+      logo: template.logo ?? undefined,
+      logoFileName: template.logoFileName ?? undefined,
+      backgroundColor: template.backgroundColor ?? undefined,
+      gradientColors: Array.isArray(template.gradientColors) ? template.gradientColors as string[] : undefined,
+      backgroundImage: template.backgroundImage ?? undefined,
+      backgroundImageFileName: template.backgroundImageFileName ?? undefined,
+    }
+  } catch (error) {
+    console.error("Error updating template:", error)
+    return null
+  }
+}
+
+export async function deleteTemplate(id: string): Promise<boolean> {
+  try {
+    await db.publicNoticeTemplate.delete({
+      where: { id }
+    })
+    return true
+  } catch (error) {
+    console.error("Error deleting template:", error)
+    return false
+  }
+}
+
+export async function applyTemplateToSettings(templateId: string): Promise<boolean> {
+  try {
+    const template = await db.publicNoticeTemplate.findUnique({
+      where: { id: templateId }
+    })
+    
+    if (!template) return false
+    
+    // Update the public notice settings with template data
+    await db.publicNoticeSettings.upsert({
+      where: { id: 'default' }, // Assuming there's a default settings record
+      update: {
+        logo: template.logo,
+        logoFileName: template.logoFileName,
+        title: template.title,
+        subtitle: template.subtitle,
+        emergencyNumber: template.emergencyNumber,
+        emergencyContact: template.emergencyContact,
+        departmentName: template.departmentName,
+        backgroundType: template.backgroundType,
+        backgroundColor: template.backgroundColor,
+        gradientColors: template.gradientColors,
+        backgroundImage: template.backgroundImage,
+        backgroundImageFileName: template.backgroundImageFileName,
+        headerBackgroundColor: template.headerBackgroundColor,
+        footerBackgroundColor: template.footerBackgroundColor,
+        accentColor: template.accentColor,
+      },
+      create: {
+        id: 'default',
+        logo: template.logo,
+        logoFileName: template.logoFileName,
+        title: template.title,
+        subtitle: template.subtitle,
+        emergencyNumber: template.emergencyNumber,
+        emergencyContact: template.emergencyContact,
+        departmentName: template.departmentName,
+        backgroundType: template.backgroundType,
+        backgroundColor: template.backgroundColor,
+        gradientColors: template.gradientColors,
+        backgroundImage: template.backgroundImage,
+        backgroundImageFileName: template.backgroundImageFileName,
+        headerBackgroundColor: template.headerBackgroundColor,
+        footerBackgroundColor: template.footerBackgroundColor,
+        accentColor: template.accentColor,
+      }
+    })
+    
+    return true
+  } catch (error) {
+    console.error("Error applying template:", error)
+    return false
+  }
+}
+
+// Dashboard Template CRUD Operations
+export async function getAllDashboardTemplates(): Promise<DashboardTemplate[]> {
+  try {
+    const templates = await db.template.findMany({
+      orderBy: { createdAt: 'desc' }
+    })
+    
+    return templates.map(template => ({
       id: template.id,
       name: template.name,
-      description: template.description,
-      widgets: JSON.parse(template.widgets as string),
-      layout: JSON.parse(template.layout as string),
-      widgetSettings: JSON.parse(template.widgetSettings as string),
+      description: template.description || "",
+      widgets: template.widgets as any[],
+      layout: template.layout as any[],
+      widgetSettings: template.widgetSettings as Record<string, any>
     }))
-
-    return { success: true, templates }
   } catch (error) {
-    console.error("Error getting templates:", error)
-    return { success: false, error, templates: [] }
+    console.error("Error fetching dashboard templates:", error)
+    return []
+  }
+}
+
+export async function getDashboardTemplateById(id: string): Promise<DashboardTemplate | null> {
+  try {
+    const template = await db.template.findUnique({
+      where: { id }
+    })
+    
+    if (!template) return null
+    
+    return {
+      id: template.id,
+      name: template.name,
+      description: template.description || "",
+      widgets: template.widgets as any[],
+      layout: template.layout as any[],
+      widgetSettings: template.widgetSettings as Record<string, any>
+    }
+  } catch (error) {
+    console.error("Error fetching dashboard template:", error)
+    return null
+  }
+}
+
+export async function createDashboardTemplate(data: Omit<DashboardTemplate, 'id'>): Promise<DashboardTemplate | null> {
+  try {
+    const template = await db.template.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        widgets: data.widgets,
+        layout: data.layout,
+        widgetSettings: data.widgetSettings
+      }
+    })
+    
+    return {
+      id: template.id,
+      name: template.name,
+      description: template.description || "",
+      widgets: template.widgets as any[],
+      layout: template.layout as any[],
+      widgetSettings: template.widgetSettings as Record<string, any>
+    }
+  } catch (error) {
+    console.error("Error creating dashboard template:", error)
+    return null
+  }
+}
+
+export async function updateDashboardTemplate(id: string, data: Partial<DashboardTemplate>): Promise<DashboardTemplate | null> {
+  try {
+    const updateData: any = {}
+    
+    if (data.name !== undefined) updateData.name = data.name
+    if (data.description !== undefined) updateData.description = data.description
+    if (data.widgets !== undefined) updateData.widgets = data.widgets
+    if (data.layout !== undefined) updateData.layout = data.layout
+    if (data.widgetSettings !== undefined) updateData.widgetSettings = data.widgetSettings
+
+    const template = await db.template.update({
+      where: { id },
+      data: updateData
+    })
+    
+    return {
+      id: template.id,
+      name: template.name,
+      description: template.description || "",
+      widgets: template.widgets as any[],
+      layout: template.layout as any[],
+      widgetSettings: template.widgetSettings as Record<string, any>
+    }
+  } catch (error) {
+    console.error("Error updating dashboard template:", error)
+    return null
+  }
+}
+
+export async function deleteDashboardTemplate(id: string): Promise<boolean> {
+  try {
+    await db.template.delete({
+      where: { id }
+    })
+    return true
+  } catch (error) {
+    console.error("Error deleting dashboard template:", error)
+    return false
   }
 }

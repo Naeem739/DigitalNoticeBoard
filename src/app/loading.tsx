@@ -1,34 +1,9 @@
-'use client'
-import { useState, useEffect } from "react";
+import { BellLoader } from '@/components/ui/loader'
 
-const Loading= () => {
-  const [dots, setDots] = useState("");
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((prevDots) => (prevDots.length < 3 ? prevDots + "." : ""));
-    }, 500); // Change dots every 500ms
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, []);
-
+export default function Loading() {
   return (
-    <div style={styles.container}>
-      <h1 >
-        Loading{dots}
-      </h1>
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <BellLoader size="lg" />
     </div>
-  );
-};
-
-const styles = {
-  container: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100vh",
-   
-  }
-
-};
-
-export default Loading;
+  )
+}

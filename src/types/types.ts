@@ -29,9 +29,15 @@ export type Category = {
 export type TNotice = {
   id: string;
   title: string;
-  content: string;
+  content?: string;
   category: string;
   categoryId: string;
+  pdfUrl?: string;
+  pdfFileName?: string;
+  pdfData?: string;
+  imageUrl?: string;
+  imageFileName?: string;
+  imageData?: string;
   categoryName?: string;
   createdAt?: Date;
   categoryRelation?: {
@@ -106,4 +112,55 @@ export type TDashboard2 = {
       imageTitleFontWeight?: string;
     };
   }[];
+};
+
+export type PublicNoticeSettings = {
+  id: string;
+  logo?: string;
+  logoFileName?: string;
+  title: string;
+  subtitle: string;
+  emergencyNumber: string;
+  emergencyContact: string;
+  departmentName: string;
+  backgroundType: 'solid' | 'gradient' | 'image';
+  backgroundColor?: string;
+  gradientColors?: string[];
+  backgroundImage?: string;
+  backgroundImageFileName?: string;
+  headerBackgroundColor: string;
+  footerBackgroundColor: string;
+  accentColor: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type PublicNoticeTemplate = {
+  id: string;
+  name: string;
+  description?: string;
+  logo?: string;
+  logoFileName?: string;
+  title: string;
+  subtitle: string;
+  emergencyNumber: string;
+  emergencyContact: string;
+  departmentName: string;
+  backgroundType: 'solid' | 'gradient' | 'image';
+  backgroundColor?: string;
+  gradientColors?: string[];
+  backgroundImage?: string;
+  backgroundImageFileName?: string;
+  headerBackgroundColor: string;
+  footerBackgroundColor: string;
+  accentColor: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type BackgroundStyle = {
+  name: string;
+  type: 'solid' | 'gradient';
+  colors: string[];
+  preview: string;
 };

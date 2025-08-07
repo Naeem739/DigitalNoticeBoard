@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { getAllDashboards, deleteDashboard } from '@/app/actions/dashboard.action'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, Layout, Eye, Calendar, BarChart3 } from 'lucide-react'
+import { Trash2, Layout, Eye, Calendar, BarChart3, Edit } from 'lucide-react'
 import { toast } from 'sonner'
+import { BellLoader } from '@/components/ui/loader'
 
 type TDashboard = {
   id: string
@@ -103,10 +104,7 @@ export default function NoticeInterfaces() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard interfaces...</p>
-        </div>
+        <BellLoader size="lg" />
       </div>
     )
   }
@@ -149,11 +147,28 @@ export default function NoticeInterfaces() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.open(`/dashboard/layout/edit-dashboard?id=${dashboard.id}`, '_blank')}
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.open(`/dashboard/view-dashboard/${dashboard.id}`, '_blank')
+                          }
+                        }}
                         className="h-8 w-8 p-0"
                         title="View Interface"
                       >
                         <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.open(`/dashboard/layout/edit-dashboard?id=${dashboard.id}`, '_blank')
+                          }
+                        }}
+                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        title="Edit Interface"
+                      >
+                        <Edit className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="ghost"
