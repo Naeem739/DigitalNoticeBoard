@@ -613,17 +613,43 @@ export default function PublicNoticePage() {
                           
                           <div className="relative flex items-center justify-center">
                             <h3 
-                              className="text-lg font-bold text-center truncate px-2 py-1 rounded-lg"
+                              className="text-lg font-bold text-center truncate px-4 py-2 rounded-xl relative overflow-hidden"
                             style={{
                               color: settings.categoryFontColor || '#1e293b',
                               fontFamily: settings.categoryFont || 'Inter',
                               fontSize: `${settings.categoryFontSize || 16}px`,
-                                fontWeight: settings.categoryFontWeight || 'bold',
-                                textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                backgroundColor: `${settings.categoryBackgroundColor || '#f8fafc'}80`
+                              fontWeight: settings.categoryFontWeight || 'bold',
+                              textShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                              backgroundColor: `${settings.categoryBackgroundColor || '#f8fafc'}90`,
+                              border: `2px solid ${settings.categoryBorderColor || '#e2e8f0'}`,
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)',
+                              backdropFilter: 'blur(10px)',
+                              position: 'relative'
                             }}
                           >
-                            {container.title || `Widget ${index + 1}`}
+                            {/* Gradient overlay for extra visual appeal */}
+                            <div 
+                              className="absolute inset-0 rounded-xl opacity-20"
+                              style={{
+                                background: `linear-gradient(135deg, ${settings.accentColor || '#3b82f6'}20, ${settings.accentColor || '#3b82f6'}10)`
+                              }}
+                            />
+                            <span className="relative z-10">
+                              {container.settings?.customCategoryName || container.title || `Widget ${index + 1}`}
+                            </span>
+                            {/* Decorative elements */}
+                            <div 
+                              className="absolute top-0 left-0 w-2 h-2 rounded-full opacity-60"
+                              style={{
+                                backgroundColor: settings.accentColor || '#3b82f6'
+                              }}
+                            />
+                            <div 
+                              className="absolute bottom-0 right-0 w-2 h-2 rounded-full opacity-60"
+                              style={{
+                                backgroundColor: settings.accentColor || '#3b82f6'
+                              }}
+                            />
                           </h3>
                           </div>
                           
@@ -703,17 +729,55 @@ export default function PublicNoticePage() {
                                       {/* Category and Date Row */}
                                       <div className="flex items-center gap-2">
                                                                                     {/* Category Badge */}
-                                            {notice.categoryName && (
-                                              <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                                            {(container.settings?.customCategoryName || notice.categoryName) && (
+                                              <div className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold relative overflow-hidden group"
                                                 style={{
-                                                  backgroundColor: `${borderColor}20`,
+                                                  backgroundColor: `${borderColor}15`,
                                                   color: settings.fontColor || '#1e293b',
-                                                  fontSize: '11px'
+                                                  fontSize: '11px',
+                                                  border: `1px solid ${borderColor}40`,
+                                                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                                  backdropFilter: 'blur(8px)',
+                                                  transition: 'all 0.3s ease'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.transform = 'scale(1.05)';
+                                                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.transform = 'scale(1)';
+                                                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
                                                 }}
                                               >
-                                            {notice.categoryName}
-                                          </div>
-                                        )}
+                                                {/* Gradient background */}
+                                                <div 
+                                                  className="absolute inset-0 rounded-full opacity-30"
+                                                  style={{
+                                                    background: `linear-gradient(135deg, ${borderColor}40, ${borderColor}20)`
+                                                  }}
+                                                />
+                                                {/* Icon for custom category names */}
+                                                {container.settings?.customCategoryName && (
+                                                  <svg 
+                                                    className="w-3 h-3 mr-1.5 relative z-10" 
+                                                    fill="currentColor" 
+                                                    viewBox="0 0 20 20"
+                                                  >
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                  </svg>
+                                                )}
+                                                <span className="relative z-10 font-medium tracking-wide">
+                                                  {container.settings?.customCategoryName || notice.categoryName}
+                                                </span>
+                                                {/* Subtle glow effect */}
+                                                <div 
+                                                  className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-20 transition-opacity duration-300"
+                                                  style={{
+                                                    background: `radial-gradient(circle, ${borderColor}40, transparent)`
+                                                  }}
+                                                />
+                                              </div>
+                                            )}
                                         
                                         {/* Creation Date */}
                                         {notice.createdAt && (

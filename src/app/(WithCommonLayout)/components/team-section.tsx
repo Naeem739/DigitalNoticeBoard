@@ -23,7 +23,7 @@ const teamMembers: TeamMember[] = [
     name: "Thomas Mendoza",
     role: "Founder",
     description: "Albucius consectetuer eu nam. Saepe legendos vulputate eu quo, id mea comprehensam signifer.",
-    image: "/images/testimonial_4.jpg",
+    image: "/images/placeholder-avatar.jpg",
     socials: {
       facebook: "#",
       twitter: "#",
@@ -35,7 +35,7 @@ const teamMembers: TeamMember[] = [
     name: "Magra Mendoza",
     role: "CEO",
     description: "Albucius consectetuer eu nam. Saepe legendos vulputate eu quo, id mea comprehensam signifer.",
-    image: "/images/testimonial_3.jpg",
+    image: "/images/placeholder-avatar.jpg",
     socials: {
       facebook: "#",
       twitter: "#",
@@ -47,7 +47,7 @@ const teamMembers: TeamMember[] = [
     name: "Andrew Cruz",
     role: "Developer",
     description: "Albucius consectetuer eu nam. Saepe legendos vulputate eu quo, id mea comprehensam signifer.",
-    image: "/images/testimonial_5.jpg",
+    image: "/images/placeholder-avatar.jpg",
     socials: {
       facebook: "#",
       twitter: "#",
@@ -59,7 +59,7 @@ const teamMembers: TeamMember[] = [
     name: "George Silva",
     role: "Designer",
     description: "Albucius consectetuer eu nam. Saepe legendos vulputate eu quo, id mea comprehensam signifer.",
-    image: "/images/testimonial_6.jpg",
+    image: "/images/placeholder-avatar.jpg",
     socials: {
       facebook: "#",
       twitter: "#",

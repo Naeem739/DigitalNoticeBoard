@@ -41,6 +41,8 @@ export type WidgetSettings = {
   categoryHeight: number
   categoryBorderColor: string
   categoryBorderWidth: number
+  // Custom category name for display
+  customCategoryName?: string
   // Image widget settings
   imageFit: string
   imageBorderRadius: number

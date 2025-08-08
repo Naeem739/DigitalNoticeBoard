@@ -136,7 +136,7 @@ export const Dashboard = ({ data }:{data:TDashboard | null}) => {
                 >
                   {container.title && (
                     <h3 className="text-xl font-semibold mb-3 truncate">
-                      {container.title}
+                      {container.settings?.customCategoryName || container.title}
                       <p> {container.width }</p><p>  {container.height}  </p> 
                     </h3>
                   )}
