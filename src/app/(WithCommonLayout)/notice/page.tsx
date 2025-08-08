@@ -722,7 +722,7 @@ export default function PublicNoticePage() {
                         >
                           {container.type === 'notice' && container.noticeIds && (
                             <div className="h-full flex flex-col justify-between gap-2">
-                              <div className="notices-container flex flex-col gap-2 overflow-auto" style={{ maxHeight: '400px' }}>
+                              <div className="notices-container flex flex-col gap-2 overflow-auto scrollbar-hide" style={{ maxHeight: '400px' }}>
                                 {container.noticeIds.slice(0, 5).map((noticeId: string, noticeIndex: number) => {
                                 const notice = getNoticeById(noticeId)
                                 if (!notice) return null
@@ -1057,3 +1057,4 @@ export default function PublicNoticePage() {
     </div>
   )
 }
+//Naeem
