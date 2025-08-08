@@ -672,30 +672,32 @@ export default function PublicNoticePage() {
                                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                                     }}
                                   >
-                                    {/* QR Code - Extended Position */}
-                                    <div className="absolute top-0 right-0 bottom-0 w-1/3 z-10">
+                                    {/* QR Code - Fixed Position */}
+                                    <div className="absolute top-2 right-2 w-24 h-24 z-10">
                                       <NoticeQRCode 
                                         notice={notice}
                                         imageData={notice.imageData}
                                         imageTitle={notice.imageFileName || notice.title}
-                                        size={120}
-                                        className="opacity-80 hover:opacity-100 transition-opacity w-full h-full flex items-center justify-center"
+                                        size={96}
+                                        className="opacity-80 hover:opacity-100 transition-opacity"
                                       />
                                     </div>
                                     {/* Notice Header */}
-                                    <div className="p-4 pb-2 pr-2/3">
+                                    <div className="p-4 pb-2 pr-28">
                                       {/* Notice Title */}
-                                                                              <h4 
-                                          className="text-sm font-semibold leading-tight mb-2"
-                                      style={{
-                                        color: settings.fontColor || '#1e293b',
-                                        fontSize: `${settings.fontSize || 14}px`,
-                                            fontWeight: settings.fontWeight || 'semibold',
-                                            fontFamily: settings.fontFamily || 'Inter',
-                                            lineHeight: '1.3'
-                                      }}
-                                    >
-                                      {notice.title}
+                                      <h4 
+                                        className="text-sm font-semibold leading-tight mb-2 line-clamp-2 break-words"
+                                        style={{
+                                          color: settings.fontColor || '#1e293b',
+                                          fontSize: `${settings.fontSize || 14}px`,
+                                          fontWeight: settings.fontWeight || 'semibold',
+                                          fontFamily: settings.fontFamily || 'Inter',
+                                          lineHeight: '1.3',
+                                          wordBreak: 'break-word',
+                                          overflowWrap: 'break-word'
+                                        }}
+                                      >
+                                        {notice.title}
                                       </h4>
                                       
                                       {/* Category and Date Row */}
@@ -738,12 +740,14 @@ export default function PublicNoticePage() {
                                     {settings.showFullContent && notice.content && (
                                         <div className="mt-3">
                                       <p 
-                                            className="text-xs leading-tight opacity-75 line-clamp-2"
+                                            className="text-xs leading-tight opacity-75 line-clamp-2 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
                                               fontFamily: settings.fontFamily || 'Inter',
                                               lineHeight: '1.3',
-                                              fontSize: '12px'
+                                              fontSize: '12px',
+                                              wordBreak: 'break-word',
+                                              overflowWrap: 'break-word'
                                         }}
                                       >
                                             {notice.content.length > 80 
