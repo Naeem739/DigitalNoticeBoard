@@ -109,6 +109,55 @@ export default function PublicNoticePage() {
     return () => clearInterval(interval)
   }, [mounted, autoPaginationEnabled, dashboards.length])
 
+  // Auto-scroll functionality for widgets
+  useEffect(() => {
+    if (!mounted || !currentDashboard) return
+
+    const autoScrollWidgets = currentDashboard.containers.filter((container: any) => 
+      container.settings?.autoScroll && container.type === 'notice'
+    )
+
+    const scrollIntervals = autoScrollWidgets.map((container: any) => {
+      const element = document.getElementById(container.id)
+      if (!element) return null
+
+      const noticesContainer = element.querySelector(".notices-container")
+      if (!noticesContainer) return null
+
+      let scrollPosition = 0
+      let isScrollingDown = true
+      const scrollSpeed = 1
+      const maxScroll = noticesContainer.scrollHeight - noticesContainer.clientHeight
+
+      // Only start scrolling if there's actually content to scroll
+      if (maxScroll <= 0) return null
+
+      const interval = setInterval(() => {
+        if (isScrollingDown) {
+          scrollPosition += scrollSpeed
+          if (scrollPosition >= maxScroll) {
+            isScrollingDown = false
+          }
+        } else {
+          scrollPosition -= scrollSpeed
+          if (scrollPosition <= 0) {
+            isScrollingDown = true
+          }
+        }
+
+        noticesContainer.scrollTop = scrollPosition
+      }, 30)
+
+      return interval
+    })
+
+    return () => {
+      scrollIntervals.forEach((interval) => {
+        if (interval) clearInterval(interval)
+      })
+    }
+  }, [mounted, currentDashboard])
+
   // Countdown timer for auto-pagination
   useEffect(() => {
     if (!mounted || !autoPaginationEnabled || dashboards.length <= 1) {
@@ -574,6 +623,7 @@ export default function PublicNoticePage() {
                     return (
                       <motion.div
                         key={container.id}
+                        id={container.id}
                         className="relative rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
                         style={{
                           gridColumn: `span ${container.w}`,
@@ -672,7 +722,8 @@ export default function PublicNoticePage() {
                         >
                           {container.type === 'notice' && container.noticeIds && (
                             <div className="h-full flex flex-col justify-between gap-2">
-                              {container.noticeIds.slice(0, 5).map((noticeId: string, noticeIndex: number) => {
+                              <div className="notices-container flex flex-col gap-2 overflow-auto" style={{ maxHeight: '400px' }}>
+                                {container.noticeIds.slice(0, 5).map((noticeId: string, noticeIndex: number) => {
                                 const notice = getNoticeById(noticeId)
                                 if (!notice) return null
                                 
@@ -849,6 +900,7 @@ export default function PublicNoticePage() {
                                   </div>
                                 </div>
                               )}
+                              </div>
                             </div>
                           )}
 
