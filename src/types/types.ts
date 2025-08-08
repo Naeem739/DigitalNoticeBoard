@@ -103,6 +103,16 @@ export type TDashboard2 = {
       noticeCount: number;
       backgroundColor: string;
       backgroundOpacity: number;
+      // Category styling properties
+      categoryFont?: string;
+      categoryFontSize?: number;
+      categoryFontWeight?: string;
+      categoryFontColor?: string;
+      categoryBackgroundColor?: string;
+      categoryHeight?: number;
+      categoryBorderColor?: string;
+      categoryBorderWidth?: number;
+      customCategoryName?: string;
       // Image-specific settings
       imageFit?: string;
       imageBorderRadius?: number;

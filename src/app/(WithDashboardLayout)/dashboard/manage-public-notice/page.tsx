@@ -210,25 +210,15 @@ export default function ManagePublicNoticePage() {
   const handleTestDatabase = async () => {
     setLoading(true)
     try {
-      const response = await fetch("/api/test-db")
-      const result = await response.json()
-
-      if (result.success) {
-        toast({
-          title: "Database Test Successful",
-          description: result.message,
-        })
-      } else {
-        toast({
-          title: "Database Test Failed",
-          description: result.error || "Database connection failed",
-          variant: "destructive",
-        })
-      }
+      // Database test functionality removed - API endpoint no longer exists
+      toast({
+        title: "Database Test Removed",
+        description: "Database testing functionality has been removed from this version",
+      })
     } catch (error) {
       toast({
         title: "Database Test Failed",
-        description: "Failed to test database connection",
+        description: "Database testing functionality has been removed",
         variant: "destructive",
       })
     } finally {

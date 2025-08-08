@@ -29,7 +29,7 @@ import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } 
 import { getCategoriesWithNotices } from "@/app/actions/category.action"
 import { getAllTemplates, createTemplate, getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
 import { createDashboard, getAllDashboards } from "@/app/actions/dashboard.action"
-// import { createImage, testImageConnection } from "@/app/actions/image.action"
+// import { createImage } from "@/app/actions/image.action"
 import { toast } from "sonner"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -94,6 +94,7 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   categoryHeight: 36,
   categoryBorderColor: "#d1d5db",
   categoryBorderWidth: 1,
+  customCategoryName: "",
   
   // Image widget settings (kept for type compatibility)
   imageFit: "cover",
@@ -698,6 +699,17 @@ function EditDashboardDemo() {
       ),
     )
 
+    // Initialize custom category name if not already set
+    if (!widgetSettings[widgetId]?.customCategoryName) {
+      setWidgetSettings((prev) => ({
+        ...prev,
+        [widgetId]: {
+          ...prev[widgetId],
+          customCategoryName: "",
+        },
+      }))
+    }
+
     toast.success(`Added ${categoryName} to widget`)
   }
 
@@ -834,6 +846,8 @@ function EditDashboardDemo() {
             categoryHeight: settings.categoryHeight,
             categoryBorderColor: settings.categoryBorderColor,
             categoryBorderWidth: settings.categoryBorderWidth,
+            // Custom category name
+            customCategoryName: settings.customCategoryName,
           },
         }
       })
@@ -1390,7 +1404,7 @@ function EditDashboardDemo() {
                         fontWeight: settings.categoryFontWeight,
                       }}
                     >
-                      {widget.content || widget.title}
+                      {settings.customCategoryName || widget.content || widget.title}
                       {widget.topNotices && widget.topNotices.length > 0 && (
                         <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
                           {widget.topNotices.length} notices
@@ -1632,7 +1646,7 @@ function EditDashboardDemo() {
       {activeSettingsWidget && (
         <div
           ref={settingsRef}
-          className="fixed bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-96 max-h-[80vh] flex flex-col"
+          className="fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-[500px] max-h-[85vh] flex flex-col backdrop-blur-sm"
           style={{
             left: `${settingsPosition.x}px`,
             top: `${settingsPosition.y}px`,
@@ -1640,32 +1654,34 @@ function EditDashboardDemo() {
         >
           {/* Header */}
           <div
-            className="flex items-center justify-between p-3 cursor-move bg-gray-50 rounded-t-lg border-b"
+            className="flex items-center justify-between p-4 cursor-move bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl border-b border-gray-200"
             onMouseDown={handleDragStart}
           >
-            <div className="flex items-center gap-2">
-              <GripVertical size={16} className="text-gray-400" />
-              <h4 className="font-medium">Widget Settings</h4>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <GripVertical size={18} className="text-blue-600" />
+              </div>
+              <h4 className="font-semibold text-gray-800 text-lg">Widget Settings</h4>
             </div>
             <button
               onClick={() => setActiveSettingsWidget(null)}
-              className="hover:bg-gray-200 rounded-full p-1 transition-colors"
+              className="hover:bg-gray-200 rounded-full p-2 transition-colors duration-200"
             >
-              <X size={16} className="text-gray-500" />
+              <X size={18} className="text-gray-500" />
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b overflow-x-auto">
+          <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
             {SETTINGS_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveSettingsTab(tab.id)}
-                className={`flex items-center gap-1 px-3 py-2 text-sm transition-colors whitespace-nowrap
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all duration-200 whitespace-nowrap
                   ${
                     activeSettingsTab === tab.id
-                      ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
-                      : "text-gray-600 hover:bg-gray-50"
+                      ? "text-blue-700 border-b-2 border-blue-600 bg-white shadow-sm"
+                      : "text-gray-600 hover:bg-white hover:text-gray-800"
                   }`}
               >
                 {tab.icon}
@@ -1675,19 +1691,19 @@ function EditDashboardDemo() {
           </div>
 
           {/* Settings Content with proper scrolling */}
-          <div className="p-4 overflow-y-auto flex-1">
+          <div className="p-6 overflow-y-auto flex-1 bg-white">
             {/* Style Tab */}
             {activeSettingsTab === "style" && (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 {/* Background Settings */}
-                <div>
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
-                    <Palette size={16} /> Background
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <label className="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4">
+                    <Palette size={18} className="text-blue-600" /> Background
                   </label>
                   <div className="space-y-3">
                     {/* Background Color */}
                     <div>
-                      <span className="text-xs text-gray-500 block mb-2">Color</span>
+                      <span className="text-xs font-medium text-gray-600 block mb-3">Color</span>
                   <div className="flex flex-wrap gap-1">
                     {getPresetColors().map((color) => (
                       <button
@@ -1717,9 +1733,9 @@ function EditDashboardDemo() {
 
                     {/* Background Opacity */}
                 <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-gray-500">Opacity</span>
-                        <span className="text-xs text-gray-600">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-medium text-gray-600">Opacity</span>
+                        <span className="text-xs font-semibold text-blue-600">
                           {Math.round(
                             (widgetSettings[activeSettingsWidget]?.backgroundOpacity ||
                               DEFAULT_WIDGET_SETTINGS.backgroundOpacity) * 100,
@@ -1743,21 +1759,21 @@ function EditDashboardDemo() {
                             Number.parseFloat(e.target.value),
                           )
                         }
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Border Settings */}
-                <div>
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
-                    <Box size={16} /> Border
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <label className="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4">
+                    <Box size={18} className="text-blue-600" /> Border
                   </label>
                   <div className="space-y-3">
                     {/* Border Color */}
                     <div>
-                      <span className="text-xs text-gray-500 block mb-2">Color</span>
+                      <span className="text-xs font-medium text-gray-600 block mb-3">Color</span>
                     <div className="flex flex-wrap gap-1">
                       {getPresetColors().map((color) => (
                         <button
@@ -1787,9 +1803,9 @@ function EditDashboardDemo() {
 
                     {/* Border Width */}
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-gray-500">Width</span>
-                        <span className="text-xs text-gray-600">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-medium text-gray-600">Width</span>
+                        <span className="text-xs font-semibold text-blue-600">
                           {widgetSettings[activeSettingsWidget]?.borderWidth || DEFAULT_WIDGET_SETTINGS.borderWidth}px
                         </span>
                       </div>
@@ -1801,20 +1817,20 @@ function EditDashboardDemo() {
                         onChange={(e) =>
                           updateWidgetSetting(activeSettingsWidget, "borderWidth", Number.parseInt(e.target.value))
                         }
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Card Opacity */}
-                <div>
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
-                    <Layers size={16} /> Card Opacity
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <label className="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4">
+                    <Layers size={18} className="text-blue-600" /> Card Opacity
                   </label>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-gray-500">Transparency</span>
-                    <span className="text-xs text-gray-600">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-gray-600">Transparency</span>
+                    <span className="text-xs font-semibold text-blue-600">
                       {Math.round(
                         (widgetSettings[activeSettingsWidget]?.cardOpacity || DEFAULT_WIDGET_SETTINGS.cardOpacity) *
                           100,
@@ -1831,7 +1847,7 @@ function EditDashboardDemo() {
                     onChange={(e) =>
                       updateWidgetSetting(activeSettingsWidget, "cardOpacity", Number.parseFloat(e.target.value))
                     }
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -2022,6 +2038,28 @@ function EditDashboardDemo() {
             {/* Category Tab */}
             {activeSettingsTab === "category" && (
               <div className="space-y-6">
+                {/* Category Name Editing */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Edit size={16} /> Category Name
+                  </label>
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-xs text-gray-500 block mb-2">Display Name</span>
+                      <input
+                        type="text"
+                        value={widgetSettings[activeSettingsWidget]?.customCategoryName || ""}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, "customCategoryName", e.target.value)}
+                        placeholder="Enter custom category name..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Leave empty to use the original category name
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Category Styling */}
                 <div>
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
@@ -2266,30 +2304,7 @@ function EditDashboardDemo() {
 
                 </div>
 
-          {/* Update the button in the settings panel to use the new function */}
-          {/* Find the button at the end of the settings panel (around line 1300) */}
-          {/* Replace:
-          <button
-            onClick={() => {
-              const widget = widgets.find((w) => w.id === activeSettingsWidget)
-              if (widget) {
-                handleSaveTemplate(widget)
-              }
-            }}
-            className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
-          >
-            Save as Template
-          </button> */}
 
-          {/* With: */}
-          <div className="p-3 border-t">
-            <button
-              onClick={handleSaveTemplate}
-              className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
-            >
-              Save as Template
-            </button>
-                  </div>
                 </div>
       )}
 
