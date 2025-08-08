@@ -1101,15 +1101,7 @@ function EditDashboardDemo() {
 
   const isEditing = new URLSearchParams(window.location.search).get('id') !== null
 
-  // Get localStorage usage info
-  const [storageUsage, setStorageUsage] = useState<{ used: number; available: number; total: number } | null>(null)
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const usage = localStorageUtils.getUsageInfo()
-      setStorageUsage(usage)
-    }
-  }, [])
 
   // Template management state
   const [templates, setTemplates] = useState<DashboardTemplate[]>([])
@@ -1148,42 +1140,7 @@ function EditDashboardDemo() {
         </div>
       )}
 
-      {/* localStorage Usage Indicator */}
-      {storageUsage && (
-        <div className={`mb-4 p-3 rounded-lg border ${
-          storageUsage.used / storageUsage.total > 0.8 
-            ? 'bg-red-50 border-red-200' 
-            : storageUsage.used / storageUsage.total > 0.6 
-            ? 'bg-yellow-50 border-yellow-200' 
-            : 'bg-green-50 border-green-200'
-        }`}>
-          <div className="flex items-center justify-between text-sm">
-            <span className={`font-medium ${
-              storageUsage.used / storageUsage.total > 0.8 
-                ? 'text-red-700' 
-                : storageUsage.used / storageUsage.total > 0.6 
-                ? 'text-yellow-700' 
-                : 'text-green-700'
-            }`}>
-              Local Storage Usage: {((storageUsage.used / storageUsage.total) * 100).toFixed(1)}%
-            </span>
-            <span className={`text-xs ${
-              storageUsage.used / storageUsage.total > 0.8 
-                ? 'text-red-600' 
-                : storageUsage.used / storageUsage.total > 0.6 
-                ? 'text-yellow-600' 
-                : 'text-green-600'
-            }`}>
-              {((storageUsage.used / 1024 / 1024)).toFixed(2)}MB / {((storageUsage.total / 1024 / 1024)).toFixed(2)}MB
-            </span>
-          </div>
-          {storageUsage.used / storageUsage.total > 0.8 && (
-            <p className="text-xs text-red-600 mt-1">
-              ⚠️ Storage is nearly full. Consider removing some widgets or clearing saved data.
-            </p>
-          )}
-        </div>
-      )}
+
       {/* Minimal Confirmation Dialog */}
       {showConfirmationDialog && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1223,7 +1180,7 @@ function EditDashboardDemo() {
           </div>
         </div>
       )}
-      <div className="mb-6 flex flex-wrap gap-4">
+      <div className="mb-6 flex flex-wrap gap-4 ml-4">
         {isEditing && (
           <Link href={`/dashboard/view-dashboard/${new URLSearchParams(window.location.search).get('id')}`}>
             <Button variant="outline" size="sm" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
@@ -1672,12 +1629,12 @@ function EditDashboardDemo() {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
+          <div className="flex border-b border-gray-200 bg-gray-50">
             {SETTINGS_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveSettingsTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all duration-200 whitespace-nowrap
+                className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-all duration-200 flex-1 min-w-0
                   ${
                     activeSettingsTab === tab.id
                       ? "text-blue-700 border-b-2 border-blue-600 bg-white shadow-sm"
@@ -1685,7 +1642,7 @@ function EditDashboardDemo() {
                   }`}
               >
                 {tab.icon}
-                {tab.label}
+                <span className="truncate">{tab.label}</span>
               </button>
             ))}
           </div>

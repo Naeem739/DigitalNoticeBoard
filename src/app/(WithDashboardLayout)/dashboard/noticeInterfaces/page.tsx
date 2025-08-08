@@ -1,6 +1,27 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+
+// Add CSS animations
+const animationStyles = `
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`
+
+// Inject styles
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style')
+  style.textContent = animationStyles
+  document.head.appendChild(style)
+}
 import { getAllDashboards, deleteDashboard } from '@/app/actions/dashboard.action'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -134,12 +155,19 @@ export default function NoticeInterfaces() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {dashboards.map((dashboard) => {
+          {dashboards.map((dashboard, index) => {
             const containerCount = getContainerCount(dashboard.containers)
             const widgetTypes = getWidgetTypes(dashboard.containers)
             
             return (
-              <Card key={dashboard.id} className="hover:shadow-lg transition-shadow">
+              <Card 
+                key={dashboard.id} 
+                className="hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-1"
+                style={{
+                  animationDelay: `${index * 100}ms`,
+                  animation: 'fadeInUp 0.6s ease-out forwards'
+                }}
+              >
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Dashboard Interface</CardTitle>
@@ -152,7 +180,7 @@ export default function NoticeInterfaces() {
                             window.open(`/dashboard/view-dashboard/${dashboard.id}`, '_blank')
                           }
                         }}
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-110"
                         title="View Interface"
                       >
                         <Eye className="w-4 h-4" />
@@ -165,7 +193,7 @@ export default function NoticeInterfaces() {
                             window.open(`/dashboard/layout/edit-dashboard?id=${dashboard.id}`, '_blank')
                           }
                         }}
-                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-110"
                         title="Edit Interface"
                       >
                         <Edit className="w-4 h-4" />
@@ -175,7 +203,7 @@ export default function NoticeInterfaces() {
                         size="sm"
                         onClick={() => handleDeleteDashboard(dashboard.id)}
                         disabled={deletingId === dashboard.id}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 hover:scale-110"
                         title="Delete"
                       >
                         {deletingId === dashboard.id ? (
@@ -189,13 +217,13 @@ export default function NoticeInterfaces() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <BarChart3 className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+                    <div className="text-center p-3 bg-blue-50 rounded-lg transition-all duration-300 hover:bg-blue-100 hover:scale-105">
+                      <BarChart3 className="w-6 h-6 text-blue-600 mx-auto mb-2 transition-transform duration-300 hover:scale-110" />
                       <div className="text-sm font-semibold text-blue-800">{containerCount}</div>
                       <div className="text-xs text-blue-600">Widgets</div>
                     </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <Layout className="w-6 h-6 text-green-600 mx-auto mb-2" />
+                    <div className="text-center p-3 bg-green-50 rounded-lg transition-all duration-300 hover:bg-green-100 hover:scale-105">
+                      <Layout className="w-6 h-6 text-green-600 mx-auto mb-2 transition-transform duration-300 hover:scale-110" />
                       <div className="text-sm font-semibold text-green-800">{dashboard.aspectRatio}</div>
                       <div className="text-xs text-green-600">Aspect Ratio</div>
                     </div>
@@ -203,12 +231,8 @@ export default function NoticeInterfaces() {
                   
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Notice Widgets:</span>
-                      <span className="font-semibold">{widgetTypes.notices}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Image Widgets:</span>
-                      <span className="font-semibold">{widgetTypes.images}</span>
+                      <span className="text-gray-600">Total Widgets:</span>
+                      <span className="font-semibold">{containerCount}</span>
                     </div>
                   </div>
                   
@@ -216,9 +240,6 @@ export default function NoticeInterfaces() {
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <Calendar className="w-3 h-3" />
                       <span>Created: {formatDate(dashboard.createdAt)}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      ID: {dashboard.id}
                     </div>
                   </div>
                 </CardContent>
