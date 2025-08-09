@@ -1475,7 +1475,7 @@ function EditDashboardDemo() {
             <GripVertical className="w-4 h-4 text-blue-600" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">Content Categories</h3>
+            <h3 className="text-lg font-semibold text-gray-800">Notice Categories</h3>
             <p className="text-xs text-gray-500">Drag categories to widgets to populate with notices</p>
           </div>
         </div>
@@ -1522,7 +1522,7 @@ function EditDashboardDemo() {
             <div className="flex items-center gap-2 text-xs text-blue-700">
               <div className="w-1 h-1 bg-blue-500 rounded-full animate-pulse"></div>
               <span className="font-medium">Tip:</span>
-              <span>Drag categories onto existing widgets to assign content, or drop them anywhere on the dashboard to automatically create new widgets</span>
+              <span>Drag categories onto existing widgets to assign Notice, or drop them anywhere on the dashboard to automatically create new widgets</span>
             </div>
           </div>
         )}
