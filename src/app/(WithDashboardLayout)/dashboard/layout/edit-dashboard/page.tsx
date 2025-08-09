@@ -109,7 +109,6 @@ const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> =
   "4:3": { width: 800, height: 600 },
   "16:9": { width: 960, height: 540 },
   "16:10": { width: 960, height: 600 },
-  "21:9": { width: 1050, height: 450 },
 }
 
 // Helper function to convert hex color to rgba
@@ -126,9 +125,16 @@ type SettingsTab = "style" | "typography" | "content" | "category"
 // Add widget type enum
 type WidgetType = "notice"
 
-// Extend Widget type to include widget type
+// Extend Widget type to include widget type and images
 interface ExtendedWidget extends Widget {
   type?: WidgetType
+  images?: Array<{
+    id: string
+    url: string
+    title: string
+    file: File
+    dbId?: string
+  }>
 }
 
 // Add this before the EditDashboardDemo component
@@ -179,6 +185,13 @@ function EditDashboardDemo() {
   
   // Add state for loading existing dashboard
   const [isLoadingExistingDashboard, setIsLoadingExistingDashboard] = useState(false)
+
+  // Add state for duplicate template name handling
+  const [showDuplicateNameDialog, setShowDuplicateNameDialog] = useState(false)
+  const [pendingTemplate, setPendingTemplate] = useState<DashboardTemplate | null>(null)
+
+  // State for tracking drag over dashboard area
+  const [isDragOverDashboard, setIsDragOverDashboard] = useState(false)
 
   // Add useEffect to load saved state on component mount
   useEffect(() => {
@@ -277,13 +290,13 @@ function EditDashboardDemo() {
       
       // Check if there are image widgets that need to be re-uploaded
       const hasImageWidgets = pendingSavedState.widgets?.some((widget: any) => 
-        widget.type === 'image' && widget.images?.length > 0
+        widget.type === 'notice' && widget.images?.length > 0
       )
       
       if (hasImageWidgets) {
         toast.info("Dashboard restored! Note: Image widgets need to be re-uploaded due to storage limitations.")
       } else {
-        toast.success("Dashboard restored successfully!")
+        toast.success("Dashboard restored successfully!", { duration: 1500 })
       }
     }
     setShowConfirmationDialog(false)
@@ -411,7 +424,7 @@ function EditDashboardDemo() {
             setLayout(newLayout)
             setWidgetSettings(newWidgetSettings)
             
-            toast.success('Existing dashboard loaded successfully!')
+            toast.success('Existing dashboard loaded successfully!', { duration: 1500 })
           }
         } catch (error) {
           console.error('Error loading existing dashboard:', error)
@@ -490,7 +503,7 @@ function EditDashboardDemo() {
         setTemplates(templates || [])
       } catch (error) {
         console.error("Error loading templates:", error)
-        toast.error("Failed to load templates")
+        toast.error("Failed to load templates", { duration: 2000 })
       }
     }
 
@@ -498,14 +511,16 @@ function EditDashboardDemo() {
   }, [])
 
   // Database template saving function
-  const saveTemplate = async (template: DashboardTemplate) => {
+  const saveTemplate = async (template: DashboardTemplate, replaceExisting?: boolean) => {
     try {
-      const result = await createDashboardTemplate(template)
-      if (result) {
-        setTemplates(prev => [...prev, result])
+      const result = await createDashboardTemplate(template, replaceExisting)
+      if (result.success && result.template) {
+        setTemplates(prev => [...prev, result.template!])
         return { success: true }
+      } else if (result.error === "DUPLICATE_NAME") {
+        return { success: false, error: "DUPLICATE_NAME" }
       } else {
-        return { success: false, message: "Failed to save template" }
+        return { success: false, message: result.error || "Failed to save template" }
       }
     } catch (error) {
       console.error("Error saving template:", error)
@@ -527,9 +542,9 @@ function EditDashboardDemo() {
         const success = await deleteDashboardTemplate(templateId)
         if (success) {
           setTemplates(prev => prev.filter(t => t.id !== templateId))
-          toast.success("Template deleted successfully!")
+          toast.success("Template deleted successfully!", { duration: 1500 })
         } else {
-          toast.error("Failed to delete template")
+          toast.error("Failed to delete template", { duration: 2000 })
         }
       } catch (error) {
         console.error("Error deleting template:", error)
@@ -573,7 +588,7 @@ function EditDashboardDemo() {
         setEditingTemplate(null)
         setTemplateName("")
         setTemplateDescription("")
-        toast.success("Template updated successfully!")
+        toast.success("Template updated successfully!", { duration: 1500 })
       } else {
         toast.error("Failed to update template")
       }
@@ -615,7 +630,7 @@ function EditDashboardDemo() {
     setWidgets([...widgets, newWidget])
     setLayout([...layout, newLayout])
 
-    toast.success(`${type === "image" ? "Image" : ""} Widget added successfully!`)
+            toast.success("Widget added successfully!", { duration: 1200 })
   }
 
   const removeWidget = (e: React.MouseEvent, id: string) => {
@@ -634,7 +649,7 @@ function EditDashboardDemo() {
     setWidgetSettings(updatedSettings)
     setActiveSettingsWidget(null)
 
-    toast.success("Widget removed")
+            toast.success("Widget removed", { duration: 1200 })
   }
 
   const handleRatioSelect = (ratio: AspectRatio) => {
@@ -669,55 +684,176 @@ function EditDashboardDemo() {
   const handleDragStart2 = (e: React.DragEvent, category: TCategoriesWithNotices) => {
     e.dataTransfer.setData("categoryId", category.id)
     e.dataTransfer.setData("categoryName", category.name)
-  }
-
-  const handleDrop = (e: React.DragEvent, widgetId: string) => {
-    e.preventDefault()
-    const categoryId = e.dataTransfer.getData("categoryId")
-    const categoryName = e.dataTransfer.getData("categoryName")
-
-    const category = categories.find((cat) => cat.id === categoryId)
-    if (!category) return
-
-    // Get top N notices from the category based on widget settings
-    const noticeCount = widgetSettings[widgetId]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount
-    // Limit the number of notices to prevent overflow
-    const topNotices = [...category.notices].slice(0, noticeCount)
-
-    setWidgets(
-      widgets.map((widget) =>
-        widget.id === widgetId
-          ? {
-              ...widget,
-              content: categoryName,
-              categoryId: categoryId,
-              category: categoryName,
-              notices: category.notices,
-              topNotices: topNotices,
-            }
-          : widget,
-      ),
-    )
-
-    // Initialize custom category name if not already set
-    if (!widgetSettings[widgetId]?.customCategoryName) {
-      setWidgetSettings((prev) => ({
-        ...prev,
-        [widgetId]: {
-          ...prev[widgetId],
-          customCategoryName: "",
-        },
-      }))
-    }
-
-    toast.success(`Added ${categoryName} to widget`)
+    e.dataTransfer.effectAllowed = "copy"
+    console.log("Drag started for category:", category.name, "with ID:", category.id)
   }
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
+    e.dataTransfer.dropEffect = "copy"
+    // Check if this is a drag operation by checking if there are any types in dataTransfer
+    if (e.dataTransfer.types.length > 0) {
+      setIsDragOverDashboard(true)
+    }
   }
 
+  const handleWidgetDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = "copy"
+    // Add visual feedback for widget drop zone
+    const target = e.currentTarget as HTMLElement
+    target.style.borderColor = '#3b82f6'
+    target.style.borderWidth = '2px'
+    target.style.borderStyle = 'dashed'
+    target.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
+    console.log("Widget drag over:", target.id)
+  }
 
+  const handleWidgetDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Remove visual feedback for widget drop zone
+    const target = e.currentTarget as HTMLElement
+    const settings = widgetSettings[target.id] || DEFAULT_WIDGET_SETTINGS
+    target.style.borderColor = settings.borderColor
+    target.style.borderWidth = `${settings.borderWidth}px`
+    target.style.borderStyle = 'solid'
+    target.style.backgroundColor = ''
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    // Only set to false if we're leaving the dashboard area completely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOverDashboard(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent, widgetId?: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOverDashboard(false)
+    
+    // Remove visual feedback if dropping on widget
+    if (widgetId) {
+      const target = e.currentTarget as HTMLElement
+      const settings = widgetSettings[widgetId] || DEFAULT_WIDGET_SETTINGS
+      target.style.borderColor = settings.borderColor
+      target.style.borderWidth = `${settings.borderWidth}px`
+      target.style.borderStyle = 'solid'
+      target.style.backgroundColor = ''
+    }
+    
+    const categoryId = e.dataTransfer.getData("categoryId")
+    const categoryName = e.dataTransfer.getData("categoryName")
+    
+    console.log("Drop event - categoryId:", categoryId, "categoryName:", categoryName, "widgetId:", widgetId)
+
+    const category = categories.find((cat) => cat.id === categoryId)
+    if (!category) {
+      console.log("Category not found for ID:", categoryId)
+      return
+    }
+
+    // If widgetId is provided, update existing widget
+    if (widgetId) {
+      console.log("Updating existing widget:", widgetId, "with category:", category.name)
+      // Get top N notices from the category based on widget settings
+      const noticeCount = widgetSettings[widgetId]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount
+      // Limit the number of notices to prevent overflow
+      const topNotices = [...category.notices].slice(0, noticeCount)
+
+      setWidgets(
+        widgets.map((widget) =>
+          widget.id === widgetId
+            ? {
+                ...widget,
+                content: categoryName,
+                categoryId: categoryId,
+                category: categoryName,
+                notices: category.notices,
+                topNotices: topNotices,
+              }
+            : widget,
+        ),
+      )
+
+      // Initialize custom category name if not already set
+      if (!widgetSettings[widgetId]?.customCategoryName) {
+        setWidgetSettings((prev) => ({
+          ...prev,
+          [widgetId]: {
+            ...prev[widgetId],
+            customCategoryName: "",
+          },
+        }))
+      }
+
+              toast.success(`Added ${categoryName} to widget`, { duration: 1200 })
+    } else {
+      console.log("Creating new widget with category:", category.name)
+      // Create new widget at drop location
+      createWidgetFromCategory(category, e)
+    }
+  }
+
+  const createWidgetFromCategory = (category: TCategoriesWithNotices, e: React.DragEvent) => {
+    if (!selectedRatio) {
+      toast.error("Please select a display ratio first")
+      return
+    }
+
+    // Calculate drop position relative to the dashboard container
+    const dashboardContainer = e.currentTarget as HTMLElement
+    const rect = dashboardContainer.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    // Convert pixel position to grid position
+    // GridLayout configuration: cols=12, rowHeight=50, margin=[12,12]
+    const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
+    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
+    
+    // Calculate grid cell dimensions
+    const colWidth = (containerWidth - 11 * 24) / 12 // 11 gaps between 12 columns, each gap is 24px (12px margin on each side)
+    const rowHeight = 50 // Fixed row height
+    
+    // Calculate grid position (ensure it's within bounds)
+    const gridX = Math.max(0, Math.min(11, Math.floor(x / (colWidth + 24))))
+    const gridY = Math.max(0, Math.min(11, Math.floor(y / (rowHeight + 24))))
+
+    const newWidgetId = `widget-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    const newWidget: ExtendedWidget = {
+      id: newWidgetId,
+      title: category.name,
+      type: "notice",
+      content: category.name,
+      category: category.name,
+      categoryId: category.id,
+      notices: category.notices,
+      topNotices: category.notices.slice(0, DEFAULT_WIDGET_SETTINGS.noticeCount),
+    }
+
+    const newLayout: Layout = {
+      i: newWidget.id,
+      x: gridX,
+      y: gridY,
+      w: 4, // Default width
+      h: 4, // Default height
+    }
+
+    // Initialize settings for this widget
+    setWidgetSettings((prev) => ({
+      ...prev,
+      [newWidgetId]: { ...DEFAULT_WIDGET_SETTINGS },
+    }))
+
+    setWidgets([...widgets, newWidget])
+    setLayout([...layout, newLayout])
+
+            toast.success(`Created new widget with ${category.name} category!`, { duration: 1200 })
+  }
 
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
     if (!selectedRatio) return { width: "0%", height: "0%" }
@@ -761,16 +897,16 @@ function EditDashboardDemo() {
         const data = await result.json()
         if (data.success) {
           clearSavedState() // Clear saved state after successful save
-          toast.success("Dashboard Updated Successfully!")
+          toast.success("Dashboard Updated Successfully!", { duration: 1500 })
         } else {
-          toast.error("Failed to update dashboard!")
+          toast.error("Failed to update dashboard!", { duration: 2000 })
         }
       } else {
         // Create new dashboard
         result = await createDashboard(dashboard)
       if (result.success) {
         clearSavedState() // Clear saved state after successful save
-        toast.success("Dashboard Created Successfully!")
+        toast.success("Dashboard Created Successfully!", { duration: 1500 })
       } else {
         toast.error("Something went wrong!")
         }
@@ -918,10 +1054,70 @@ function EditDashboardDemo() {
     setIsTemplateModalOpen(true)
   }
 
+  const handleTemplateSave = async (replaceExisting?: boolean) => {
+    if (!templateName.trim()) {
+      toast.error("Please enter a template name")
+      return
+    }
+
+    const newTemplate: DashboardTemplate = {
+      id: `template-${Date.now()}`,
+      name: templateName,
+      description: templateDescription,
+      widgets: [...widgets],
+      layout: [...layout],
+      widgetSettings: { ...widgetSettings }
+    }
+
+    try {
+      const result = await saveTemplate(newTemplate, replaceExisting)
+      
+      if (result.success) {
+        setShowTemplateModal(false)
+        setTemplateName("")
+        setTemplateDescription("")
+        setShowDuplicateNameDialog(false)
+        setPendingTemplate(null)
+        toast.success("Template saved successfully!", { duration: 1500 })
+      } else if (result.error === "DUPLICATE_NAME") {
+        // Show duplicate name dialog
+        setPendingTemplate(newTemplate)
+        setShowDuplicateNameDialog(true)
+        setShowTemplateModal(false)
+      } else {
+        toast.error("Failed to save template", { duration: 2000 })
+      }
+    } catch (error) {
+      toast.error("Error saving template")
+    }
+  }
+
+  const handleReplaceTemplate = async () => {
+    if (pendingTemplate) {
+      // Check if this is a custom template or regular template
+      if (pendingTemplate.id.startsWith('custom-template-')) {
+        await saveCustomTemplate(true)
+      } else {
+        await handleTemplateSave(true)
+      }
+    }
+  }
+
+  const handleTryAnotherName = () => {
+    setShowDuplicateNameDialog(false)
+    setPendingTemplate(null)
+    // Check if this was a custom template or regular template
+    if (pendingTemplate?.id.startsWith('custom-template-')) {
+      setIsTemplateModalOpen(true)
+    } else {
+      setShowTemplateModal(true)
+    }
+  }
+
   // Add this new function to save the custom template
   // Add after handleSaveTemplate
 
-  const saveCustomTemplate = async () => {
+  const saveCustomTemplate = async (replaceExisting?: boolean) => {
     if (!newTemplateName.trim()) {
       toast.error("Please enter a template name")
       return
@@ -948,7 +1144,7 @@ function EditDashboardDemo() {
 
     try {
       // Save to database
-      const result = await saveTemplate(newTemplate)
+      const result = await saveTemplate(newTemplate, replaceExisting)
 
       if (result.success) {
         // Update local state
@@ -956,9 +1152,16 @@ function EditDashboardDemo() {
         setIsTemplateModalOpen(false)
         setNewTemplateName("")
         setNewTemplateDescription("")
-        toast.success(`Template "${newTemplateName}" saved successfully!`)
+        setShowDuplicateNameDialog(false)
+        setPendingTemplate(null)
+        toast.success(`Template "${newTemplateName}" saved successfully!`, { duration: 1500 })
+      } else if (result.error === "DUPLICATE_NAME") {
+        // Show duplicate name dialog for custom template
+        setPendingTemplate(newTemplate)
+        setShowDuplicateNameDialog(true)
+        setIsTemplateModalOpen(false)
       } else {
-        toast.error("Failed to save template to database")
+        toast.error("Failed to save template to database", { duration: 2000 })
       }
     } catch (error) {
       toast.error(`Error saving template: ${error}`)
@@ -1016,45 +1219,67 @@ function EditDashboardDemo() {
     const rowHeight = 50 // Match the new rowHeight
     const widgetHeight = widgetLayout.h * rowHeight
 
-    // For image widgets, reserve much less space for a very compact layout
-    const reservedSpace = widgetType === "image" ? 50 : 120 // Much reduced space for image widgets
+    // Reserve space for the widget header and other elements
+    const reservedSpace = 120 // Space for header and other elements
 
     return Math.max(80, widgetHeight - reservedSpace) // Ensure minimum height of 80px
   }
 
   // Add this function inside the EditDashboardDemo component
   const applyTemplate = (template: DashboardTemplate) => {
-    // Create a map of existing widget notices based on position
-    const existingNotices = new Map(
-      widgets.map((widget, index) => [index, {
-        notices: widget.notices,
-        topNotices: widget.topNotices,
-        category: widget.category,
-        categoryId: widget.categoryId,
-        content: widget.content
-      }])
-    )
+    // Store all existing widget data (categories, notices, content) by position
+    const existingWidgetData = widgets.map((widget) => ({
+      notices: widget.notices || [],
+      topNotices: widget.topNotices || [],
+      category: widget.category,
+      categoryId: widget.categoryId,
+      content: widget.content,
+      customCategoryName: widgetSettings[widget.id]?.customCategoryName || ''
+    }))
 
-    // Apply template while preserving notices
+    // Apply template completely but preserve existing categories and notices for corresponding positions
     const newWidgets = template.widgets.map((templateWidget, index) => {
-      const existingData = existingNotices.get(index)
+      const existingData = existingWidgetData[index]
+      
       return {
         ...templateWidget,
+        // Always preserve existing notices if they exist
         notices: existingData?.notices || [],
         topNotices: existingData?.topNotices || [],
+        // Preserve existing category COMPLETELY - don't fall back to template
         category: existingData?.category || templateWidget.title,
         categoryId: existingData?.categoryId || '',
+        // Preserve existing content if it exists
         content: existingData?.content || templateWidget.title
       }
     })
 
-    // Update widget settings to include notice count from existing widgets
+    // Update widget settings to apply template colors while preserving only specific user settings
     const newWidgetSettings = { ...template.widgetSettings }
-    widgets.forEach((widget, index) => {
-      if (newWidgetSettings[template.widgets[index]?.id]) {
-        newWidgetSettings[template.widgets[index].id] = {
-          ...newWidgetSettings[template.widgets[index].id],
-          noticeCount: widgetSettings[widget.id]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount
+    
+    // For each new widget, preserve only specific settings (not colors/styling)
+    newWidgets.forEach((newWidget, index) => {
+      const oldWidget = widgets[index]
+      if (oldWidget && widgetSettings[oldWidget.id]) {
+        const oldSettings = widgetSettings[oldWidget.id]
+        const existingData = existingWidgetData[index]
+        
+        // Check if this widget has an existing category or content
+        const hasExistingCategory = !!(existingData?.category || existingData?.content)
+        
+        // Apply template settings first, then selectively preserve only non-visual settings
+        newWidgetSettings[newWidget.id] = {
+          ...newWidgetSettings[newWidget.id], // Template settings (including colors)
+          // Preserve only content-related settings, not visual/color settings
+          noticeCount: oldSettings.noticeCount || newWidgetSettings[newWidget.id]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount,
+          autoScroll: oldSettings.autoScroll !== undefined ? oldSettings.autoScroll : newWidgetSettings[newWidget.id]?.autoScroll,
+          showFullContent: oldSettings.showFullContent !== undefined ? oldSettings.showFullContent : newWidgetSettings[newWidget.id]?.showFullContent,
+          // Preserve customCategoryName ONLY if the widget has an existing category or content
+          // If there's an existing category, preserve the customCategoryName exactly as it was
+          // If there's no existing category, use the template's customCategoryName
+          customCategoryName: hasExistingCategory 
+            ? oldSettings.customCategoryName ?? '' // Preserve existing customCategoryName exactly as it was (use nullish coalescing)
+            : (newWidgetSettings[newWidget.id]?.customCategoryName || '')
         }
       }
     })
@@ -1062,7 +1287,7 @@ function EditDashboardDemo() {
     setWidgets(newWidgets)
     setLayout(template.layout)
     setWidgetSettings(newWidgetSettings)
-    toast.success(`Applied "${template.name}" Template while preserving notices!`)
+    toast.success(`Applied "${template.name}" template while preserving all categories and content!`, { duration: 1500 })
   }
 
   const createDashboardFromTemplate = async (template: DashboardTemplate) => {
@@ -1089,7 +1314,7 @@ function EditDashboardDemo() {
 
         const result = await createDashboard(dashboard)
         if (result.success) {
-          toast.success(`Dashboard Created from "${template.name}" Template!`)
+          toast.success(`Dashboard Created from "${template.name}" Template!`, { duration: 1500 })
         } else {
           toast.error("Something went wrong!")
         }
@@ -1244,20 +1469,63 @@ function EditDashboardDemo() {
         </button>
       </div>
 
-      <div className="mb-6 p-4 bg-white rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold mb-3">Draggable Categories:</h3>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((category) => (
-            <div
-              key={category.id}
-              draggable
-              onDragStart={(e) => handleDragStart2(e, category)}
-              className="bg-indigo-50 px-3 py-1 rounded-md cursor-move hover:bg-indigo-100 transition-colors border border-indigo-200"
-            >
-              {category.name} ({category.notices.length} notices)
-            </div>
-          ))}
+      <div className="mb-4 p-3 bg-white rounded-lg shadow-sm border border-gray-200 w-full">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 bg-blue-100 rounded-md">
+            <GripVertical className="w-4 h-4 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Content Categories</h3>
+            <p className="text-xs text-gray-500">Drag categories to widgets to populate with notices</p>
+          </div>
         </div>
+        
+        <div className="flex flex-wrap gap-2">
+          {categories.length === 0 ? (
+            <div className="w-full text-center py-4">
+              <div className="inline-flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full mb-2">
+                <ListFilter className="w-4 h-4 text-gray-400" />
+              </div>
+              <p className="text-gray-500 text-sm">No categories available</p>
+            </div>
+          ) : (
+            categories.map((category) => (
+              <div
+                key={category.id}
+                draggable
+                onDragStart={(e) => handleDragStart2(e, category)}
+                className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-lg cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-blue-100 group-hover:bg-blue-200 rounded-md transition-colors">
+                    <GripVertical className="w-3 h-3 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-800 group-hover:text-blue-800 transition-colors text-sm">
+                      {category.name}
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+                      <span className="text-xs text-gray-500">
+                        {category.notices.length} {category.notices.length === 1 ? 'notice' : 'notices'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        
+        {categories.length > 0 && (
+          <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-100">
+            <div className="flex items-center gap-2 text-xs text-blue-700">
+              <div className="w-1 h-1 bg-blue-500 rounded-full animate-pulse"></div>
+              <span className="font-medium">Tip:</span>
+              <span>Drag categories onto existing widgets to assign content, or drop them anywhere on the dashboard to automatically create new widgets</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -1265,12 +1533,31 @@ function EditDashboardDemo() {
         <div className="xl:col-span-3">
       {selectedRatio && (
         <div
-          className="border-4 border-dashed border-gray-300 rounded-lg mx-auto overflow-hidden bg-white p-4"
+          className={`border-4 border-dashed rounded-lg mx-auto overflow-hidden bg-white p-4 relative transition-all duration-200 ${
+            isDragOverDashboard 
+              ? 'border-blue-400 bg-blue-50 shadow-lg' 
+              : 'border-gray-300'
+          }`}
           style={{
             width: RATIO_DIMENSIONS[selectedRatio].width,
             height: RATIO_DIMENSIONS[selectedRatio].height,
           }}
+          onDrop={(e) => handleDrop(e)}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
         >
+          {/* Drop zone indicator */}
+          {isDragOverDashboard && (
+            <div className="absolute inset-0 pointer-events-none bg-blue-50 bg-opacity-50 border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Plus className="w-6 h-6 text-blue-600" />
+                </div>
+                <p className="text-blue-700 font-medium">Drop to create new widget</p>
+              </div>
+            </div>
+          )}
+          
           <ClientOnlyGridLayout
             className="layout"
             layout={layout}
@@ -1316,7 +1603,8 @@ function EditDashboardDemo() {
                     overflow: "hidden", // Prevent content from overflowing the widget
                   }}
                   onDrop={(e) => handleDrop(e, widget.id)}
-                  onDragOver={handleDragOver}
+                  onDragOver={handleWidgetDragOver}
+                  onDragLeave={handleWidgetDragLeave}
                 >
                   <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md z-10">
                     {dimensions.width} × {dimensions.height}
@@ -1601,17 +1889,23 @@ function EditDashboardDemo() {
 
       {/* Draggable Settings Modal */}
       {activeSettingsWidget && (
-        <div
-          ref={settingsRef}
-          className="fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-[500px] max-h-[85vh] flex flex-col backdrop-blur-sm"
-          style={{
-            left: `${settingsPosition.x}px`,
-            top: `${settingsPosition.y}px`,
-          }}
-        >
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm animate-in fade-in-0 duration-200 z-40"
+            onClick={() => setActiveSettingsWidget(null)}
+          />
+          <div
+            ref={settingsRef}
+            className="fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-[500px] max-h-[85vh] flex flex-col backdrop-blur-sm animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300 ease-out"
+            style={{
+              left: `${settingsPosition.x}px`,
+              top: `${settingsPosition.y}px`,
+            }}
+          >
           {/* Header */}
           <div
-            className="flex items-center justify-between p-4 cursor-move bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl border-b border-gray-200"
+            className="flex items-center justify-between p-4 cursor-move bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl border-b border-gray-200 animate-in slide-in-from-top-2 duration-200"
             onMouseDown={handleDragStart}
           >
             <div className="flex items-center gap-3">
@@ -1629,7 +1923,7 @@ function EditDashboardDemo() {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 bg-gray-50">
+          <div className="flex border-b border-gray-200 bg-gray-50 animate-in slide-in-from-top-2 duration-300 delay-100">
             {SETTINGS_TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -1648,10 +1942,10 @@ function EditDashboardDemo() {
           </div>
 
           {/* Settings Content with proper scrolling */}
-          <div className="p-6 overflow-y-auto flex-1 bg-white">
+          <div className="p-6 overflow-y-auto flex-1 bg-white animate-in fade-in-0 duration-500 delay-200">
             {/* Style Tab */}
             {activeSettingsTab === "style" && (
-              <div className="space-y-8">
+              <div className="space-y-8 animate-in fade-in-0 slide-in-from-left-2 duration-300">
                 {/* Background Settings */}
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
                   <label className="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4">
@@ -1812,7 +2106,7 @@ function EditDashboardDemo() {
 
             {/* Typography Tab */}
             {activeSettingsTab === "typography" && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-in fade-in-0 slide-in-from-left-2 duration-300">
                 {/* Font Color */}
                 <div>
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
@@ -1905,7 +2199,7 @@ function EditDashboardDemo() {
 
             {/* Content Tab */}
             {activeSettingsTab === "content" && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-in fade-in-0 slide-in-from-left-2 duration-300">
                 {/* Notice Count */}
                 <div>
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
@@ -1994,7 +2288,7 @@ function EditDashboardDemo() {
 
             {/* Category Tab */}
             {activeSettingsTab === "category" && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-in fade-in-0 slide-in-from-left-2 duration-300">
                 {/* Category Name Editing */}
                 <div>
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
@@ -2260,9 +2554,8 @@ function EditDashboardDemo() {
 
 
                 </div>
-
-
-                </div>
+          </div>
+        </>
       )}
 
       {/* Template Save Modal */}
@@ -2330,36 +2623,7 @@ function EditDashboardDemo() {
                   Cancel
                 </button>
                 <button
-                  onClick={async () => {
-                    if (!templateName.trim()) {
-                      toast.error("Please enter a template name");
-                      return;
-                    }
-                    
-                    try {
-                      const newTemplate: DashboardTemplate = {
-                        id: `template-${Date.now()}`,
-                        name: templateName,
-                        description: templateDescription,
-                        widgets: [...widgets],
-                        layout: [...layout],
-                        widgetSettings: { ...widgetSettings }
-                      };
-                      
-                      const result = await saveTemplate(newTemplate);
-                      if (result.success) {
-                        setTemplates([...templates, newTemplate]);
-                        setShowTemplateModal(false);
-                        setTemplateName("");
-                        setTemplateDescription("");
-                        toast.success("Template saved successfully!");
-                      } else {
-                        toast.error("Failed to save template");
-                      }
-                    } catch (error) {
-                      toast.error("Error saving template");
-                    }
-                  }}
+                  onClick={() => handleTemplateSave()}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
                   Save Template
@@ -2370,10 +2634,80 @@ function EditDashboardDemo() {
         </div>
       )}
 
+      {/* Duplicate Name Confirmation Dialog */}
+      {showDuplicateNameDialog && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Template Name Already Exists</h3>
+                <button
+                  onClick={() => {
+                    setShowDuplicateNameDialog(false)
+                    setPendingTemplate(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div className="text-sm text-yellow-700">
+                      <p className="font-medium">Template "{pendingTemplate?.name || templateName}" already exists</p>
+                      <p className="text-yellow-600 mt-1">
+                        Choose an option to proceed:
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleReplaceTemplate}
+                    className="w-full px-4 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Replace Existing Template
+                  </button>
+                  
+                  <button
+                    onClick={handleTryAnotherName}
+                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Try Another Name
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setShowDuplicateNameDialog(false)
+                      setPendingTemplate(null)
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* View All Templates Modal */}
       {showViewAllModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full border border-gray-200 max-h-[80vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full border border-gray-200 max-h-[80vh] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-semibold text-gray-900">All Templates</h3>
@@ -2431,17 +2765,18 @@ function EditDashboardDemo() {
                       
                       {/* Template Preview - Same structure as View modal */}
                       <div className="w-full flex justify-center mb-3">
-                        <div className="bg-white border border-gray-200 rounded-lg p-2" style={{ width: 240, minHeight: 160 }}>
-                          <div className="relative w-full h-full">
+                        <div className="bg-white border border-gray-200 rounded-lg p-2" style={{ width: 240, height: 'auto', minHeight: 200 }}>
+                          <div className="relative w-full" style={{ height: `${Math.max(200, Math.max(...template.layout.map(l => (l.y + l.h) * 20)) + 10)}px` }}>
                             {template.layout.map((layoutItem) => {
                               const widget = template.widgets.find(w => w.id === layoutItem.i)
-                              const settings = template.widgetSettings?.[widget?.id] || DEFAULT_WIDGET_SETTINGS
                               if (!widget) return null
                               
+                              const widgetSettings = template.widgetSettings?.[widget.id] || DEFAULT_WIDGET_SETTINGS
+                              
                               // Generate background colors
-                              const bgColor = hexToRgba(settings.backgroundColor, settings.backgroundOpacity)
-                              const cardBgColor = hexToRgba(settings.backgroundColor, settings.cardOpacity)
-                              const categoryBgColor = settings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
+                              const bgColor = hexToRgba(widgetSettings.backgroundColor, widgetSettings.backgroundOpacity)
+                              const cardBgColor = hexToRgba(widgetSettings.backgroundColor, widgetSettings.cardOpacity)
+                              const categoryBgColor = widgetSettings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
                               
                               return (
                                 <div
@@ -2449,16 +2784,15 @@ function EditDashboardDemo() {
                                   className="rounded-lg shadow-md absolute"
                                   style={{
                                     left: `${(layoutItem.x / 12) * 100}%`,
-                                    top: `${layoutItem.y * 4}px`,
+                                    top: `${layoutItem.y * 20}px`,
                                     width: `${(layoutItem.w / 12) * 100}%`,
-                                    height: `${layoutItem.h * 25}px`,
+                                    height: `${layoutItem.h * 20}px`,
                                     backgroundColor: bgColor,
-                                    borderColor: settings.borderColor,
-                                    borderWidth: `${settings.borderWidth}px`,
+                                    borderColor: widgetSettings.borderColor,
+                                    borderWidth: `${widgetSettings.borderWidth}px`,
                                     borderStyle: "solid",
                                     display: "flex",
                                     flexDirection: "column",
-                                    height: "100%",
                                     overflow: "hidden",
                                   }}
                                 >
@@ -2467,9 +2801,9 @@ function EditDashboardDemo() {
                                     className="p-1 flex-shrink-0"
                                     style={{
                                       backgroundColor: categoryBgColor,
-                                      height: `${Math.min(settings.categoryHeight, 20)}px`,
-                                      borderBottom: settings.categoryBorderWidth > 0
-                                        ? `${settings.categoryBorderWidth}px solid ${settings.categoryBorderColor}`
+                                      height: `${Math.min(widgetSettings.categoryHeight, 20)}px`,
+                                      borderBottom: widgetSettings.categoryBorderWidth > 0
+                                        ? `${widgetSettings.categoryBorderWidth}px solid ${widgetSettings.categoryBorderColor}`
                                         : "none",
                                       display: "flex",
                                       alignItems: "center",
@@ -2479,10 +2813,10 @@ function EditDashboardDemo() {
                                     <div
                                       className="text-xs font-semibold text-center"
                                       style={{
-                                        color: settings.categoryFontColor,
-                                        fontFamily: settings.categoryFont,
-                                        fontSize: `${Math.min(settings.categoryFontSize, 10)}px`,
-                                        fontWeight: settings.categoryFontWeight,
+                                        color: widgetSettings.categoryFontColor,
+                                        fontFamily: widgetSettings.categoryFont,
+                                        fontSize: `${Math.min(widgetSettings.categoryFontSize, 10)}px`,
+                                        fontWeight: widgetSettings.categoryFontWeight,
                                       }}
                                     >
                                       {/* Empty title - just structure */}
@@ -2499,8 +2833,8 @@ function EditDashboardDemo() {
                                           className="rounded shadow p-1"
                                           style={{
                                             backgroundColor: cardBgColor,
-                                            borderLeft: `2px solid ${settings.borderColor}`,
-                                            fontFamily: settings.fontFamily,
+                                            borderLeft: `2px solid ${widgetSettings.borderColor}`,
+                                            fontFamily: widgetSettings.fontFamily,
                                             height: '20px', // Smaller height for preview
                                           }}
                                         >
@@ -2627,11 +2961,13 @@ function EditDashboardDemo() {
 
       {/* View Template Modal */}
       {showViewModal && selectedTemplate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full border border-gray-200 max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-gray-900">Template Details</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+            {/* Template card content */}
+            <div className="p-6">
+              {/* Template name with close button */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">{selectedTemplate.name}</h3>
                 <button
                   onClick={() => {
                     setShowViewModal(false)
@@ -2639,107 +2975,119 @@ function EditDashboardDemo() {
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <X size={24} />
+                  <X size={20} />
                 </button>
               </div>
-            </div>
-            
-            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">{selectedTemplate.name}</h4>
-                  {selectedTemplate.description && (
-                    <p className="text-gray-600">{selectedTemplate.description}</p>
-                  )}
-                </div>
-                {/* Render real widgets preview */}
-                <div className="w-full flex justify-center">
-                  <div className="bg-white border border-gray-200 rounded-lg p-2" style={{ width: 480, minHeight: 320 }}>
-                    <div className="relative w-full h-full">
-                      {selectedTemplate.layout.map((layoutItem) => {
-                        const widget = selectedTemplate.widgets.find(w => w.id === layoutItem.i)
-                        const settings = selectedTemplate.widgetSettings?.[widget?.id] || DEFAULT_WIDGET_SETTINGS
-                        if (!widget) return null
-                        
-                        // Generate background colors
-                        const bgColor = hexToRgba(settings.backgroundColor, settings.backgroundOpacity)
-                        const cardBgColor = hexToRgba(settings.backgroundColor, settings.cardOpacity)
-                        const categoryBgColor = settings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
-                        
-                        return (
+              
+              {/* Template description */}
+              {selectedTemplate.description && (
+                <p className="text-sm text-gray-600 mb-4">{selectedTemplate.description}</p>
+              )}
+              
+              {/* Template Preview */}
+              <div className="w-full flex justify-center mb-4">
+                <div className="bg-white border border-gray-200 rounded-lg p-2" style={{ width: '100%', height: 'auto', minHeight: 200 }}>
+                  <div className="relative w-full" style={{ height: `${Math.max(200, Math.max(...selectedTemplate.layout.map(l => (l.y + l.h) * 25)) + 15)}px` }}>
+                    {selectedTemplate.layout.map((layoutItem) => {
+                      const widget = selectedTemplate.widgets.find(w => w.id === layoutItem.i)
+                      if (!widget) return null
+                      
+                      const widgetSettings = selectedTemplate.widgetSettings?.[widget.id] || DEFAULT_WIDGET_SETTINGS
+                      
+                      // Generate background colors
+                      const bgColor = hexToRgba(widgetSettings.backgroundColor, widgetSettings.backgroundOpacity)
+                      const cardBgColor = hexToRgba(widgetSettings.backgroundColor, widgetSettings.cardOpacity)
+                      const categoryBgColor = widgetSettings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
+                      
+                      return (
+                        <div
+                          key={widget.id}
+                          className="rounded-lg shadow-md absolute"
+                          style={{
+                            left: `${(layoutItem.x / 12) * 100}%`,
+                            top: `${layoutItem.y * 25}px`,
+                            width: `${(layoutItem.w / 12) * 100}%`,
+                            height: `${layoutItem.h * 25}px`,
+                            backgroundColor: bgColor,
+                            borderColor: widgetSettings.borderColor,
+                            borderWidth: `${widgetSettings.borderWidth}px`,
+                            borderStyle: "solid",
+                            display: "flex",
+                            flexDirection: "column",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {/* Widget Header */}
                           <div
-                            key={widget.id}
-                            className="rounded-lg shadow-md absolute"
+                            className="p-1 flex-shrink-0"
                             style={{
-                              left: `${(layoutItem.x / 12) * 100}%`,
-                              top: `${layoutItem.y * 8}px`,
-                              width: `${(layoutItem.w / 12) * 100}%`,
-                              height: `${layoutItem.h * 50}px`,
-                              backgroundColor: bgColor,
-                              borderColor: settings.borderColor,
-                              borderWidth: `${settings.borderWidth}px`,
-                              borderStyle: "solid",
+                              backgroundColor: categoryBgColor,
+                              height: `${Math.min(widgetSettings.categoryHeight, 20)}px`,
+                              borderBottom: widgetSettings.categoryBorderWidth > 0
+                                ? `${widgetSettings.categoryBorderWidth}px solid ${widgetSettings.categoryBorderColor}`
+                                : "none",
                               display: "flex",
-                              flexDirection: "column",
-                              height: "100%",
-                              overflow: "hidden",
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
                           >
-                            {/* Widget Header */}
                             <div
-                              className="p-2 flex-shrink-0"
+                              className="text-xs font-semibold text-center"
                               style={{
-                                backgroundColor: categoryBgColor,
-                                height: `${settings.categoryHeight}px`,
-                                borderBottom: settings.categoryBorderWidth > 0
-                                  ? `${settings.categoryBorderWidth}px solid ${settings.categoryBorderColor}`
-                                  : "none",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
+                                color: widgetSettings.categoryFontColor,
+                                fontFamily: widgetSettings.categoryFont,
+                                fontSize: `${Math.min(widgetSettings.categoryFontSize, 10)}px`,
+                                fontWeight: widgetSettings.categoryFontWeight,
                               }}
                             >
-                              <div
-                                className="text-lg font-semibold text-center"
-                                style={{
-                                  color: settings.categoryFontColor,
-                                  fontFamily: settings.categoryFont,
-                                  fontSize: `${settings.categoryFontSize}px`,
-                                  fontWeight: settings.categoryFontWeight,
-                                }}
-                              >
-                                {/* Empty title - just structure */}
+                              {/* Empty title - just structure */}
+                            </div>
+                          </div>
+
+                          {/* Widget Content */}
+                          <div className="p-1 flex-grow flex flex-col overflow-hidden">
+                            <div className="space-y-1 flex-grow overflow-y-auto">
+                              {/* Render empty notice placeholders */}
+                              {Array.from({ length: 2 }).map((_, index) => (
+                                <div
+                                  key={index}
+                                  className="rounded shadow p-1"
+                                  style={{
+                                    backgroundColor: cardBgColor,
+                                    borderLeft: `2px solid ${widgetSettings.borderColor}`,
+                                    fontFamily: widgetSettings.fontFamily,
+                                    height: '15px', // Smaller height for preview
+                                  }}
+                                >
+                                  {/* Empty notice - just structure */}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-                
-                            {/* Widget Content */}
-                            <div className="p-2 flex-grow flex flex-col overflow-hidden">
-                              <div className="space-y-2 flex-grow overflow-y-auto">
-                                {/* Render empty notice placeholders */}
-                                {Array.from({ length: 4 }).map((_, index) => (
-                                  <div
-                                    key={index}
-                                    className="rounded shadow p-2"
-                                    style={{
-                                      backgroundColor: cardBgColor,
-                                      borderLeft: `3px solid ${settings.borderColor}`,
-                                      fontFamily: settings.fontFamily,
-                                      height: '40px', // Fixed height for placeholder
-                                    }}
-                                  >
-                                    {/* Empty notice - just structure */}
-                        </div>
-                                ))}
-                        </div>
-                      </div>
-                  </div>
-                        )
-                      })}
-                </div>
-                </div>
-                </div>
-                {/* End real widgets preview */}
               </div>
+              
+              {/* Template stats */}
+              <div className="flex justify-between items-center text-sm text-gray-600 mb-4">
+                <span>{selectedTemplate.widgets.length} widgets</span>
+                <span>{selectedTemplate.layout.length} layout items</span>
+              </div>
+              
+              {/* Apply Template button */}
+              <button
+                onClick={() => {
+                  applyTemplate(selectedTemplate)
+                  setShowViewModal(false)
+                  setSelectedTemplate(null)
+                }}
+                className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Apply Template
+              </button>
             </div>
           </div>
         </div>

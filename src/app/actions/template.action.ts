@@ -243,9 +243,58 @@ export async function getDashboardTemplateById(id: string): Promise<DashboardTem
   }
 }
 
-export async function createDashboardTemplate(data: Omit<DashboardTemplate, 'id'>): Promise<DashboardTemplate | null> {
+export async function checkTemplateNameExists(name: string, excludeId?: string): Promise<boolean> {
   try {
-    const template = await db.template.create({
+    const whereClause: any = { name }
+    if (excludeId) {
+      whereClause.id = { not: excludeId }
+    }
+    
+    const existingTemplate = await db.template.findFirst({
+      where: whereClause
+    })
+    
+    return !!existingTemplate
+  } catch (error) {
+    console.error("Error checking template name:", error)
+    return false
+  }
+}
+
+export async function createDashboardTemplate(data: Omit<DashboardTemplate, 'id'>, replaceExisting?: boolean): Promise<{ success: boolean; template?: DashboardTemplate; error?: string }> {
+  try {
+    // Check if template name already exists
+    const nameExists = await checkTemplateNameExists(data.name)
+    
+    if (nameExists && !replaceExisting) {
+      return { 
+        success: false, 
+        error: "DUPLICATE_NAME",
+        template: null 
+      }
+    }
+    
+    let template
+    if (nameExists && replaceExisting) {
+      // Find and update existing template
+      const existingTemplate = await db.template.findFirst({
+        where: { name: data.name }
+      })
+      
+      if (existingTemplate) {
+        template = await db.template.update({
+          where: { id: existingTemplate.id },
+          data: {
+            description: data.description,
+            widgets: data.widgets,
+            layout: data.layout,
+            widgetSettings: data.widgetSettings
+          }
+        })
+      }
+    } else {
+      // Create new template
+      template = await db.template.create({
       data: {
         name: data.name,
         description: data.description,
@@ -254,18 +303,26 @@ export async function createDashboardTemplate(data: Omit<DashboardTemplate, 'id'
         widgetSettings: data.widgetSettings
       }
     })
+    }
+    
+    if (!template) {
+      return { success: false, error: "Failed to save template" }
+    }
     
     return {
+      success: true,
+      template: {
       id: template.id,
       name: template.name,
       description: template.description || "",
       widgets: template.widgets as any[],
       layout: template.layout as any[],
       widgetSettings: template.widgetSettings as Record<string, any>
+      }
     }
   } catch (error) {
     console.error("Error creating dashboard template:", error)
-    return null
+    return { success: false, error: "Database error" }
   }
 }
 
