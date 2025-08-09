@@ -59,7 +59,12 @@ export default function RootLayout({
       <body className={inter.className}>
        <Providers>
           {children}
-          <Toaster />
+          <Toaster 
+            duration={2000}
+            position="top-right"
+            richColors
+            closeButton
+          />
 
        </Providers>
         {/* </SessionProvider> */}
