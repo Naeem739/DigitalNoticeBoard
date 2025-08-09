@@ -484,7 +484,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   }
 
   return (
-    <div className="w-full bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg p-6 transition-all duration-300" suppressHydrationWarning>
+    <div className="w-full bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg transition-all duration-300 pb-20" suppressHydrationWarning>
+      <div className="p-6">
       {/* Toast configuration for top middle */}
       <Toaster
         position="top-center"
@@ -518,17 +519,6 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
         </h1>
         
         <div className="flex flex-col md:flex-row w-full md:w-auto space-y-4 md:space-y-0 md:space-x-4">
-          {/* Test button for image functionality */}
-          <button
-            onClick={addTestNoticeWithImage}
-            className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-lg p-3 transition-colors duration-200 shadow-sm"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Test Image Notice
-          </button>
-          
           {/* Category filter dropdown - moved to left */}
           <div className="relative w-full md:w-64 order-2 md:order-1">
             <div 
@@ -769,48 +759,53 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             </div>
           </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-2 mt-6" suppressHydrationWarning>
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
-              >
-                Previous
-              </button>
-              
-              {[...Array(totalPages)].map((_, index) => (
-                <button
-                  key={index + 1}
-                  onClick={() => handlePageChange(index + 1)}
-                  className={`px-3 py-1 rounded-lg ${
-                    currentPage === index + 1
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  } transition-colors duration-150`}
-                >
-                  {index + 1}
-                </button>
-              ))}
-              
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
-              >
-                Next
-              </button>
-            </div>
-          )}
 
-          {/* Page Info */}
-          {filteredNotices.length > 0 && (
-            <div className="text-center text-gray-600 mt-4" suppressHydrationWarning>
-              Showing {indexOfFirstNotice + 1} to {Math.min(indexOfLastNotice, filteredNotices.length)} of {filteredNotices.length} notices
-            </div>
-          )}
         </>
+      )}
+      </div>
+
+      {/* Fixed Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40" suppressHydrationWarning>
+          <div className="flex justify-center items-center space-x-2 py-4 px-6">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 shadow-sm"
+            >
+              Previous
+            </button>
+            
+            {[...Array(totalPages)].map((_, index) => (
+              <button
+                key={index + 1}
+                onClick={() => handlePageChange(index + 1)}
+                className={`px-4 py-2 rounded-lg ${
+                  currentPage === index + 1
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                } transition-colors duration-150 shadow-sm`}
+              >
+                {index + 1}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 shadow-sm"
+            >
+              Next
+            </button>
+            
+            {/* Page Info */}
+            {filteredNotices.length > 0 && (
+              <div className="ml-6 text-sm text-gray-600 border-l border-gray-300 pl-6">
+                Showing {indexOfFirstNotice + 1} to {Math.min(indexOfLastNotice, filteredNotices.length)} of {filteredNotices.length} notices
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Edit Notice Modal */}
