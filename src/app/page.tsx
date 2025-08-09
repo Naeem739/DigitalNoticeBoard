@@ -353,26 +353,28 @@ export default function Home() {
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
-            className="bg-[#1e1e1e] p-6 rounded-xl shadow-2xl"
+            className="bg-[#1e1e1e] rounded-xl overflow-hidden shadow-2xl"
           >
-            <div className="flex space-x-4 mb-4">
-              <Users className="text-yellow-500 w-8 h-8" />
-              <Share2 className="text-blue-500 w-8 h-8" />
-              <LayoutDashboard className="text-green-500 w-8 h-8" />
-            </div>
-            <h3 className="text-2xl font-bold mb-2">
-              {session ? 'Your Workspace' : 'Collaborative Workspace'}
-            </h3>
-            <p className="text-gray-400">
-              {session ? (
-                'Manage your notices, collaborate with your team, and stay organized with our powerful dashboard.'
-              ) : (
-                'Bring your team together with real-time updates, shared boards, and seamless communication.'
-              )}
-            </p>
+            <video
+              className="w-full h-auto"
+              autoPlay
+              loop
+              muted
+              playsInline
+              controls={false}
+            >
+              <source src="/videos/demo-video.mp4" type="video/mp4" />
+              <source src="/videos/demo-video.webm" type="video/webm" />
+              Your browser does not support the video tag.
+            </video>
+            
+            {/* Optional overlay for better visual integration */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
           </motion.div>
         </div>
       </main>
+
+
 
       <section className="container mx-auto px-6 py-16 bg-[#1e1e1e]">
         <div className="text-center mb-12">
