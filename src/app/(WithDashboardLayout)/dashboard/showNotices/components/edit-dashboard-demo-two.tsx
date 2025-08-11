@@ -764,46 +764,71 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
       )}
       </div>
 
-      {/* Fixed Pagination Footer */}
+      {/* Professional Pagination Footer */}
       {totalPages > 1 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40" suppressHydrationWarning>
-          <div className="flex justify-center items-center space-x-2 py-4 px-6">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 shadow-sm"
-            >
-              Previous
-            </button>
-            
-            {[...Array(totalPages)].map((_, index) => (
+          <div className="flex justify-center items-center py-6 px-6">
+            <div className="flex items-center space-x-4">
+              {/* Previous Button */}
               <button
-                key={index + 1}
-                onClick={() => handlePageChange(index + 1)}
-                className={`px-4 py-2 rounded-lg ${
-                  currentPage === index + 1
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                } transition-colors duration-150 shadow-sm`}
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+                title="Previous page"
               >
-                {index + 1}
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
-            ))}
-            
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 shadow-sm"
-            >
-              Next
-            </button>
-            
-            {/* Page Info */}
-            {filteredNotices.length > 0 && (
-              <div className="ml-6 text-sm text-gray-600 border-l border-gray-300 pl-6">
-                Showing {indexOfFirstNotice + 1} to {Math.min(indexOfLastNotice, filteredNotices.length)} of {filteredNotices.length} notices
+              
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-2">
+                {[...Array(totalPages)].map((_, index) => {
+                  const pageNumber = index + 1;
+                  const isActive = currentPage === pageNumber;
+                  
+                  return (
+                    <button
+                      key={pageNumber}
+                      onClick={() => handlePageChange(pageNumber)}
+                      className={`flex items-center justify-center w-10 h-10 rounded-full font-medium text-sm transition-all duration-200 ${
+                        isActive
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 transform scale-105'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md'
+                      }`}
+                    >
+                      {pageNumber}
+                    </button>
+                  );
+                })}
               </div>
-            )}
+              
+              {/* Next Button */}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+                title="Next page"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              
+              {/* Page Information */}
+              {filteredNotices.length > 0 && (
+                <div className="ml-8 flex items-center space-x-2 text-sm text-gray-600">
+                  <div className="w-px h-6 bg-gray-300"></div>
+                  <span className="font-medium">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <span className="text-gray-400">•</span>
+                  <span>
+                    {filteredNotices.length} total
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

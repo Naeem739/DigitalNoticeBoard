@@ -40,6 +40,12 @@ export default function NoticeInterfaces() {
   const [dashboards, setDashboards] = useState<TDashboard[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1);
+  const dashboardsPerPage = 6;
+  const indexOfLastDashboard = currentPage * dashboardsPerPage;
+  const indexOfFirstDashboard = indexOfLastDashboard - dashboardsPerPage;
+  const currentDashboards = dashboards.slice(indexOfFirstDashboard, indexOfLastDashboard);
+  const totalPages = Math.ceil(dashboards.length / dashboardsPerPage);
 
   useEffect(() => {
     fetchDashboards()
@@ -154,11 +160,11 @@ export default function NoticeInterfaces() {
           </CardContent>
         </Card>
       ) : (
+        <>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {dashboards.map((dashboard, index) => {
+          {currentDashboards.map((dashboard, index) => {
             const containerCount = getContainerCount(dashboard.containers)
             const widgetTypes = getWidgetTypes(dashboard.containers)
-            
             return (
               <Card 
                 key={dashboard.id} 
@@ -228,14 +234,12 @@ export default function NoticeInterfaces() {
                       <div className="text-xs text-green-600">Aspect Ratio</div>
                     </div>
                   </div>
-                  
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">Total Widgets:</span>
                       <span className="font-semibold">{containerCount}</span>
                     </div>
                   </div>
-                  
                   <div className="pt-3 border-t">
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <Calendar className="w-3 h-3" />
@@ -247,6 +251,55 @@ export default function NoticeInterfaces() {
             )
           })}
         </div>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <nav
+            className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-gray-200 shadow-lg z-40"
+            aria-label="Pagination Navigation"
+            suppressHydrationWarning
+          >
+            <div className="flex flex-wrap justify-center items-center gap-2 py-3 px-4 md:px-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                aria-label="Previous Page"
+                className="h-9 w-9 p-0 rounded-full text-gray-500 disabled:text-gray-300 border border-transparent hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-indigo-500 transition"
+              >
+                <span className="sr-only">Previous</span>
+                <svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M13 16l-4-4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <Button
+                  key={i + 1}
+                  variant={currentPage === i + 1 ? 'default' : 'ghost'}
+                  size="icon"
+                  onClick={() => setCurrentPage(i + 1)}
+                  aria-label={`Page ${i + 1}`}
+                  className={`h-9 w-9 p-0 rounded-full text-sm font-semibold border transition-all duration-150 ${currentPage === i + 1 ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'text-gray-700 border-transparent hover:border-gray-300 hover:bg-gray-100'} focus-visible:ring-2 focus-visible:ring-indigo-500`}
+                >
+                  {i + 1}
+                </Button>
+              ))}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                aria-label="Next Page"
+                className="h-9 w-9 p-0 rounded-full text-gray-500 disabled:text-gray-300 border border-transparent hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-indigo-500 transition"
+              >
+                <span className="sr-only">Next</span>
+                <svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M7 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </Button>
+              <span className="ml-4 text-xs text-gray-500 hidden md:inline-block">
+                Page {currentPage} of {totalPages} ({dashboards.length} total)
+              </span>
+            </div>
+          </nav>
+        )}
+        </>
       )}
     </div>
   )

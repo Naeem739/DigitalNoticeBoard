@@ -293,17 +293,6 @@ export default function ShowAllAdminPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            toast.info('Edit functionality coming soon')
-                          }}
-                          className="h-8 w-8 p-0 hover:bg-blue-50"
-                          title="Edit Admin"
-                        >
-                          <Edit className="w-4 h-4 text-blue-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
                           onClick={() => handleDeleteAdmin(admin.id, admin.name)}
                           disabled={deletingId === admin.id}
                           className="h-8 w-8 p-0 hover:bg-red-50"
@@ -338,14 +327,8 @@ export default function ShowAllAdminPage() {
                     </div>
                     
                     <div className="pt-3 border-t">
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>ID: {admin.id.slice(0, 8)}...</span>
-                        <Badge variant="outline" className="text-xs">
-                          Admin
-                        </Badge>
-                      </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        Last Updated: {getTimeAgo(admin.updatedAt)}
+                        Joining Date: {formatDate(admin.createdAt)}
                       </div>
                     </div>
                   </CardContent>
