@@ -30,9 +30,10 @@ import {
   Star,
   MoreHorizontal,
   ExternalLink,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Sparkles
 } from "lucide-react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface TemplateManagerProps {
   currentSettings: Partial<PublicNoticeSettings>
@@ -51,6 +52,7 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
   const [filterType, setFilterType] = useState("all")
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [selectedTemplate, setSelectedTemplate] = useState<PublicNoticeTemplate | null>(null)
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
 
   // Load templates on component mount
   useEffect(() => {
@@ -161,10 +163,27 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
           accentColor: template.accentColor,
         })
 
+        // Show success message and highlight applied template
+        setAppliedTemplateId(template.id)
         toast({
-          title: "Template Applied",
-          description: `${template.name} has been applied successfully!`,
+          title: "Template Applied Successfully! ✨",
+          description: `${template.name} has been applied to your notice board.`,
         })
+
+        // Reset highlight after 3 seconds
+        setTimeout(() => setAppliedTemplateId(null), 3000)
+
+        // Broadcast that settings changed so public page refreshes immediately
+        try {
+          if (typeof window !== 'undefined') {
+            if ('BroadcastChannel' in window) {
+              const bc = new BroadcastChannel('public-notice')
+              bc.postMessage({ type: 'settings-updated', at: Date.now() })
+              bc.close()
+            }
+            localStorage.setItem('public-notice-settings-updated', String(Date.now()))
+          }
+        } catch {}
       } else {
         toast({
           title: "Error",
@@ -282,8 +301,6 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
     }
   }
 
-
-
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -319,29 +336,39 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
 
   return (
     <>
-      <Card className="bg-white border border-gray-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bookmark className="w-5 h-5 text-blue-600" />
-            Template Manager
-            <Badge variant="secondary" className="ml-auto">
-              {templates.length} templates
-            </Badge>
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-3 text-lg font-semibold text-gray-800">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+              <Bookmark className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span>Template Manager</span>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                  {templates.length} templates
+                </Badge>
+              </div>
+              <p className="text-xs text-gray-500 font-normal mt-1">Save and apply design templates</p>
+            </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
               <DialogTrigger asChild>
-                <Button className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
-                  <Save className="w-4 h-4" />
+                <Button className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200">
+                  <Save className="w-4 h-4 mr-2" />
                   Save as Template
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Save Current Settings as Template</DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-emerald-600" />
+                    Save Current Settings as Template
+                  </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
@@ -354,17 +381,27 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
                       className="mt-1"
                     />
                   </div>
-
-                  <div className="flex gap-2">
+                  <div>
+                    <Label htmlFor="templateDescription">Description (Optional)</Label>
+                    <Textarea
+                      id="templateDescription"
+                      value={templateDescription}
+                      onChange={(e) => setTemplateDescription(e.target.value)}
+                      placeholder="Describe your template..."
+                      className="mt-1"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-2">
                     <Button
                       onClick={handleSaveTemplate}
                       disabled={loading || !templateName.trim()}
-                      className="flex-1"
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                     >
                       {loading ? (
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <Save className="w-4 h-4" />
+                        <Save className="w-4 h-4 mr-2" />
                       )}
                       {loading ? "Saving..." : "Save Template"}
                     </Button>
@@ -382,7 +419,7 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
             <Button
               variant="outline"
               onClick={() => setShowViewAllDialog(true)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
             >
               <ExternalLink className="w-4 h-4" />
               View All
@@ -390,19 +427,19 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
           </div>
 
           {/* Search and Filter */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 placeholder="Search templates..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 border-gray-200 focus:border-blue-300 focus:ring-blue-200"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-32 border-gray-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -412,18 +449,20 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
                   <SelectItem value="image">Image</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="flex items-center gap-1 ml-auto">
+              <div className="flex items-center gap-1 ml-auto bg-gray-100 p-1 rounded-lg">
                 <Button
-                  variant={viewMode === "list" ? "default" : "outline"}
+                  variant={viewMode === "list" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("list")}
+                  className="h-8 px-2"
                 >
                   <List className="w-4 h-4" />
                 </Button>
                 <Button
-                  variant={viewMode === "grid" ? "default" : "outline"}
+                  variant={viewMode === "grid" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("grid")}
+                  className="h-8 px-2"
                 >
                   <Grid className="w-4 h-4" />
                 </Button>
@@ -432,8 +471,12 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
           </div>
 
           {/* Templates List */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Recent Templates</Label>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium text-gray-700">Recent Templates</Label>
+              <span className="text-xs text-gray-500">{filteredTemplates.length} found</span>
+            </div>
+            
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
@@ -441,137 +484,160 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
             ) : filteredTemplates.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Bookmark className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-sm">No templates found</p>
+                <p className="text-sm font-medium">No templates found</p>
                 <p className="text-xs text-gray-400 mt-1">
                   {searchTerm || filterType !== "all" ? "Try adjusting your search or filter" : "Save your current settings as a template to get started"}
                 </p>
               </div>
             ) : (
-              <div className={`space-y-2 max-h-64 overflow-y-auto ${
-                viewMode === "grid" ? "grid grid-cols-2 gap-2" : ""
+              <div className={`space-y-3 max-h-80 overflow-y-auto ${
+                viewMode === "grid" ? "grid grid-cols-2 gap-3" : ""
               }`}>
-                {filteredTemplates.slice(0, viewMode === "grid" ? 4 : 3).map((template) => (
-                  <motion.div
-                    key={template.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`border border-gray-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-sm transition-all ${
-                      viewMode === "grid" ? "text-center" : ""
-                    }`}
-                  >
-                    {viewMode === "grid" ? (
-                      <div className="space-y-2">
-                        <div
-                          className="h-16 rounded-lg mb-2 shadow-inner"
-                          style={getBackgroundPreview(template)}
-                        />
-                        <h4 className="font-medium text-gray-900 text-sm truncate">{template.name}</h4>
-                        <Badge variant="outline" className="text-xs">
-                          {template.backgroundType}
-                        </Badge>
-                        <div className="flex items-center justify-center gap-1">
+                <AnimatePresence>
+                  {filteredTemplates.slice(0, viewMode === "grid" ? 4 : 3).map((template) => (
+                    <motion.div
+                      key={template.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className={`group relative border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-all duration-200 ${
+                        appliedTemplateId === template.id ? 'ring-2 ring-green-500 ring-opacity-50 bg-green-50' : 'bg-white'
+                      } ${
+                        viewMode === "grid" ? "text-center" : ""
+                      }`}
+                    >
+                      {appliedTemplateId === template.id && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </motion.div>
+                      )}
+                      
+                      {viewMode === "grid" ? (
+                        <div className="space-y-3">
+                          <div
+                            className="h-20 rounded-lg mb-3 shadow-inner border border-gray-100"
+                            style={getBackgroundPreview(template)}
+                          />
+                          <h4 className="font-medium text-gray-900 text-sm truncate">{template.name}</h4>
+                          <Badge variant="outline" className="text-xs bg-gray-50">
+                            {template.backgroundType}
+                          </Badge>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleApplyTemplate(template)}
                             disabled={loading}
-                            className="flex items-center gap-1 text-xs"
+                            className="w-full mt-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                           >
-                            <Download className="w-3 h-3" />
+                            <Download className="w-3 h-3 mr-1" />
                             Apply
                           </Button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium text-gray-900">{template.name}</h4>
-                            <Badge variant="outline" className="text-xs">
-                              {template.backgroundType}
-                            </Badge>
-                          </div>
-
-                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatDate(template.createdAt)}
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-12 h-12 rounded-lg shadow-inner border border-gray-100"
+                                style={getBackgroundPreview(template)}
+                              />
+                              <div>
+                                <h4 className="font-medium text-gray-900">{template.name}</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant="outline" className="text-xs bg-gray-50">
+                                    {template.backgroundType}
+                                  </Badge>
+                                  <span className="text-xs text-gray-500">
+                                    <Clock className="w-3 h-3 inline mr-1" />
+                                    {formatDate(template.createdAt)}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleApplyTemplate(template)}
+                              disabled={loading}
+                              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                              title="Apply Template"
+                            >
+                              <Download className="w-3 h-3 mr-1" />
+                              Apply
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditTemplate(template)}
+                              disabled={loading}
+                              size="sm"
+                              className="text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                              title="Edit Template"
+                            >
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDuplicateTemplate(template)}
+                              disabled={loading}
+                              size="sm"
+                              className="text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                              title="Duplicate Template"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteTemplate(template.id, template.name)}
+                              disabled={loading}
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Delete Template"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleApplyTemplate(template)}
-                            disabled={loading}
-                            className="flex items-center gap-1"
-                            title="Apply Template"
-                          >
-                            <Download className="w-3 h-3" />
-                            Apply
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditTemplate(template)}
-                            disabled={loading}
-                            className="flex items-center gap-1"
-                            title="Edit Template"
-                          >
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDuplicateTemplate(template)}
-                            disabled={loading}
-                            className="flex items-center gap-1"
-                            title="Duplicate Template"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteTemplate(template.id, template.name)}
-                            disabled={loading}
-                            className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            title="Delete Template"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             )}
           </div>
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => setShowViewAllDialog(true)}
-              className="flex items-center gap-2 text-xs"
+              className="flex items-center gap-2 text-xs text-gray-600 hover:text-gray-800"
             >
               <SettingsIcon className="w-3 h-3" />
-              Manage All
+              Manage All Templates
             </Button>
           </div>
 
           {/* Info */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-gray-600" />
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Sparkles className="w-4 h-4 text-blue-600" />
+              </div>
               <div className="text-sm">
-                <div className="font-medium text-gray-800">Template Tips</div>
-                <div className="text-xs text-gray-600 mt-1">
+                <div className="font-medium text-blue-800 mb-1">Pro Tips</div>
+                <div className="text-xs text-blue-700 leading-relaxed">
                   Save your current settings as templates to quickly apply them later. 
-                  Use search and filters to find the perfect template.
+                  Use search and filters to find the perfect design for your notice board.
                 </div>
               </div>
             </div>
@@ -581,16 +647,23 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
 
       {/* View All Templates Dialog */}
       <Dialog open={showViewAllDialog} onOpenChange={setShowViewAllDialog}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Bookmark className="w-5 h-5" />
-              All Templates ({templates.length})
+            <DialogTitle className="flex items-center gap-3 text-xl">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+                <Bookmark className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <div>All Templates</div>
+                <div className="text-sm font-normal text-gray-500 mt-1">
+                  {templates.length} templates available
+                </div>
+              </div>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Search and Filter for Dialog */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
@@ -616,13 +689,13 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
             {/* Templates Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredTemplates.map((template) => (
-                <Card key={template.id} className="hover:shadow-md transition-shadow">
+                <Card key={template.id} className="hover:shadow-lg transition-all duration-200 group">
                   <CardContent className="p-4">
                     <div
-                      className="h-24 rounded-lg mb-3 shadow-inner"
+                      className="h-28 rounded-lg mb-4 shadow-inner border border-gray-100"
                       style={getBackgroundPreview(template)}
                     />
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-gray-900 truncate">{template.name}</h4>
                         <Badge variant="outline" className="text-xs">
@@ -636,43 +709,44 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
                           {formatDate(template.createdAt)}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 pt-2">
+                      
+                      <div className="flex items-center gap-2 pt-2">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleApplyTemplate(template)}
                           disabled={loading}
-                          className="flex items-center gap-1 text-xs flex-1"
+                          className="flex-1 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                         >
-                          <Download className="w-3 h-3" />
+                          <Download className="w-3 h-3 mr-1" />
                           Apply
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
                           onClick={() => handleEditTemplate(template)}
                           disabled={loading}
-                          className="flex items-center gap-1"
+                          className="text-gray-600 hover:text-gray-800 hover:bg-gray-100"
                           title="Edit Template"
                         >
                           <Edit className="w-3 h-3" />
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
                           onClick={() => handleDuplicateTemplate(template)}
                           disabled={loading}
-                          className="flex items-center gap-1"
+                          className="text-gray-600 hover:text-gray-800 hover:bg-gray-100"
                           title="Duplicate Template"
                         >
                           <Copy className="w-3 h-3" />
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
                           onClick={() => handleDeleteTemplate(template.id, template.name)}
                           disabled={loading}
-                          className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           title="Delete Template"
                         >
                           <Trash2 className="w-3 h-3" />
