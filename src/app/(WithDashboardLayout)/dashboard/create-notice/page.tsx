@@ -828,13 +828,7 @@ export default function NoticeEditor() {
             </div>
             
             <div className="flex gap-4">
-              <Button 
-                type="button"
-                variant="outline"
-                className="border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                Save as Draft
-              </Button>
+            
           <Button 
             type="submit" 
                 disabled={isSaving || !title.trim() || !selectedCategory || 
