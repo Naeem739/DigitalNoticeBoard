@@ -19,7 +19,7 @@ export const usePublicNoticeSettings = () => {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/public-notice-settings');
+      const response = await fetch('/api/public-notice-settings', { cache: 'no-store' });
       const result = await response.json();
       
       if (result.success && result.data) {
@@ -99,6 +99,39 @@ export const usePublicNoticeSettings = () => {
       loadSettings();
     }
   }, [loadSettings, mounted]);
+
+  // Listen for cross-tab update signals and refresh immediately
+  useEffect(() => {
+    if (!mounted) return;
+
+    let bc: BroadcastChannel | null = null;
+
+    // BroadcastChannel listener
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      bc = new BroadcastChannel('public-notice');
+      bc.onmessage = (ev) => {
+        const msg = ev?.data;
+        if (msg && msg.type === 'settings-updated') {
+          loadSettings();
+        }
+      };
+    }
+
+    // Fallback via storage event
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'public-notice-settings-updated') {
+        loadSettings();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      if (bc) {
+        bc.close();
+      }
+    };
+  }, [mounted, loadSettings]);
 
   // Manual refresh function
   const refreshSettings = useCallback(() => {

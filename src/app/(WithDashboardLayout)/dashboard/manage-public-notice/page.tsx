@@ -143,6 +143,18 @@ export default function ManagePublicNoticePage() {
           title: "Settings Saved Successfully!",
           description: "Your public notice board settings have been updated and are now live.",
         })
+        // Notify other tabs/pages to refresh immediately
+        try {
+          if (typeof window !== 'undefined') {
+            if ('BroadcastChannel' in window) {
+              const bc = new BroadcastChannel('public-notice')
+              bc.postMessage({ type: 'settings-updated', at: Date.now() })
+              bc.close()
+            }
+            // localStorage fallback to trigger storage event
+            localStorage.setItem('public-notice-settings-updated', String(Date.now()))
+          }
+        } catch {}
         
         // Reset success state after 3 seconds
         setTimeout(() => {
