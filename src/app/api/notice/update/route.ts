@@ -6,7 +6,7 @@ export async function PUT(request: Request) {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
         const body = await request.json();
-        const { title, content, category, categoryId, imageData, imageFileName, imageUrl } = body;
+        const { title, content, category, categoryId, imageData, imageFileName, imageUrl, pdfData, pdfFileName, pdfUrl } = body;
 
         if (!id) {
             return NextResponse.json(
@@ -22,7 +22,10 @@ export async function PUT(request: Request) {
             categoryId: categoryId,
             imageData: imageData,
             imageFileName: imageFileName,
-            imageUrl: imageUrl
+            imageUrl: imageUrl,
+            pdfData: pdfData,
+            pdfFileName: pdfFileName,
+            pdfUrl: pdfUrl
         };
 
         // Only include content if it's provided

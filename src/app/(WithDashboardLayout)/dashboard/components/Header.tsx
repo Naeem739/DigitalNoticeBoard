@@ -1,4 +1,4 @@
-import { Bell, Search, User, Menu } from 'lucide-react'
+import { Bell, Search, User, Menu, Shield, Crown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
@@ -9,10 +9,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { signOut, useSession } from 'next-auth/react'
 
 const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   const { data: session } = useSession()
+  const userRole = session?.user?.role
 
   const handleLogout = async () => {
     console.log("Attempting to sign out...");
@@ -22,6 +24,21 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
     });
     console.log("Signed out.");
   };
+
+  const getRoleBadge = () => {
+    switch (userRole) {
+      case 'SUPER_ADMIN':
+        return <Badge variant="destructive" className="text-xs"><Crown className="w-3 h-3 mr-1" />Super Admin</Badge>
+      case 'ADMIN':
+        return <Badge variant="default" className="text-xs"><Shield className="w-3 h-3 mr-1" />Admin</Badge>
+      case 'MODERATOR':
+        return <Badge variant="secondary" className="text-xs"><Shield className="w-3 h-3 mr-1" />Moderator</Badge>
+      case 'USER':
+        return <Badge variant="outline" className="text-xs"><User className="w-3 h-3 mr-1" />User</Badge>
+      default:
+        return <Badge variant="outline" className="text-xs">Unknown</Badge>
+    }
+  }
 
   return (
     <header className="bg-white shadow-md py-4 px-4 flex items-center justify-between border-b border-gray-200">
@@ -34,6 +51,7 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
         </div>
       </div>
       <div className="flex items-center space-x-4">
+        {getRoleBadge()}
         <Button variant="ghost" size="icon">
           <Bell className="h-5 w-5" />
         </Button>
@@ -52,15 +70,12 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
                 <p className="text-xs leading-none text-muted-foreground">
                   {session?.user?.email || 'admin@smartnoticeboard.com'}
                 </p>
+                <p className="text-xs leading-none text-blue-600 font-medium">
+                  {session?.user?.role || 'ADMIN'}
+                </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              Settings
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleLogout} className="text-red-600">
               Log out
             </DropdownMenuItem>

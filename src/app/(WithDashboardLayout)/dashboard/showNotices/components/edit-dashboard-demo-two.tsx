@@ -4,6 +4,7 @@ import { TDashboard2, TNotice, Category } from "@/types/types"
 import { useState, useEffect } from "react"
 import { Pencil, Trash2, X, Check, ChevronDown, Filter, AlertCircle, Search, Save, XCircle, Download } from "lucide-react"
 import { toast, Toaster } from "react-hot-toast"
+import { useSession } from "next-auth/react"
 
 interface WidgetContainerProps {
   data: TDashboard2
@@ -11,6 +12,9 @@ interface WidgetContainerProps {
 }
 
 export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role
+  
   // Deep clone data to make it mutable
   const [localData, setLocalData] = useState<TDashboard2>(() => {
     if (typeof window === 'undefined') {
@@ -33,15 +37,9 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   
-  // State for image preview
-  const [showImagePreview, setShowImagePreview] = useState<string | null>(null);
-  
   // State for image upload in edit modal
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  
-  // State for PDF preview
-  const [showPdfPreview, setShowPdfPreview] = useState<string | null>(null);
   
   // State for PDF upload in edit modal
   const [selectedPdf, setSelectedPdf] = useState<File | null>(null);
@@ -49,6 +47,18 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   
   // Loading states for operations
   const [isLoading, setIsLoading] = useState<{id: string, operation: string} | null>(null);
+
+  // State for content modal
+  const [contentModalOpen, setContentModalOpen] = useState(false);
+  const [selectedContent, setSelectedContent] = useState<{title: string, content: string, category: string} | null>(null);
+
+  // State for image modal
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [selectedImageContent, setSelectedImageContent] = useState<{title: string, imageData: string, fileName: string} | null>(null);
+
+  // State for PDF modal
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [selectedPdfContent, setSelectedPdfContent] = useState<{title: string, pdfData: string, fileName: string} | null>(null);
 
   const [isClient, setIsClient] = useState(false);
 
@@ -100,7 +110,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     .filter(notice => 
       !searchTerm || 
       notice.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (notice.categoryName && notice.categoryName.toLowerCase().includes(searchTerm.toLowerCase()))
+      (notice.categoryName && notice.categoryName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (notice.content && notice.content.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   
   // Calculate pagination
@@ -167,6 +178,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
       // Prepare update data
       const updateData: any = {
         title: editingNotice.title.trim(),
+        content: editingNotice.content,
         category: editingNotice.category,
         categoryId: editingNotice.categoryId
       };
@@ -219,6 +231,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
         if (notice.id === editingNotice.id) {
           return { 
             ...editingNotice,
+            content: updateData.content,
             imageData: updateData.imageData || notice.imageData,
             imageFileName: updateData.imageFileName || notice.imageFileName,
             pdfData: updateData.pdfData || notice.pdfData,
@@ -444,6 +457,55 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     });
   };
 
+  // Handle content modal for USER role
+  const openContentModal = (notice: TNotice) => {
+    setSelectedContent({
+      title: notice.title,
+      content: notice.content || '',
+      category: notice.categoryName || 'Uncategorized'
+    });
+    setContentModalOpen(true);
+  };
+
+  const closeContentModal = () => {
+    setContentModalOpen(false);
+    setSelectedContent(null);
+  };
+
+  // Handle image modal for all roles
+  const openImageModal = (notice: TNotice) => {
+    if (notice.imageData) {
+      setSelectedImageContent({
+        title: notice.title,
+        imageData: notice.imageData,
+        fileName: notice.imageFileName || 'Image'
+      });
+      setImageModalOpen(true);
+    }
+  };
+
+  const closeImageModal = () => {
+    setImageModalOpen(false);
+    setSelectedImageContent(null);
+  };
+
+  // Handle PDF modal for all roles
+  const openPdfModal = (notice: TNotice) => {
+    if (notice.pdfData) {
+      setSelectedPdfContent({
+        title: notice.title,
+        pdfData: notice.pdfData,
+        fileName: notice.pdfFileName || 'PDF'
+      });
+      setPdfModalOpen(true);
+    }
+  };
+
+  const closePdfModal = () => {
+    setPdfModalOpen(false);
+    setSelectedPdfContent(null);
+  };
+
   // Test function to add a sample notice with image data
   const addTestNoticeWithImage = async () => {
     try {
@@ -560,7 +622,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by title or category..."
+                  placeholder="Search by title, category, or content..."
                   className="w-full p-3 outline-none"
                   autoFocus
                 />
@@ -610,13 +672,15 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
           <div className="overflow-hidden rounded-xl shadow-md border border-gray-200" suppressHydrationWarning>
             <div className="overflow-x-auto">
               <table className="min-w-full bg-white">
-                <thead>
-                  <tr className="bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
-                    <th className="py-3 px-6 text-left font-medium tracking-wider">Category</th>
-                    <th className="py-3 px-6 text-left font-medium tracking-wider">Notice Title</th>
-                    <th className="py-3 px-6 text-center font-medium tracking-wider w-32">Actions</th>
-                  </tr>
-                </thead>
+                                 <thead>
+                   <tr className="bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
+                     <th className="py-3 px-6 text-left font-medium tracking-wider">Category</th>
+                     <th className="py-3 px-6 text-left font-medium tracking-wider">Notice Title</th>
+                     {userRole !== 'USER' && (
+                       <th className="py-3 px-6 text-center font-medium tracking-wider w-32">Actions</th>
+                     )}
+                   </tr>
+                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {currentNotices.map((notice, index) => (
                     <tr 
@@ -631,6 +695,23 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                       <td className="py-4 px-6">
                         <div className="flex flex-col">
                           <span className="text-gray-700 font-medium">{notice.title}</span>
+                          
+                                                    {/* Content for all roles - inline with title */}
+                          <div className="mt-2">
+                            {notice.content ? (
+                              <button
+                                onClick={() => openContentModal(notice)}
+                                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition-colors duration-150 flex items-center gap-1"
+                              >
+                                <span>See more</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                            ) : (
+                              <span className="text-gray-500 text-sm italic">No content available</span>
+                            )}
+                          </div>
                           {/* Image controls */}
                           {notice.imageData && (
                             <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -640,24 +721,26 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                               </div>
                               <div className="flex space-x-2">
                                 <button
-                                  onClick={() => toggleImagePreview(notice.id)}
+                                  onClick={() => openImageModal(notice)}
                                   className="flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-md text-sm hover:bg-yellow-200 transition-colors font-medium"
                                 >
                                   <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                   </svg>
-                                  {showImagePreview === notice.id ? 'Hide Preview' : 'Show Preview'}
+                                  Show Preview
                                 </button>
-                                <button
-                                  onClick={() => handleEdit(notice)}
-                                  className="flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 transition-colors font-medium"
-                                >
-                                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                  Edit
-                                </button>
+                                {userRole !== 'USER' && (
+                                  <button
+                                    onClick={() => handleEdit(notice)}
+                                    className="flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 transition-colors font-medium"
+                                  >
+                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleDownload(notice)}
                                   className="flex items-center px-3 py-1.5 bg-purple-100 text-purple-700 rounded-md text-sm hover:bg-purple-200 transition-colors font-medium"
@@ -666,16 +749,6 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                                   Download
                                 </button>
                               </div>
-                              {showImagePreview === notice.id && (
-                                <div className="mt-3 pt-3 border-t border-gray-200">
-                                  <div className="font-bold text-sm mb-2 text-gray-700">Image Preview</div>
-                                  <img
-                                    src={`data:image/jpeg;base64,${notice.imageData}`}
-                                    alt={notice.title}
-                                    className="max-w-xs max-h-48 object-contain rounded-lg border border-gray-200 shadow-sm"
-                                  />
-                                </div>
-                              )}
                             </div>
                           )}
                           
@@ -688,24 +761,26 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                               </div>
                               <div className="flex space-x-2">
                                 <button
-                                  onClick={() => togglePdfPreview(notice.id)}
+                                  onClick={() => openPdfModal(notice)}
                                   className="flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-md text-sm hover:bg-yellow-200 transition-colors font-medium"
                                 >
                                   <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                   </svg>
-                                  {showPdfPreview === notice.id ? 'Hide Preview' : 'Show Preview'}
+                                  Show Preview
                                 </button>
-                                <button
-                                  onClick={() => handleEdit(notice)}
-                                  className="flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 transition-colors font-medium"
-                                >
-                                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                  Edit
-                                </button>
+                                {userRole !== 'USER' && (
+                                  <button
+                                    onClick={() => handleEdit(notice)}
+                                    className="flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 transition-colors font-medium"
+                                  >
+                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handlePdfDownload(notice)}
                                   className="flex items-center px-3 py-1.5 bg-purple-100 text-purple-700 rounded-md text-sm hover:bg-purple-200 transition-colors font-medium"
@@ -714,43 +789,35 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                                   Download
                                 </button>
                               </div>
-                              {showPdfPreview === notice.id && (
-                                <div className="mt-3 pt-3 border-t border-gray-200">
-                                  <div className="font-bold text-sm mb-2 text-gray-700">PDF Preview</div>
-                                  <iframe
-                                    src={`data:application/pdf;base64,${notice.pdfData}`}
-                                    className="w-full h-64 border border-gray-200 rounded-lg"
-                                    title="PDF Preview"
-                                  />
-                                </div>
-                              )}
                             </div>
                           )}
                         </div>
                       </td>
                       <td className="py-4 px-6 text-center">
-                        <div className="flex justify-center space-x-2">
-                          <button 
-                            onClick={() => handleEdit(notice)}
-                            disabled={isLoading !== null}
-                            className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full transition-colors duration-150 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            title="Edit Notice"
-                          >
-                            <Pencil className="h-5 w-5" />
-                          </button>
-                          <button 
-                            onClick={() => confirmDelete(notice.id, notice.title)}
-                            disabled={isLoading !== null}
-                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-full transition-colors duration-150 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                            title="Delete Notice"
-                          >
-                            {isLoading?.id === notice.id && isLoading?.operation === 'delete' ? (
-                              <span className="h-5 w-5 block rounded-full border-2 border-t-transparent border-red-600 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-5 w-5" />
-                            )}
-                          </button>
-                        </div>
+                        {userRole !== 'USER' && (
+                          <div className="flex justify-center space-x-2">
+                            <button 
+                              onClick={() => handleEdit(notice)}
+                              disabled={isLoading !== null}
+                              className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full transition-colors duration-150 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              title="Edit Notice"
+                            >
+                              <Pencil className="h-5 w-5" />
+                            </button>
+                            <button 
+                              onClick={() => confirmDelete(notice.id, notice.title)}
+                              disabled={isLoading !== null}
+                              className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-full transition-colors duration-150 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                              title="Delete Notice"
+                            >
+                              {isLoading?.id === notice.id && isLoading?.operation === 'delete' ? (
+                                <span className="h-5 w-5 block rounded-full border-2 border-t-transparent border-red-600 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-5 w-5" />
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -834,7 +901,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
       )}
 
       {/* Edit Notice Modal */}
-      {editModalOpen && editingNotice && (
+      {editModalOpen && editingNotice && userRole !== 'USER' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" suppressHydrationWarning>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             {/* Modal Header */}
@@ -879,8 +946,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                   />
                 </div>
                 
-                {/* Notice Content - Show only when content is not empty */}
-                {editingNotice.content && editingNotice.content.trim() !== '' ? (
+                {/* Notice Content - Show only when no image or PDF data */}
+                {(!editingNotice.imageData && !editingNotice.pdfData) && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Notice Content
@@ -888,17 +955,17 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                     <div className="space-y-4">
                       <textarea
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 bg-white text-gray-900"
-                        value={editingNotice.content}
+                        value={editingNotice.content || ''}
                         onChange={(e) => setEditingNotice({...editingNotice, content: e.target.value})}
                         rows={6}
                         placeholder="Enter notice content"
                       />
                     </div>
                   </div>
-                ) : (
-                  <>
-                    {/* Image Upload - Show only when imageData is not empty */}
-                    {editingNotice.imageData && (
+                )}
+                
+                {/* Image Upload - Show only when imageData is not empty */}
+                {editingNotice.imageData && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Notice Image
@@ -964,8 +1031,9 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                         </div>
                       </div>
                     )}
-                    {/* PDF Upload - Show only when imageData is empty */}
-                    {!editingNotice.imageData && (
+                    
+                    {/* PDF Upload - Show only when pdfData is not empty */}
+                    {editingNotice.pdfData && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Notice PDF
@@ -1032,8 +1100,6 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                         </div>
                       </div>
                     )}
-                  </>
-                )}
               </div>
             </div>
             
@@ -1058,6 +1124,153 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                   <Save className="h-5 w-5" />
                 )}
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Content Modal for All Roles */}
+      {contentModalOpen && selectedContent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">{selectedContent.title}</h3>
+                  <p className="text-sm text-indigo-100">Category: {selectedContent.category}</p>
+                </div>
+              </div>
+              <button 
+                onClick={closeContentModal}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors duration-150"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-grow">
+              <div className="prose prose-lg max-w-none">
+                <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                  <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                    {selectedContent.content}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
+              <button
+                onClick={closeContentModal}
+                className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Modal for All Roles */}
+      {imageModalOpen && selectedImageContent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">{selectedImageContent.title}</h3>
+                  <p className="text-sm text-indigo-100">File: {selectedImageContent.fileName}</p>
+                </div>
+              </div>
+              <button 
+                onClick={closeImageModal}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors duration-150"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-grow flex items-center justify-center">
+              <div className="max-w-full max-h-full">
+                <img
+                  src={`data:image/jpeg;base64,${selectedImageContent.imageData}`}
+                  alt={selectedImageContent.title}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
+              <button
+                onClick={closeImageModal}
+                className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Modal for All Roles */}
+      {pdfModalOpen && selectedPdfContent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">{selectedPdfContent.title}</h3>
+                  <p className="text-sm text-indigo-100">File: {selectedPdfContent.fileName}</p>
+                </div>
+              </div>
+              <button 
+                onClick={closePdfModal}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors duration-150"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-grow">
+              <div className="w-full h-full">
+                <iframe
+                  src={`data:application/pdf;base64,${selectedPdfContent.pdfData}`}
+                  className="w-full h-full min-h-[600px] border border-gray-200 rounded-lg"
+                  title="PDF Preview"
+                />
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
+              <button
+                onClick={closePdfModal}
+                className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150"
+              >
+                Close
               </button>
             </div>
           </div>

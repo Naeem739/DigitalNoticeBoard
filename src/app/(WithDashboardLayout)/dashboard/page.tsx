@@ -26,6 +26,7 @@ import {
 import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { BellLoader, DashboardLoader, ContentSkeleton } from '@/components/ui/loader'
 
 type TDashboardStats = {
@@ -45,6 +46,7 @@ type TDashboardStats = {
     id: string
     title: string
     imageFileName?: string
+    imageData?: string
     createdAt: Date
   }>
   recentPDFs: Array<{
@@ -62,6 +64,7 @@ type TDashboardStats = {
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const router = useRouter()
   const [stats, setStats] = useState<TDashboardStats>({
     totalNotices: 0,
     totalCategories: 0,
@@ -88,7 +91,7 @@ export default function DashboardPage() {
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [session, router])
 
   const fetchDashboardStats = async () => {
     try {
@@ -179,15 +182,29 @@ export default function DashboardPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Welcome back, {session?.user?.name || 'Administrator'}!
+              Welcome back, {session?.user?.name || 'User'}!
             </h1>
-            <p className="text-gray-600 mt-1">Here's what's happening with your Smart Notice Board</p>
+            <p className="text-gray-600 mt-1">
+              {session?.user?.role === 'USER' 
+                ? 'Here are the latest notices and updates from your Smart Notice Board'
+                : 'Here\'s what\'s happening with your Smart Notice Board'
+              }
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-sm">
-            <Crown className="w-3 h-3 mr-1" />
-            Admin Access
+            {session?.user?.role === 'USER' ? (
+              <>
+                <Eye className="w-3 h-3 mr-1" />
+                View Only
+              </>
+            ) : (
+              <>
+                <Crown className="w-3 h-3 mr-1" />
+                Admin Access
+              </>
+            )}
           </Badge>
         </div>
       </motion.div>
@@ -196,7 +213,7 @@ export default function DashboardPage() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
+        className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${session?.user?.role === 'USER' ? '3' : '5'} gap-6`}
       >
         <Link href="/dashboard/showNotices">
           <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 hover:shadow-lg transition-shadow cursor-pointer">
@@ -214,21 +231,23 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/category">
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Users className="w-6 h-6 text-green-600" />
+        {session?.user?.role !== 'USER' && (
+          <Link href="/dashboard/category">
+            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <Users className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-green-800">{stats.totalCategories}</div>
+                    <div className="text-sm text-green-600">Categories</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-green-800">{stats.totalCategories}</div>
-                  <div className="text-sm text-green-600">Categories</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
         <Link href="/dashboard/showImageNotices">
           <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 hover:shadow-lg transition-shadow cursor-pointer">
@@ -262,77 +281,139 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/noticeInterfaces">
-          <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-orange-200 hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-orange-100 rounded-lg">
-                  <Layout className="w-6 h-6 text-orange-600" />
+        {session?.user?.role !== 'USER' && (
+          <Link href="/dashboard/noticeInterfaces">
+            <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-orange-200 hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-orange-100 rounded-lg">
+                    <Layout className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-orange-800">{stats.totalNoticeInterfaces}</div>
+                    <div className="text-sm text-orange-600">Notice Interfaces</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-orange-800">{stats.totalNoticeInterfaces}</div>
-                  <div className="text-sm text-orange-600">Notice Interfaces</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
       </motion.div>
 
-      {/* Quick Actions */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-      >
-        <Link href="/dashboard/create-notice">
-          <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 group">
-            <CardContent className="p-4 text-center">
-              <div className="p-3 bg-blue-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
-                <Plus className="w-6 h-6 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-gray-800">Create Notice</h3>
-              <p className="text-xs text-gray-500 mt-1">Add new notice content</p>
-            </CardContent>
-          </Card>
-        </Link>
+      {/* Quick Actions for Admin and Moderator */}
+      {(session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          <Link href="/dashboard/create-notice">
+            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 group">
+              <CardContent className="p-4 text-center">
+                <div className="p-3 bg-blue-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
+                  <Plus className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-gray-800">Create Notice</h3>
+                <p className="text-xs text-gray-500 mt-1">Add new notice content</p>
+              </CardContent>
+            </Card>
+          </Link>
 
-        <Link href="/dashboard/layout/edit-dashboard">
-          <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-green-300 group">
-            <CardContent className="p-4 text-center">
-              <div className="p-3 bg-green-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-green-200 transition-colors">
-                <Layout className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="font-semibold text-gray-800">New Interface</h3>
-              <p className="text-xs text-gray-500 mt-1">Create or customize a dashboard interface</p>
-            </CardContent>
-          </Card>
-        </Link>
+          <Link href="/dashboard/layout/edit-dashboard">
+            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-green-300 group">
+              <CardContent className="p-4 text-center">
+                <div className="p-3 bg-green-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-green-200 transition-colors">
+                  <Layout className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-gray-800">New Interface</h3>
+                <p className="text-xs text-gray-500 mt-1">Create or customize a dashboard interface</p>
+              </CardContent>
+            </Card>
+          </Link>
 
-        <Link href="/dashboard/showNotices">
-          <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-purple-300 group">
-            <CardContent className="p-4 text-center">
-              <div className="p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-purple-200 transition-colors">
-                <Eye className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="font-semibold text-gray-800">View Notices</h3>
-              <p className="text-xs text-gray-500 mt-1">Browse all notices</p>
-            </CardContent>
-          </Card>
-        </Link>
+          <Link href="/dashboard/showNotices">
+            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-purple-300 group">
+              <CardContent className="p-4 text-center">
+                <div className="p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-purple-200 transition-colors">
+                  <Eye className="w-6 h-6 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-gray-800">View Notices</h3>
+                <p className="text-xs text-gray-500 mt-1">Browse all notices</p>
+              </CardContent>
+            </Card>
+          </Link>
 
-        <Link href="/dashboard/admin/make-admin">
-          <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-orange-300 group">
-            <CardContent className="p-4 text-center">
-              <div className="p-3 bg-orange-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-orange-200 transition-colors">
-                <Crown className="w-6 h-6 text-orange-600" />
-              </div>
-              <h3 className="font-semibold text-gray-800">Manage Admins</h3>
-              <p className="text-xs text-gray-500 mt-1">User management</p>
-            </CardContent>
-          </Card>
-        </Link>
-      </motion.div>
+          <Link href={
+            session?.user?.role === 'ADMIN' 
+              ? "/dashboard/admin/make-moderator" 
+              : session?.user?.role === 'MODERATOR'
+              ? "/dashboard/admin/make-user"
+              : "/dashboard/admin/make-admin"
+          }>
+            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-orange-300 group">
+              <CardContent className="p-4 text-center">
+                <div className="p-3 bg-orange-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-orange-200 transition-colors">
+                  <Crown className="w-6 h-6 text-orange-600" />
+                </div>
+                <h3 className="font-semibold text-gray-800">
+                  {session?.user?.role === 'ADMIN' 
+                    ? 'Manage Moderators' 
+                    : session?.user?.role === 'MODERATOR'
+                    ? 'Manage Users'
+                    : 'Manage Admins'
+                  }
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">User management</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </motion.div>
+      )}
+
+      {/* Quick Actions for USER Role */}
+      {session?.user?.role === 'USER' && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        >
+          <Link href="/dashboard/showNotices">
+            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 group">
+              <CardContent className="p-4 text-center">
+                <div className="p-3 bg-blue-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
+                  <FileText className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-gray-800">View Notices</h3>
+                <p className="text-xs text-gray-500 mt-1">Browse all notices with content</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/dashboard/showImageNotices">
+            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-purple-300 group">
+              <CardContent className="p-4 text-center">
+                <div className="p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-purple-200 transition-colors">
+                  <Image className="w-6 h-6 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-gray-800">View Images</h3>
+                <p className="text-xs text-gray-500 mt-1">Browse all image notices</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/dashboard/showPDFNotices">
+            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-red-300 group">
+              <CardContent className="p-4 text-center">
+                <div className="p-3 bg-red-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-red-200 transition-colors">
+                  <FileText className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="font-semibold text-gray-800">View PDFs</h3>
+                <p className="text-xs text-gray-500 mt-1">Browse all PDF notices</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </motion.div>
+      )}
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -352,13 +433,17 @@ export default function DashboardPage() {
               {stats.recentNotices.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No notices yet</p>
-                  <Link href="/dashboard/create-notice">
-                    <Button variant="outline" size="sm" className="mt-2">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Create First Notice
-                    </Button>
-                  </Link>
+                  <p className="text-gray-500">
+                    {session?.user?.role === 'USER' ? 'No notices available yet' : 'No notices yet'}
+                  </p>
+                  {(session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') && (
+                    <Link href="/dashboard/create-notice">
+                      <Button variant="outline" size="sm" className="mt-2">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Create First Notice
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -378,15 +463,20 @@ export default function DashboardPage() {
                       <div key={notice.id} className="flex items-start justify-between p-3 bg-white rounded-lg border border-gray-200">
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-gray-900 truncate mb-1">{notice.title}</h4>
-                          <p className="text-sm text-gray-600 text-truncate-1 leading-tight">
-                            {truncatedContent}
-                          </p>
+                          {session?.user?.role === 'USER' && notice.content && (
+                            <p className="text-sm text-gray-600 text-truncate-1 leading-tight mb-2">
+                              {notice.content.length > 100 
+                                ? notice.content.substring(0, 100) + '...' 
+                                : notice.content
+                              }
+                            </p>
+                          )}
                           <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
-                          <Badge variant="outline" className="text-xs">{notice.category}</Badge>
-                          <span>{getTimeAgo(notice.createdAt)}</span>
+                            <Badge variant="outline" className="text-xs">{notice.category}</Badge>
+                            <span>{getTimeAgo(notice.createdAt)}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
                     );
                   })}
                   <div className="text-center pt-2">
@@ -418,13 +508,17 @@ export default function DashboardPage() {
               {stats.recentImages.length === 0 ? (
                 <div className="text-center py-8">
                   <Image className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No images uploaded yet</p>
-                  <Link href="/dashboard/layout/edit-dashboard">
-                    <Button variant="outline" size="sm" className="mt-2">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Images
-                    </Button>
-                  </Link>
+                  <p className="text-gray-500">
+                    {session?.user?.role === 'USER' ? 'No images available yet' : 'No images uploaded yet'}
+                  </p>
+                  {(session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') && (
+                    <Link href="/dashboard/layout/edit-dashboard">
+                      <Button variant="outline" size="sm" className="mt-2">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Images
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -480,13 +574,17 @@ export default function DashboardPage() {
               {stats.recentPDFs.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No PDFs uploaded yet</p>
-                  <Link href="/dashboard/create-notice">
-                    <Button variant="outline" size="sm" className="mt-2">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add PDFs
-                    </Button>
-                  </Link>
+                  <p className="text-gray-500">
+                    {session?.user?.role === 'USER' ? 'No PDFs available yet' : 'No PDFs uploaded yet'}
+                  </p>
+                  {(session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') && (
+                    <Link href="/dashboard/create-notice">
+                      <Button variant="outline" size="sm" className="mt-2">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add PDFs
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -523,47 +621,49 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* System Status */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <Card className="bg-gradient-to-br from-gray-50 to-slate-50 border-gray-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-gray-600" />
-              System Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <div>
-                  <div className="font-medium text-green-800">System Online</div>
-                  <div className="text-xs text-green-600">All services operational</div>
+      {/* System Status - Only for Admin and Moderator Users */}
+      {(session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card className="bg-gradient-to-br from-gray-50 to-slate-50 border-gray-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-gray-600" />
+                System Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <div>
+                    <div className="font-medium text-green-800">System Online</div>
+                    <div className="text-xs text-green-600">All services operational</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <div>
+                    <div className="font-medium text-blue-800">Database Connected</div>
+                    <div className="text-xs text-blue-600">PostgreSQL active</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
+                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                  <div>
+                    <div className="font-medium text-purple-800">Authentication</div>
+                    <div className="text-xs text-purple-600">NextAuth.js ready</div>
+                  </div>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <div>
-                  <div className="font-medium text-blue-800">Database Connected</div>
-                  <div className="text-xs text-blue-600">PostgreSQL active</div>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
-                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                <div>
-                  <div className="font-medium text-purple-800">Authentication</div>
-                  <div className="text-xs text-purple-600">NextAuth.js ready</div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Image Modal */}
       {showImageModal && selectedImage && (

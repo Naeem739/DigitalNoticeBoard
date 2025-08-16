@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { 
   Home, 
   BarChart2, 
@@ -34,6 +35,8 @@ import type React from "react"
 
 export default function Sidebar({ isOpen }: { isOpen: boolean }) {
   const [openMenus, setOpenMenus] = useState<string[]>([])
+  const { data: session } = useSession()
+  const userRole = session?.user?.role
 
   const toggleMenu = (menu: string) => {
     setOpenMenus((prev) => (prev.includes(menu) ? prev.filter((item) => item !== menu) : [...prev, menu]))
@@ -113,34 +116,59 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
         <MenuItem href="/notice" icon={Bell}>
           Public Notices
         </MenuItem>
-        <MenuItem href="/dashboard/manage-public-notice" icon={Settings}>
-          Notice Board Settings
-        </MenuItem>
-        <MenuItem href="/dashboard/category" icon={FolderPlus}>
-          Notice Categories
-        </MenuItem>
-        <DropdownMenu
-          title="Manage Notices"
-          items={[
-            { href: "/dashboard/create-notice", icon: Plus, label: "New Notice" },
-            { href: "/dashboard/showNotices", icon: List, label: "All Notices" },
-            { href: "/dashboard/showImageNotices", icon: Image, label: "Image-Based Notices" }
-          ]}
-        />
-        <DropdownMenu
-          title="Interface Management"
-          items={[
-            { href: "/dashboard/layout/edit-dashboard", icon: LayoutDashboard, label: "New Interface" },
-            { href: "/dashboard/noticeInterfaces", icon: Grid3X3, label: "All Interfaces" }
-          ]}
-        />
-        <DropdownMenu
-          title="Manage Users"
-          items={[
-            { href: "/dashboard/admin/make-admin", icon: UserPlus, label: "Add Administrator" },
-            { href: "/dashboard/admin/showAllAdmin", icon: UserCheck, label: "Administrators" }
-          ]}
-        />
+        {userRole !== 'USER' && (
+          <>
+            {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+              <>
+                <MenuItem href="/dashboard/manage-public-notice" icon={Settings}>
+                  Notice Board Settings
+                </MenuItem>
+                <MenuItem href="/dashboard/category" icon={FolderPlus}>
+                  Notice Categories
+                </MenuItem>
+              </>
+            )}
+            <DropdownMenu
+              title="Manage Notices"
+              items={[
+                { href: "/dashboard/create-notice", icon: Plus, label: "New Notice" },
+                { href: "/dashboard/showNotices", icon: List, label: "All Notices" },
+                { href: "/dashboard/showImageNotices", icon: Image, label: "Image-Based Notices" }
+              ]}
+            />
+            <DropdownMenu
+              title="Interface Management"
+              items={[
+                { href: "/dashboard/layout/edit-dashboard", icon: LayoutDashboard, label: "New Interface" },
+                { href: "/dashboard/noticeInterfaces", icon: Grid3X3, label: "All Interfaces" }
+              ]}
+            />
+            <DropdownMenu
+              title="Manage Users"
+              items={
+                userRole === 'ADMIN' 
+                  ? [
+                      { href: "/dashboard/admin/make-moderator", icon: UserPlus, label: "Add Moderator" },
+                      { href: "/dashboard/admin/showAllModerator", icon: UserCheck, label: "Moderators" }
+                    ]
+                  : userRole === 'MODERATOR'
+                  ? [
+                      { href: "/dashboard/admin/make-user", icon: UserPlus, label: "Add User" },
+                      { href: "/dashboard/admin/showAllUsers", icon: UserCheck, label: "All Users" }
+                    ]
+                  : [
+                      { href: "/dashboard/admin/make-admin", icon: UserPlus, label: "Add Administrator" },
+                      { href: "/dashboard/admin/showAllAdmin", icon: UserCheck, label: "Administrators" }
+                    ]
+              }
+            />
+          </>
+        )}
+        {userRole === 'USER' && (
+          <MenuItem href="/dashboard/showNotices" icon={List}>
+            View Notices
+          </MenuItem>
+        )}
       </nav>
     </div>
   )

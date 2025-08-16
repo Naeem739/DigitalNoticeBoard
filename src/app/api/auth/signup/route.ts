@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 // import prisma from "@/lib/prisma"
 import { hash } from "bcrypt"
 import { prisma } from "@/db/prisma"
+import { UserRole } from "@prisma/client"
 
 export async function POST(req: Request) {
   try {
@@ -23,25 +24,42 @@ export async function POST(req: Request) {
       )
     }
 
+    // Check if this is the first user in the system
+    const userCount = await prisma.user.count()
+    
+    let userRole: UserRole = UserRole.USER
+    if (userCount === 0) {
+      // First user becomes SUPER_ADMIN
+      userRole = UserRole.SUPER_ADMIN
+    } else if (role) {
+      // For subsequent users, use the provided role
+      userRole = role === 'admin' ? UserRole.ADMIN : role === 'moderator' ? UserRole.MODERATOR : UserRole.USER
+    }
+
     const user = await prisma.user.create({
       data: {
         name,
         email: email.toLowerCase(),
         password: hashed_password,
+        role: userRole,
       },
     })
-    console.log("user    ", user);
 
     return NextResponse.json({
       success: true,
       user: {
         name: user.name,
         email: user.email,
-        role: role || 'user'
+        role: user.role
       },
-      message: role === 'admin' ? 'Admin user created successfully' : 'User created successfully'
+      message: userCount === 0 
+        ? 'Super Admin account created successfully! You are the first user of the system.'
+        : role === 'admin' 
+        ? 'Admin user created successfully' 
+        : role === 'moderator' 
+        ? 'Moderator user created successfully' 
+        : 'User created successfully'
     })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error('Error creating user:', error)
     return NextResponse.json(

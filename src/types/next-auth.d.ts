@@ -7,6 +7,7 @@ declare module 'next-auth' {
             id?: string | undefined;
             name?: string | null;
             email?:string | null;
+            role?: string;
         } & DefaultSession['user']
        
 
@@ -15,6 +16,7 @@ declare module 'next-auth' {
         name:string ;
         email:string ;
         sub:email;
+        role?: string;
     }
 
 }
@@ -23,7 +25,8 @@ declare module 'next-auth' {
         name:string;
         email:string;
         sub:string;
-        id:string
+        id:string;
+        role?: string;
     }
 
 }
