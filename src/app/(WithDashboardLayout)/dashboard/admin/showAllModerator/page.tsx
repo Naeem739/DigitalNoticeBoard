@@ -5,22 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Users, UserCheck, Calendar, Mail, User, Trash2, Edit, Search, Crown, Shield, Activity, Filter } from 'lucide-react'
+import { Users, UserCheck, Calendar, Mail, User, Trash2, Edit, Search, Shield, Activity, Filter } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
-type TAdmin = {
+type TModerator = {
   id: string
   name: string
   email: string
-  role: string // Add role field
+  role: string
   createdAt: Date
   updatedAt: Date
 }
 
-export default function ShowAllAdminPage() {
-  const [admins, setAdmins] = useState<TAdmin[]>([])
-  const [filteredAdmins, setFilteredAdmins] = useState<TAdmin[]>([])
+export default function ShowAllModeratorPage() {
+  const [moderators, setModerators] = useState<TModerator[]>([])
+  const [filteredModerators, setFilteredModerators] = useState<TModerator[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -28,17 +28,17 @@ export default function ShowAllAdminPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
-    fetchAdmins()
+    fetchModerators()
   }, [])
 
   useEffect(() => {
-    // Filter and sort admins
-    let filtered = admins.filter(admin => 
-      admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      admin.email.toLowerCase().includes(searchTerm.toLowerCase())
+    // Filter and sort moderators
+    let filtered = moderators.filter(moderator => 
+      moderator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      moderator.email.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
-    // Sort admins
+    // Sort moderators
     filtered.sort((a, b) => {
       let aValue = a[sortBy]
       let bValue = b[sortBy]
@@ -58,50 +58,50 @@ export default function ShowAllAdminPage() {
       }
     })
 
-    setFilteredAdmins(filtered)
-  }, [admins, searchTerm, sortBy, sortOrder])
+    setFilteredModerators(filtered)
+  }, [moderators, searchTerm, sortBy, sortOrder])
 
-  const fetchAdmins = async () => {
+  const fetchModerators = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/admin/allAdmins')
+      const response = await fetch('/api/admin/allModerators')
       const result = await response.json()
       
       if (response.ok) {
-        setAdmins(result.admins || [])
+        setModerators(result.moderators || [])
       } else {
-        toast.error('Failed to fetch admin users')
+        toast.error('Failed to fetch moderator users')
       }
     } catch (error) {
-      console.error('Error fetching admins:', error)
-      toast.error('Error fetching admin users')
+      console.error('Error fetching moderators:', error)
+      toast.error('Error fetching moderator users')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDeleteAdmin = async (adminId: string, adminName: string) => {
-    if (!confirm(`Are you sure you want to delete admin "${adminName}"? This action cannot be undone.`)) {
+  const handleDeleteModerator = async (moderatorId: string, moderatorName: string) => {
+    if (!confirm(`Are you sure you want to delete moderator "${moderatorName}"? This action cannot be undone.`)) {
       return
     }
 
     try {
-      setDeletingId(adminId)
-      const response = await fetch(`/api/admin/delete/${adminId}`, {
+      setDeletingId(moderatorId)
+      const response = await fetch(`/api/admin/delete/${moderatorId}`, {
         method: 'DELETE',
       })
 
       const result = await response.json()
 
       if (response.ok) {
-        setAdmins(prev => prev.filter(admin => admin.id !== adminId))
-        toast.success(`Admin "${adminName}" deleted successfully`)
+        setModerators(prev => prev.filter(moderator => moderator.id !== moderatorId))
+        toast.success(`Moderator "${moderatorName}" deleted successfully`)
       } else {
-        toast.error(result.message || 'Failed to delete admin')
+        toast.error(result.message || 'Failed to delete moderator')
       }
     } catch (error) {
-      console.error('Error deleting admin:', error)
-      toast.error('Error deleting admin')
+      console.error('Error deleting moderator:', error)
+      toast.error('Error deleting moderator')
     } finally {
       setDeletingId(null)
     }
@@ -137,7 +137,7 @@ export default function ShowAllAdminPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading admin users...</p>
+          <p className="text-gray-600">Loading moderator users...</p>
         </div>
       </div>
     )
@@ -152,20 +152,20 @@ export default function ShowAllAdminPage() {
       >
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Crown className="w-8 h-8 text-yellow-500" />
-            <Shield className="w-4 h-4 text-blue-600 absolute -top-1 -right-1" />
+            <Shield className="w-8 h-8 text-blue-500" />
+            <UserCheck className="w-4 h-4 text-green-600 absolute -top-1 -right-1" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              All Administrators
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+              All Moderators
             </h1>
-            <p className="text-gray-600 mt-1">Manage all administrative users in the system</p>
+            <p className="text-gray-600 mt-1">Manage all moderator users in the system</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <UserCheck className="w-6 h-6 text-green-600" />
           <Badge variant="secondary" className="text-lg font-semibold">
-            {filteredAdmins.length} {filteredAdmins.length === 1 ? 'Admin' : 'Admins'}
+            {filteredModerators.length} {filteredModerators.length === 1 ? 'Moderator' : 'Moderators'}
           </Badge>
         </div>
       </motion.div>
@@ -179,7 +179,7 @@ export default function ShowAllAdminPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            placeholder="Search admins by name or email..."
+            placeholder="Search moderators by name or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 border-2 focus:border-blue-500"
@@ -217,8 +217,8 @@ export default function ShowAllAdminPage() {
             <div className="flex items-center gap-3">
               <Users className="w-8 h-8 text-blue-600" />
               <div>
-                <div className="text-2xl font-bold text-blue-800">{admins.length}</div>
-                <div className="text-sm text-blue-600">Total Admins</div>
+                <div className="text-2xl font-bold text-blue-800">{moderators.length}</div>
+                <div className="text-sm text-blue-600">Total Moderators</div>
               </div>
             </div>
           </CardContent>
@@ -229,7 +229,7 @@ export default function ShowAllAdminPage() {
             <div className="flex items-center gap-3">
               <Activity className="w-8 h-8 text-green-600" />
               <div>
-                <div className="text-2xl font-bold text-green-800">{filteredAdmins.length}</div>
+                <div className="text-2xl font-bold text-green-800">{filteredModerators.length}</div>
                 <div className="text-sm text-green-600">Active Results</div>
               </div>
             </div>
@@ -239,17 +239,17 @@ export default function ShowAllAdminPage() {
         <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <Crown className="w-8 h-8 text-purple-600" />
+              <Shield className="w-8 h-8 text-purple-600" />
               <div>
-                <div className="text-2xl font-bold text-purple-800">∞</div>
-                <div className="text-sm text-purple-600">System Access</div>
+                <div className="text-2xl font-bold text-purple-800">⚡</div>
+                <div className="text-sm text-purple-600">Moderate Access</div>
               </div>
             </div>
           </CardContent>
         </Card>
       </motion.div>
 
-      {filteredAdmins.length === 0 ? (
+      {filteredModerators.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -258,12 +258,12 @@ export default function ShowAllAdminPage() {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Users className="w-16 h-16 text-gray-400 mb-4" />
               <h3 className="text-xl font-semibold text-gray-600 mb-2">
-                {searchTerm ? 'No matching admins found' : 'No Admin Users Found'}
+                {searchTerm ? 'No matching moderators found' : 'No Moderator Users Found'}
               </h3>
               <p className="text-gray-500 text-center">
                 {searchTerm 
                   ? 'Try adjusting your search terms or filters.'
-                  : 'No admin users have been created yet. Admin users will appear here once they are added to the system.'
+                  : 'No moderator users have been created yet. Moderator users will appear here once they are added to the system.'
                 }
               </p>
             </CardContent>
@@ -272,9 +272,9 @@ export default function ShowAllAdminPage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <AnimatePresence>
-            {filteredAdmins.map((admin, index) => (
+            {filteredModerators.map((moderator, index) => (
               <motion.div
-                key={admin.id}
+                key={moderator.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
@@ -286,20 +286,20 @@ export default function ShowAllAdminPage() {
                       <CardTitle className="text-lg flex items-center gap-2">
                         <div className="relative">
                           <User className="w-5 h-5 text-blue-600" />
-                          <Crown className="w-3 h-3 text-yellow-500 absolute -top-1 -right-1" />
+                          <Shield className="w-3 h-3 text-green-500 absolute -top-1 -right-1" />
                         </div>
-                        <span className="truncate">{admin.name}</span>
+                        <span className="truncate">{moderator.name}</span>
                       </CardTitle>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteAdmin(admin.id, admin.name)}
-                          disabled={deletingId === admin.id}
+                          onClick={() => handleDeleteModerator(moderator.id, moderator.name)}
+                          disabled={deletingId === moderator.id}
                           className="h-8 w-8 p-0 hover:bg-red-50"
-                          title="Delete Admin"
+                          title="Delete Moderator"
                         >
-                          {deletingId === admin.id ? (
+                          {deletingId === moderator.id ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
                           ) : (
                             <Trash2 className="w-4 h-4 text-red-600" />
@@ -313,7 +313,7 @@ export default function ShowAllAdminPage() {
                       <div className="flex items-center gap-3">
                         <Mail className="w-4 h-4 text-gray-500" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{admin.email}</p>
+                          <p className="text-sm font-medium text-gray-900 truncate">{moderator.email}</p>
                           <p className="text-xs text-gray-500">Email Address</p>
                         </div>
                       </div>
@@ -321,8 +321,8 @@ export default function ShowAllAdminPage() {
                       <div className="flex items-center gap-3">
                         <Calendar className="w-4 h-4 text-gray-500" />
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">{formatDate(admin.createdAt)}</p>
-                          <p className="text-xs text-gray-500">{getTimeAgo(admin.createdAt)}</p>
+                          <p className="text-sm font-medium text-gray-900">{formatDate(moderator.createdAt)}</p>
+                          <p className="text-xs text-gray-500">{getTimeAgo(moderator.createdAt)}</p>
                         </div>
                       </div>
                       
@@ -330,7 +330,7 @@ export default function ShowAllAdminPage() {
                         <Shield className="w-4 h-4 text-gray-500" />
                         <div className="flex-1">
                           <Badge variant="secondary" className="text-xs">
-                            {admin.role}
+                            {moderator.role}
                           </Badge>
                           <p className="text-xs text-gray-500 mt-1">Role</p>
                         </div>
@@ -339,7 +339,7 @@ export default function ShowAllAdminPage() {
                     
                     <div className="pt-3 border-t">
                       <div className="text-xs text-gray-500 mt-1">
-                        Joining Date: {formatDate(admin.createdAt)}
+                        Joining Date: {formatDate(moderator.createdAt)}
                       </div>
                     </div>
                   </CardContent>
@@ -359,26 +359,26 @@ export default function ShowAllAdminPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-gray-800">
               <Shield className="w-5 h-5" />
-              Administrative Management
+              Moderator Management
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
               <p className="text-sm text-gray-600">
-                Admin users have full access to all system features and can manage other users.
+                Moderator users have limited access to system features and can manage notices and categories.
               </p>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-red-600 rounded-full mt-2 flex-shrink-0"></div>
               <p className="text-sm text-gray-600">
-                You can delete admin users, but be careful as this action cannot be undone.
+                You can delete moderator users, but be careful as this action cannot be undone.
               </p>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
               <p className="text-sm text-gray-600">
-                To add new admin users, use the "Make Admin" page in the Admin section.
+                To add new moderator users, use the "Make Moderator" page in the Admin section.
               </p>
             </div>
           </CardContent>
@@ -386,4 +386,4 @@ export default function ShowAllAdminPage() {
       </motion.div>
     </div>
   )
-} 
+}

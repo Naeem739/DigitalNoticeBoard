@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Trash2, FileText, Download, Eye } from 'lucide-react'
 import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
 
 type TPDF = {
   id: string
@@ -17,6 +18,8 @@ type TPDF = {
 }
 
 export default function ShowPDFNotices() {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role
   const [pdfs, setPdfs] = useState<TPDF[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -252,20 +255,22 @@ export default function ShowPDFNotices() {
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeletePDF(pdf.id)}
-                      disabled={deletingId === pdf.id}
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      title="Delete"
-                    >
-                      {deletingId === pdf.id ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </Button>
+                    {userRole !== 'USER' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeletePDF(pdf.id)}
+                        disabled={deletingId === pdf.id}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Delete"
+                      >
+                        {deletingId === pdf.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>

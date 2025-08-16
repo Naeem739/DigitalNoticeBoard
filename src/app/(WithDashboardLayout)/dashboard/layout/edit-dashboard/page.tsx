@@ -35,6 +35,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { SpinningBellLoader, WaveLoader } from "@/components/ui/loader"
 import { localStorageUtils } from "@/lib/utils"
+import { useSession } from "next-auth/react"
 
 // Client-only wrapper for GridLayout to prevent hydration issues
 const ClientOnlyGridLayout = ({ children, ...props }: any) => {
@@ -150,6 +151,9 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[]
 // Dynamic template loading - no hardcoded templates
 
 function EditDashboardDemo() {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role
+  
   const [widgets, setWidgets] = useState<ExtendedWidget[]>([])
   const [layout, setLayout] = useState<Layout[]>([])
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>(null)
@@ -1761,12 +1765,14 @@ function EditDashboardDemo() {
                 >
                   View All
                 </button>
-                <button
-                  onClick={() => setShowTemplateModal(true)}
-                  className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 transition-colors"
-                >
-                  Save Current
-                </button>
+                {userRole !== 'MODERATOR' && (
+                  <button
+                    onClick={() => setShowTemplateModal(true)}
+                    className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 transition-colors"
+                  >
+                    Save Current
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1861,20 +1867,24 @@ function EditDashboardDemo() {
                               >
                                 Apply
                               </button>
-                              <button
-                                onClick={() => handleEditTemplate(template)}
-                                className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
-                                title="Edit Template"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTemplate(template.id)}
-                                className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                                title="Delete Template"
-                              >
-                                Delete
-                              </button>
+                              {userRole !== 'MODERATOR' && (
+                                <>
+                                  <button
+                                    onClick={() => handleEditTemplate(template)}
+                                    className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
+                                    title="Edit Template"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTemplate(template.id)}
+                                    className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                                    title="Delete Template"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         )}
@@ -1892,12 +1902,12 @@ function EditDashboardDemo() {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm animate-in fade-in-0 duration-200 z-40"
+            className="fixed inset-0 bg-black/20 animate-in fade-in-0 duration-200 z-40"
             onClick={() => setActiveSettingsWidget(null)}
           />
           <div
             ref={settingsRef}
-            className="fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-[500px] max-h-[85vh] flex flex-col backdrop-blur-sm animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300 ease-out"
+            className="fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-50 w-[500px] max-h-[85vh] flex flex-col animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300 ease-out"
             style={{
               left: `${settingsPosition.x}px`,
               top: `${settingsPosition.y}px`,
@@ -2560,7 +2570,7 @@ function EditDashboardDemo() {
 
       {/* Template Save Modal */}
       {showTemplateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -2636,7 +2646,7 @@ function EditDashboardDemo() {
 
       {/* Duplicate Name Confirmation Dialog */}
       {showDuplicateNameDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -2706,7 +2716,7 @@ function EditDashboardDemo() {
 
       {/* View All Templates Modal */}
       {showViewAllModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full border border-gray-200 max-h-[80vh] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
@@ -2744,18 +2754,22 @@ function EditDashboardDemo() {
                           >
                             View
                           </button>
-                          <button
-                            onClick={() => handleEditTemplate(template)}
-                            className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTemplate(template.id)}
-                            className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                          >
-                            Delete
-                          </button>
+                          {userRole !== 'MODERATOR' && (
+                            <>
+                              <button
+                                onClick={() => handleEditTemplate(template)}
+                                className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTemplate(template.id)}
+                                className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                       
@@ -2875,7 +2889,7 @@ function EditDashboardDemo() {
 
       {/* Edit Template Modal */}
       {showEditModal && editingTemplate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -2961,7 +2975,7 @@ function EditDashboardDemo() {
 
       {/* View Template Modal */}
       {showViewModal && selectedTemplate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
             {/* Template card content */}
             <div className="p-6">

@@ -3,36 +3,35 @@ import { prisma } from '@/db/prisma'
 
 export async function GET(request: NextRequest) {
   try {
-    const admins = await prisma.user.findMany({
+    const moderators = await prisma.user.findMany({
       where: {
-        role: 'ADMIN' // Use proper enum value
-      },
-      orderBy: {
-        createdAt: 'desc'
+        role: 'MODERATOR'
       },
       select: {
         id: true,
         name: true,
         email: true,
-        role: true, // Include role field
+        role: true,
         createdAt: true,
         updatedAt: true
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     })
 
     return NextResponse.json({
       success: true,
-      admins: admins
+      moderators
     })
   } catch (error) {
-    console.error('Error fetching admins:', error)
+    console.error('Error fetching moderators:', error)
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to fetch admin users'
+        message: 'Failed to fetch moderators'
       },
       { status: 500 }
     )
   }
 }
-

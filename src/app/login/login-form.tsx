@@ -11,7 +11,7 @@ import { Eye, EyeOff, Mail, Lock, Loader2 } from "lucide-react"
 
 export function LoginForm() {
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
+  const callbackUrl = searchParams.get("callbackUrl") || "/"
   const [isLoading, setIsLoading] = React.useState<boolean>(false)
   const [showPassword, setShowPassword] = React.useState<boolean>(false)
   const [formData, setFormData] = React.useState({

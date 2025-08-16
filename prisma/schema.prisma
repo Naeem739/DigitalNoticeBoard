@@ -14,120 +14,115 @@ model User {
   password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  role      UserRole @default(USER)
 }
 
 model Notice {
-  id          String @id @default(uuid()) 
-  title       String
-  content     String
-  category    String
-  categoryId   String 
-  pdfUrl      String? // PDF file URL
-  pdfFileName String? // Original PDF filename
-  pdfData     String? // Base64 encoded PDF data
-  imageUrl    String? // Image file URL
-  imageFileName String? // Original image filename
-  imageData   String? // Base64 encoded image data
-  createdAt   DateTime? @default(now())
-  categoryRelation  Category @relation(fields: [categoryId], references: [id])
-  container   Container?
+  id                  String     @id @default(uuid())
+  category            String
+  categoryId          String
+  content             String
+  createdAt           DateTime?  @default(now())
+  title               String
+  pdfData             String?
+  pdfFileName         String?
+  pdfUrl              String?
+  imageData           String?
+  imageFileName       String?
+  imageUrl            String?
+  displayCategoryName String?
+  container           Container?
+  categoryRelation    Category   @relation(fields: [categoryId], references: [id])
 }
 
-
-
-model Container{
-  id       String     @id @default(uuid())
-  type     String
-  height   Float
-  width    Float
-  top      Float
-  left     Float 
+model Container {
+  id             String @id @default(uuid())
+  type           String
+  height         Float
+  width          Float
+  top            Float
+  left           Float
+  noticeId       String @unique
   NoticeRelation Notice @relation(fields: [noticeId], references: [id])
-  noticeId  String @unique
 }
-
-
 
 model Category {
-  id      String @id @default(uuid())
-  name    String @unique
-  notices Notice[]
-  icon    String? // New: icon for the category
-  editedName String? // New: editable category name
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  // noticeId
+  id         String   @id @default(uuid())
+  name       String   @unique
+  editedName String?
+  icon       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  notices    Notice[]
 }
 
 model Dashboard {
-  id           String @id @default(uuid())
-  aspectRatio  String
-  containers   Json
+  id          String    @id @default(uuid())
+  aspectRatio String
+  containers  Json
   createdAt   DateTime? @default(now())
 }
+
 model Template {
   id             String   @id @default(cuid())
-  name           String
-  description    String?
-  widgets        Json
-  layout         Json
-  widgetSettings Json
   createdAt      DateTime @default(now())
+  description    String?
+  layout         Json
+  name           String
   updatedAt      DateTime @updatedAt
+  widgetSettings Json
+  widgets        Json
 }
 
 model PublicNoticeSettings {
-  id                String   @id @default(cuid())
-  logo              String?  // Base64 encoded logo image
-  logoFileName      String?  // Original logo filename
-  title             String   @default("Smart Notice Board")
-  subtitle          String   @default("Information Technology Department")
-  emergencyNumber   String   @default("01734528367")
-  emergencyContact  String   @default("Md. Rashid Al Asif")
-  departmentName    String   @default("Information Technology Department")
-  
-  // Background settings
-  backgroundType    String   @default("gradient") // "solid", "gradient", "image"
-  backgroundColor   String?  // For solid color
-  gradientColors    Json?    // Array of colors for gradient
-  backgroundImage   String?  // Base64 encoded background image
-  backgroundImageFileName String? // Original background image filename
-  
-  // Additional settings
-  headerBackgroundColor String @default("#1e293b")
-  footerBackgroundColor String @default("#1e293b")
-  accentColor         String @default("#3b82f6")
-  
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  logo                    String?
+  logoFileName            String?
+  title                   String   @default("Smart Notice Board")
+  subtitle                String   @default("Information Technology Department")
+  emergencyNumber         String   @default("01734528367")
+  emergencyContact        String   @default("Md. Rashid Al Asif")
+  departmentName          String   @default("Information Technology Department")
+  backgroundType          String   @default("gradient")
+  backgroundColor         String?
+  gradientColors          Json?
+  backgroundImage         String?
+  backgroundImageFileName String?
+  headerBackgroundColor   String   @default("#1e293b")
+  footerBackgroundColor   String   @default("#1e293b")
+  accentColor             String   @default("#3b82f6")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  fontColor               String   @default("#ffffff")
 }
 
 model PublicNoticeTemplate {
-  id                String   @id @default(cuid())
-  name              String   // Template name
-  description       String?  // Template description
-  
-  // Template settings (same structure as PublicNoticeSettings)
-  logo              String?  // Base64 encoded logo image
-  logoFileName      String?  // Original logo filename
-  title             String   @default("Smart Notice Board")
-  subtitle          String   @default("Information Technology Department")
-  emergencyNumber   String   @default("01734528367")
-  emergencyContact  String   @default("Md. Rashid Al Asif")
-  departmentName    String   @default("Information Technology Department")
-  
-  // Background settings
-  backgroundType    String   @default("gradient") // "solid", "gradient", "image"
-  backgroundColor   String?  // For solid color
-  gradientColors    Json?    // Array of colors for gradient
-  backgroundImage   String?  // Base64 encoded background image
-  backgroundImageFileName String? // Original background image filename
-  
-  // Additional settings
-  headerBackgroundColor String @default("#1e293b")
-  footerBackgroundColor String @default("#1e293b")
-  accentColor         String @default("#3b82f6")
-  
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  name                    String
+  description             String?
+  logo                    String?
+  logoFileName            String?
+  title                   String   @default("Smart Notice Board")
+  subtitle                String   @default("Information Technology Department")
+  emergencyNumber         String   @default("01734528367")
+  emergencyContact        String   @default("Md. Rashid Al Asif")
+  departmentName          String   @default("Information Technology Department")
+  backgroundType          String   @default("gradient")
+  backgroundColor         String?
+  gradientColors          Json?
+  backgroundImage         String?
+  backgroundImageFileName String?
+  headerBackgroundColor   String   @default("#1e293b")
+  footerBackgroundColor   String   @default("#1e293b")
+  accentColor             String   @default("#3b82f6")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  fontColor               String   @default("#ffffff")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  USER
 }

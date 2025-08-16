@@ -36,6 +36,7 @@ const handler = NextAuth({
           id: user.id + '',
           email: user.email,
           name: user.name,
+          role: user.role,
         }
       }
     })
@@ -50,6 +51,7 @@ const handler = NextAuth({
         session.user.name = token.name;
         session.user.email = token.email;
         session.user.id = token.sub;
+        session.user.role = token.role;
       }
 
       // console.log("From session_________________________");
@@ -62,6 +64,7 @@ const handler = NextAuth({
          token.name = user.name;
         token.email = user.email;
          token.id = user.id;
+         token.role = user.role;
       }
       // console.log("token", token);
       // console.log("user from NextAuth ",user);
