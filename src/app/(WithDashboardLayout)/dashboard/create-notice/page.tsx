@@ -239,7 +239,7 @@ export default function NoticeEditor() {
       return;
     }
     
-    if (contentMode === 'text' && !content.trim()) {
+    if (contentMode === 'text' && (!content.trim() || content === '<br>' || content === '<div><br></div>')) {
       toast.error("Please enter content in the text editor");
       return;
     }
@@ -375,8 +375,8 @@ export default function NoticeEditor() {
   const handleEditorInput = (e: React.FormEvent<HTMLDivElement>) => {
     checkFormatting();
     const target = e.target as HTMLDivElement;
-    // Store plain text instead of HTML
-    setContent(target.textContent || target.innerText || '');
+    // Store HTML content to preserve formatting and newlines
+    setContent(target.innerHTML || '');
   };
 
   if (isLoading) {
@@ -805,7 +805,7 @@ export default function NoticeEditor() {
             id="richTextEditor"
             contentEditable
             onInput={handleEditorInput}
-            onBlur={(e) => setContent(e.currentTarget.textContent || e.currentTarget.innerText || '')}
+            onBlur={(e) => setContent(e.currentTarget.innerHTML || '')}
             onFocus={checkFormatting}
             onKeyUp={checkFormatting}
             onMouseUp={checkFormatting}
@@ -832,7 +832,7 @@ export default function NoticeEditor() {
           <Button 
             type="submit" 
                 disabled={isSaving || !title.trim() || !selectedCategory || 
-                  (contentMode === 'text' && !content.trim()) || 
+                  (contentMode === 'text' && (!content.trim() || content === '<br>' || content === '<div><br></div>')) || 
                   (contentMode === 'pdf' && !pdfFile) ||
                   (contentMode === 'image' && !imageFile)}
                 className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3 px-8 rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-300 disabled:opacity-50 flex items-center gap-2 shadow-lg"

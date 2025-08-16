@@ -1707,7 +1707,7 @@ function EditDashboardDemo() {
                                   {notice.title}
                                 </p>
                                 {settings.showFullContent && notice.content && (
-                                  <p
+                                  <div
                                     className="text-xs mt-1"
                                     style={{
                                       color: settings.fontColor,
@@ -1716,8 +1716,10 @@ function EditDashboardDemo() {
                                       wordBreak: "break-word", // Prevent long words from overflowing
                                     }}
                                   >
-                                    {notice.content}
-                                  </p>
+                                    <div 
+                                      dangerouslySetInnerHTML={{ __html: notice.content }}
+                                    />
+                                  </div>
                                 )}
                               </div>
                             ))}

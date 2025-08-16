@@ -865,7 +865,7 @@ export default function PublicNoticePage() {
                                       {/* Notice Content */}
                                     {settings.showFullContent && notice.content && (
                                         <div className="mt-2 md:mt-3">
-                                      <p 
+                                      <div 
                                             className="text-xs leading-tight opacity-75 line-clamp-2 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
@@ -876,11 +876,14 @@ export default function PublicNoticePage() {
                                               overflowWrap: 'break-word'
                                         }}
                                       >
-                                            {notice.content.length > 60 
-                                              ? `${notice.content.substring(0, 60)}...` 
-                                              : notice.content
-                                            }
-                                      </p>
+                                            <div 
+                                              dangerouslySetInnerHTML={{ 
+                                                __html: notice.content.length > 60 
+                                                  ? `${notice.content.substring(0, 60)}...` 
+                                                  : notice.content
+                                              }} 
+                                            />
+                                      </div>
                                         </div>
                                     )}
                                   </div>

@@ -464,12 +464,15 @@ export default function DashboardPage() {
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-gray-900 truncate mb-1">{notice.title}</h4>
                           {session?.user?.role === 'USER' && notice.content && (
-                            <p className="text-sm text-gray-600 text-truncate-1 leading-tight mb-2">
-                              {notice.content.length > 100 
-                                ? notice.content.substring(0, 100) + '...' 
-                                : notice.content
-                              }
-                            </p>
+                            <div className="text-sm text-gray-600 text-truncate-1 leading-tight mb-2">
+                              <div 
+                                dangerouslySetInnerHTML={{ 
+                                  __html: notice.content.length > 100 
+                                    ? notice.content.substring(0, 100) + '...' 
+                                    : notice.content
+                                }} 
+                              />
+                            </div>
                           )}
                           <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
                             <Badge variant="outline" className="text-xs">{notice.category}</Badge>

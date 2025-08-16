@@ -279,15 +279,17 @@ export default function ViewDashboard() {
                                 {notice.title}
                               </p>
                               {settings.showFullContent && notice.content && (
-                                <p 
+                                <div 
                                   className="text-xs mt-1 opacity-70"
                                   style={{
                                     color: settings.fontColor || '#1e293b',
                                     fontFamily: settings.fontFamily || 'Inter'
                                   }}
                                 >
-                                  {notice.content}
-                                </p>
+                                  <div 
+                                    dangerouslySetInnerHTML={{ __html: notice.content }}
+                                  />
+                                </div>
                               )}
                             </div>
                           )

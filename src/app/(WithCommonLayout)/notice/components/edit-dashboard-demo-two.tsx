@@ -403,7 +403,11 @@ export function WidgetContainer({ data }: WidgetContainerProps) {
 
                       {notice?.content && (
                         <div className="mt-2">
-                          {getTruncatedContent(notice.content, !!widget.settings?.showFullContent)}
+                          <div 
+                            dangerouslySetInnerHTML={{ 
+                              __html: getTruncatedContent(notice.content, !!widget.settings?.showFullContent)
+                            }} 
+                          />
                         </div>
                       )}
                         </div>
