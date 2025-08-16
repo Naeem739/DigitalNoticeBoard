@@ -9,6 +9,56 @@ A modern, responsive digital notice board system built with **Next.js 15**, feat
 
 ## ✨ Features
 
+# Role-Based Access Control (RBAC) System
+
+## Overview
+SmartNoticeBoard implements a four-tier role system with automatic Super Admin assignment for the first user. Each role has specific permissions and route access restrictions.
+
+## Role Hierarchy
+
+### Super Admin (First User)
+- **Automatic Assignment:** First signup becomes Super Admin  
+- **Full Access:** Complete system control and user management  
+- **Can Create:** All user types (Super Admin, Admin, Moderator, User)  
+
+### Admin
+- **User Management:** Can create Moderators and Users only  
+- **Full System Access:** All dashboard features except Super Admin pages  
+- **Content Control:** Full CRUD operations on notices, categories, templates  
+
+### Moderator
+- **Content Management:** CRUD operations on notices  
+- **User Creation:** Can create Users only  
+- **Limited Access:** Cannot create templates or access admin pages  
+
+### User (Default Role)
+- **Read-Only Access:** View notices, images, and PDFs  
+- **No Administrative Functions:** Cannot create, edit, or manage content  
+
+## Route Protection
+
+### Public Routes
+- `/`  
+- `/login`  
+- `/signup`  
+
+### Protected Routes by Role
+- **Super Admin:** All routes  
+- **Admin:** Most routes (except Super Admin management)  
+- **Moderator:** Content viewing and basic management  
+- **User:** View-only routes only  
+
+## Security Features
+- **NextAuth.js:** Secure session management  
+- **Middleware Protection:** Automatic route access control  
+- **Password Hashing:** Bcrypt encryption  
+- **Role Validation:** Server-side permission checks  
+
+## User Creation Flow
+- **First User:** Automatically becomes Super Admin  
+- **Regular Signup:** Defaults to User role  
+- **Admin Creation:** Existing admins can assign specific roles  
+
 ### 🎨 Dashboard Management
 - **Drag-and-Drop Layout**: Customizable widget positioning with React Grid Layout
 - **Real-time Updates**: Live content synchronization across devices
