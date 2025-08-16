@@ -70,6 +70,16 @@ export default function PublicNoticePage() {
   // Initialize component
   useEffect(() => {
     setMounted(true)
+    
+    // Add classes to prevent scrolling
+    document.body.classList.add('notice-page-active')
+    document.documentElement.classList.add('notice-page-active')
+    
+    // Cleanup function to remove classes
+    return () => {
+      document.body.classList.remove('notice-page-active')
+      document.documentElement.classList.remove('notice-page-active')
+    }
   }, [])
 
   // Auto-refresh every 30 minutes
@@ -397,7 +407,7 @@ export default function PublicNoticePage() {
 
   return (
     <div 
-      className="min-h-screen flex flex-col"
+      className="h-screen flex flex-col overflow-hidden notice-page-container"
       style={getBackgroundStyle()}
     >
       {/* Header */}
@@ -411,7 +421,7 @@ export default function PublicNoticePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="max-w-6xl mx-auto px-3 py-2">
+        <div className="w-full px-3 py-2">
           {/* Main Header Row */}
           <div className="flex items-center justify-between">
             {/* Left side - Logo and Title */}
@@ -432,7 +442,7 @@ export default function PublicNoticePage() {
               )}
               <div>
                 <motion.h1 
-                  className="text-xl font-bold text-white"
+                  className="text-lg font-bold text-white truncate"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
@@ -440,7 +450,7 @@ export default function PublicNoticePage() {
                   {settings?.title || "Smart Notice Board"}
                 </motion.h1>
                 <motion.p 
-                  className="text-sm text-gray-300"
+                  className="text-xs text-gray-300 truncate"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 }}
@@ -453,7 +463,7 @@ export default function PublicNoticePage() {
             {/* Center - Emergency Contact Info */}
             {(settings?.emergencyNumber || settings?.emergencyContact) && (
               <motion.div 
-                className="flex items-center space-x-4 text-white"
+                className="hidden md:flex items-center space-x-4 text-white"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
@@ -482,7 +492,7 @@ export default function PublicNoticePage() {
             {/* Right side - Time and Date */}
             <div className="text-right text-white">
               <motion.div 
-                className="text-xl font-bold font-mono"
+                className="text-lg font-bold font-mono"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 }}
@@ -504,22 +514,23 @@ export default function PublicNoticePage() {
 
           {/* Auto-refresh and Pagination Controls */}
           <motion.div 
-            className="mt-2 pt-2 border-t border-white/20 flex items-center justify-center space-x-4"
+            className="mt-2 pt-2 border-t border-white/20 flex items-center justify-center space-x-2 md:space-x-4"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
             {/* Auto-refresh indicator */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 flex items-center space-x-2 text-white">
+            <div className="bg-white/10 backdrop-blur-sm rounded-full px-2 md:px-3 py-1 flex items-center space-x-2 text-white">
               <RefreshCw className="w-3 h-3 animate-spin" />
-              <span className="text-xs font-medium">Auto-refreshing every 30 minutes</span>
+              <span className="text-xs font-medium hidden sm:inline">Auto-refreshing every 30 minutes</span>
+              <span className="text-xs font-medium sm:hidden">Auto-refresh</span>
             </div>
 
             {/* Auto-pagination toggle */}
             {dashboards.length > 1 && (
               <button
                 onClick={toggleAutoPagination}
-                className="bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 flex items-center space-x-2 text-white hover:bg-white/20 transition-all"
+                className="bg-white/10 backdrop-blur-sm rounded-full px-2 md:px-3 py-1 flex items-center space-x-2 text-white hover:bg-white/20 transition-all"
                 title={autoPaginationEnabled ? 'Disable auto-pagination' : 'Enable auto-pagination'}
               >
                 {autoPaginationEnabled ? (
@@ -538,7 +549,7 @@ export default function PublicNoticePage() {
 
             {/* Dashboard Navigation */}
             {dashboards.length > 1 && (
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 md:space-x-3">
                 <button
                   onClick={goToPrevDashboard}
                   disabled={currentDashboardIndex === 0}
@@ -569,8 +580,11 @@ export default function PublicNoticePage() {
                   <ChevronRight className="w-4 h-4" />
                 </button>
                 
-                <div className="text-white text-xs font-medium">
+                <div className="text-white text-xs font-medium hidden sm:inline">
                   Page {currentDashboardIndex + 1} of {dashboards.length}
+                </div>
+                <div className="text-white text-xs font-medium sm:hidden">
+                  {currentDashboardIndex + 1}/{dashboards.length}
                 </div>
               </div>
             )}
@@ -579,12 +593,12 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 p-2 md:p-6 overflow-hidden">
+        <div className="w-full h-full overflow-hidden">
           {/* Dashboard Content */}
           {dashboardLoading ? (
             <motion.div 
-              className="flex items-center justify-center min-h-[400px]"
+              className="flex items-center justify-center h-full"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
@@ -595,24 +609,21 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className="rounded-lg shadow-lg p-6 mx-4 sm:mx-6 lg:mx-8"
+              className="w-full h-full rounded-lg shadow-lg p-2 md:p-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
               <div 
-                className="relative mx-auto overflow-hidden rounded-lg shadow-lg"
+                className="relative w-full h-full overflow-hidden rounded-lg shadow-lg"
                 style={{
                   aspectRatio: currentDashboard.aspectRatio,
-                  width: '100vw',
-                  minHeight: '500px',
-                  height: 'auto',
-                  marginLeft: 'calc(-50vw + 50%)',
-                  marginRight: 'calc(-50vw + 50%)'
+                  minHeight: '300px',
+                  maxHeight: '100%'
                 }}
               >
                 {/* Grid Layout for Widgets */}
-                <div className="grid gap-4 px-4 sm:px-6 lg:px-8" style={{ gridTemplateColumns: 'repeat(12, 1fr)', minHeight: '400px' }}>
+                <div className="grid gap-2 md:gap-4 p-2 md:p-4 h-full notice-grid-container" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
                   {currentDashboard.containers.map((container, index) => {
                     const settings = container.settings || {}
                     const bgColor = settings.backgroundColor || '#ffffff'
@@ -626,12 +637,13 @@ export default function PublicNoticePage() {
                         id={container.id}
                         className="relative rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
                         style={{
-                          gridColumn: `span ${container.w}`,
-                          gridRow: `span ${container.h}`,
+                          gridColumn: `span ${Math.min(container.w, 12)}`,
+                          gridRow: `span ${Math.min(container.h, 6)}`,
                           backgroundColor: `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
                           border: `${borderWidth}px solid ${borderColor}`,
                           position: 'relative',
-                          minHeight: '250px',
+                          minHeight: '150px',
+                          maxHeight: '100%',
                           boxShadow: `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`
                         }}
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -644,7 +656,7 @@ export default function PublicNoticePage() {
                       >
                         {/* Widget Header */}
                         <div 
-                          className="px-4 py-3 border-b relative overflow-hidden"
+                          className="px-2 md:px-4 py-2 md:py-3 border-b relative overflow-hidden flex-shrink-0"
                           style={{
                             backgroundColor: settings.categoryBackgroundColor || '#f8fafc',
                             borderBottomColor: settings.categoryBorderColor || '#e2e8f0',
@@ -663,11 +675,11 @@ export default function PublicNoticePage() {
                           
                           <div className="relative flex items-center justify-center">
                             <h3 
-                              className="text-lg font-bold text-center truncate px-4 py-2 rounded-xl relative overflow-hidden"
+                              className="text-sm md:text-lg font-bold text-center truncate px-2 md:px-4 py-1 md:py-2 rounded-xl relative overflow-hidden"
                             style={{
                               color: settings.categoryFontColor || '#1e293b',
                               fontFamily: settings.categoryFont || 'Inter',
-                              fontSize: `${settings.categoryFontSize || 16}px`,
+                              fontSize: `clamp(12px, ${settings.categoryFontSize || 16}px, 18px)`,
                               fontWeight: settings.categoryFontWeight || 'bold',
                               textShadow: '0 2px 4px rgba(0,0,0,0.15)',
                               backgroundColor: `${settings.categoryBackgroundColor || '#f8fafc'}90`,
@@ -714,15 +726,14 @@ export default function PublicNoticePage() {
 
                         {/* Widget Content */}
                         <div 
-                          className="p-4 flex-1 flex flex-col justify-center" 
+                          className="p-2 md:p-4 flex-1 flex flex-col justify-center overflow-hidden" 
                           style={{ 
-                            minHeight: '200px', 
-                            height: '100%'
+                            minHeight: '150px'
                           }}
                         >
                           {container.type === 'notice' && container.noticeIds && (
                             <div className="h-full flex flex-col justify-between gap-2">
-                              <div className="notices-container flex flex-col gap-2 overflow-auto scrollbar-hide" style={{ maxHeight: '400px' }}>
+                              <div className="notices-container flex flex-col gap-2 overflow-auto scrollbar-hide flex-1">
                                 {container.noticeIds.slice(0, 5).map((noticeId: string, noticeIndex: number) => {
                                 const notice = getNoticeById(noticeId)
                                 if (!notice) return null
@@ -730,15 +741,15 @@ export default function PublicNoticePage() {
                                 return (
                                   <motion.div
                                     key={noticeId}
-                                    className="group relative overflow-hidden rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex-1"
+                                    className="group relative overflow-hidden rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex-1 min-h-0"
                                     style={{
                                       backgroundColor: `${bgColor}${Math.round((settings.cardOpacity || 0.95) * 255).toString(16).padStart(2, '0')}`,
                                       borderLeft: `3px solid ${borderColor}`,
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
-                                      minHeight: '140px',
-                                      maxHeight: '180px',
-                                      minWidth: '400px',
+                                      minHeight: '100px',
+                                      maxHeight: '140px',
+                                      width: '100%',
                                       overflow: 'hidden'
                                     }}
                                     initial={{ opacity: 0, y: 10 }}
@@ -749,24 +760,24 @@ export default function PublicNoticePage() {
                                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                                     }}
                                   >
-                                    {/* QR Code - Fixed Position */}
-                                    <div className="absolute top-2 right-2 w-24 h-24 z-10">
+                                    {/* QR Code - Responsive Size */}
+                                    <div className="qr-code-container responsive-qr-code">
                                       <NoticeQRCode 
                                         notice={notice}
                                         imageData={notice.imageData}
                                         imageTitle={notice.imageFileName || notice.title}
-                                        size={96}
-                                        className="opacity-80 hover:opacity-100 transition-opacity"
+                                        size={64}
+                                        className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
                                       />
                                     </div>
                                     {/* Notice Header */}
-                                    <div className="p-4 pb-2 pr-28">
+                                    <div className="p-2 md:p-4 pb-2 pr-16 md:pr-20 lg:pr-24 xl:pr-28">
                                       {/* Notice Title */}
                                       <h4 
-                                        className="text-sm font-semibold leading-tight mb-2 line-clamp-2 break-words"
+                                        className="text-xs md:text-sm font-semibold leading-tight mb-2 line-clamp-2 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
-                                          fontSize: `${settings.fontSize || 14}px`,
+                                          fontSize: `clamp(10px, ${settings.fontSize || 14}px, 16px)`,
                                           fontWeight: settings.fontWeight || 'semibold',
                                           fontFamily: settings.fontFamily || 'Inter',
                                           lineHeight: '1.3',
@@ -778,14 +789,14 @@ export default function PublicNoticePage() {
                                       </h4>
                                       
                                       {/* Category and Date Row */}
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-2 flex-wrap">
                                                                                     {/* Category Badge */}
                                             {(container.settings?.customCategoryName || notice.categoryName) && (
-                                              <div className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold relative overflow-hidden group"
+                                              <div className="inline-flex items-center px-2 md:px-3 py-1 md:py-1.5 rounded-full text-xs font-semibold relative overflow-hidden group"
                                                 style={{
                                                   backgroundColor: `${borderColor}15`,
                                                   color: settings.fontColor || '#1e293b',
-                                                  fontSize: '11px',
+                                                  fontSize: '10px',
                                                   border: `1px solid ${borderColor}40`,
                                                   boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                                                   backdropFilter: 'blur(8px)',
@@ -810,7 +821,7 @@ export default function PublicNoticePage() {
                                                 {/* Icon for custom category names */}
                                                 {container.settings?.customCategoryName && (
                                                   <svg 
-                                                    className="w-3 h-3 mr-1.5 relative z-10" 
+                                                    className="w-3 h-3 mr-1 md:mr-1.5 relative z-10" 
                                                     fill="currentColor" 
                                                     viewBox="0 0 20 20"
                                                   >
@@ -842,7 +853,7 @@ export default function PublicNoticePage() {
                                               className="text-xs font-medium opacity-70"
                                               style={{
                                                 color: settings.fontColor || '#1e293b',
-                                                fontSize: '11px'
+                                                fontSize: '10px'
                                               }}
                                             >
                                               {formatNoticeDate(notice.createdAt)}
@@ -853,20 +864,20 @@ export default function PublicNoticePage() {
                                       
                                       {/* Notice Content */}
                                     {settings.showFullContent && notice.content && (
-                                        <div className="mt-3">
+                                        <div className="mt-2 md:mt-3">
                                       <p 
                                             className="text-xs leading-tight opacity-75 line-clamp-2 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
                                               fontFamily: settings.fontFamily || 'Inter',
                                               lineHeight: '1.3',
-                                              fontSize: '12px',
+                                              fontSize: '10px',
                                               wordBreak: 'break-word',
                                               overflowWrap: 'break-word'
                                         }}
                                       >
-                                            {notice.content.length > 80 
-                                              ? `${notice.content.substring(0, 80)}...` 
+                                            {notice.content.length > 60 
+                                              ? `${notice.content.substring(0, 60)}...` 
                                               : notice.content
                                             }
                                       </p>
@@ -905,7 +916,7 @@ export default function PublicNoticePage() {
                           )}
 
                           {container.type === 'image' && container.imageIds && (
-                            <div className="h-full flex items-center justify-center p-4">
+                            <div className="h-full flex items-center justify-center p-2 md:p-4">
                               {container.imageIds.slice(0, 1).map((imageId: string) => {
                                 const image = getImageById(imageId)
                                 if (!image) return null
@@ -936,14 +947,14 @@ export default function PublicNoticePage() {
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                     
                                     {settings.showImageTitle && (
-                                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-lg">
+                                      <div className="absolute bottom-0 left-0 right-0 p-2 md:p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-lg">
                                         <div className="flex items-center justify-between">
                                           <div className="flex-1">
                                         <p
-                                          className="text-sm font-semibold text-white truncate"
+                                          className="text-xs md:text-sm font-semibold text-white truncate"
                                           style={{
                                             color: settings.imageTitleColor || '#ffffff',
-                                            fontSize: `${settings.imageTitleFontSize || 14}px`,
+                                            fontSize: `clamp(10px, ${settings.imageTitleFontSize || 14}px, 16px)`,
                                                 fontWeight: settings.imageTitleFontWeight || 'semibold',
                                                 fontFamily: settings.fontFamily || 'Inter',
                                                 textShadow: '0 1px 2px rgba(0,0,0,0.5)'
@@ -971,20 +982,20 @@ export default function PublicNoticePage() {
 
                           {(!container.noticeIds || container.noticeIds.length === 0) && 
                            (!container.imageIds || container.imageIds.length === 0) && (
-                            <div className="flex items-center justify-center h-full p-6">
+                            <div className="flex items-center justify-center h-full p-4 md:p-6">
                               <div className="text-center">
-                                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center opacity-30"
+                                <div className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 rounded-full flex items-center justify-center opacity-30"
                                   style={{
                                     backgroundColor: `${borderColor}20`,
                                     border: `2px dashed ${borderColor}40`
                                   }}
                                 >
-                                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                   </svg>
                                 </div>
                                 <p 
-                                  className="text-sm font-medium opacity-60"
+                                  className="text-xs md:text-sm font-medium opacity-60"
                                   style={{
                                     color: settings.fontColor || '#1e293b'
                                   }}
@@ -1011,13 +1022,13 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : (
             <motion.div 
-              className="flex items-center justify-center min-h-[400px]"
+              className="flex items-center justify-center h-full"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
               <div className="text-center text-white">
-                <h2 className="text-2xl font-bold mb-4">No Dashboards Available</h2>
-                <p className="text-lg opacity-80">Please create dashboard interfaces first.</p>
+                <h2 className="text-xl md:text-2xl font-bold mb-4">No Dashboards Available</h2>
+                <p className="text-base md:text-lg opacity-80">Please create dashboard interfaces first.</p>
               </div>
             </motion.div>
           )}
@@ -1035,20 +1046,20 @@ export default function PublicNoticePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.9 }}
       >
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between text-white">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm">
+        <div className="w-full px-3 md:px-6 py-2 md:py-4">
+          <div className="flex items-center justify-between text-white text-xs md:text-sm">
+            <div className="flex items-center space-x-2 md:space-x-4">
+              <span>
                 © {new Date().getFullYear()} {settings?.title || "Smart Notice Board"}
               </span>
-              <span className="text-white/60">•</span>
-              <span className="text-sm text-white/80">
+              <span className="text-white/60 hidden sm:inline">•</span>
+              <span className="text-white/80 hidden sm:inline">
                 {settings?.departmentName || "Information Technology Department"}
               </span>
             </div>
-            <div className="flex items-center space-x-4 text-sm text-white/80">
-              <span>Last updated: {new Date().toLocaleString()}</span>
-              <span className="text-white/60">•</span>
+            <div className="flex items-center space-x-2 md:space-x-4 text-white/80">
+              <span className="hidden md:inline">Last updated: {new Date().toLocaleString()}</span>
+              <span className="text-white/60 hidden md:inline">•</span>
               <span>Auto-refresh enabled</span>
             </div>
           </div>
@@ -1057,4 +1068,3 @@ export default function PublicNoticePage() {
     </div>
   )
 }
-//Naeem
