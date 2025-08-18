@@ -26,9 +26,11 @@ import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import "./edit-dashboard.css"
 import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } from "@/types/template-types"
-import { getCategoriesWithNotices } from "@/app/actions/category.action"
+import { getCategoriesWithNotices, getCategories } from "@/app/actions/category.action"
 import { getAllTemplates, createTemplate, getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
 import { createDashboard, getAllDashboards } from "@/app/actions/dashboard.action"
+import { createNotice } from "@/app/actions/notice.action"
+import { createCategory } from "@/app/actions/category.action"
 // import { createImage } from "@/app/actions/image.action"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -97,13 +99,30 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   categoryBorderWidth: 1,
   customCategoryName: "",
   
-  // Image widget settings (kept for type compatibility)
+  // Image display settings (enhanced for professional use)
   imageFit: "cover",
   imageBorderRadius: 8,
   showImageTitle: true,
-  imageTitleColor: "#1e293b",
+  imageTitleColor: "#ffffff",
   imageTitleFontSize: 14,
   imageTitleFontWeight: "medium",
+  imageOverlay: true,
+  imageOverlayOpacity: 0.3,
+  imageShadow: true,
+  imageShadowColor: "rgba(0, 0, 0, 0.2)",
+  imageShadowBlur: 8,
+  imageShadowOffset: 4,
+  imageZoom: false,
+  imageRotation: 0,
+  imageBrightness: 100,
+  imageContrast: 100,
+  imageSaturation: 100,
+  imageBlur: 0,
+  imageGrayscale: false,
+  imageSepia: false,
+  imageInvert: false,
+  
+
 }
 
 const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
@@ -120,11 +139,27 @@ const hexToRgba = (hex: string, opacity: number) => {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`
 }
 
+// Helper function to reconstruct image URL from notice data
+const reconstructImageUrl = (notice: any) => {
+  let imageUrl = notice.imageUrl
+  if (!imageUrl && notice.imageData) {
+    // If we only have base64 data, reconstruct the full data URL
+    // We need to determine the image type from the notice data
+    const imageType = notice.imageFileName ? 
+      notice.imageFileName.split('.').pop()?.toLowerCase() : 'jpeg'
+    const mimeType = imageType === 'png' ? 'image/png' : 
+                   imageType === 'gif' ? 'image/gif' : 
+                   imageType === 'webp' ? 'image/webp' : 'image/jpeg'
+    imageUrl = `data:${mimeType};base64,${notice.imageData}`
+  }
+  return imageUrl || ''
+}
+
 // Add this type for the settings tabs
-type SettingsTab = "style" | "typography" | "content" | "category"
+type SettingsTab = "style" | "typography" | "content" | "category" | "image"
 
 // Add widget type enum
-type WidgetType = "notice"
+type WidgetType = "notice" | "image"
 
 // Extend Widget type to include widget type and images
 interface ExtendedWidget extends Widget {
@@ -135,7 +170,12 @@ interface ExtendedWidget extends Widget {
     title: string
     file: File
     dbId?: string
+    width?: number
+    height?: number
+    size?: number
+    type?: string
   }>
+
 }
 
 // Add this before the EditDashboardDemo component
@@ -144,6 +184,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[]
   { id: "typography", label: "Typography", icon: <Type size={16} /> },
   { id: "content", label: "Content", icon: <Box size={16} /> },
   { id: "category", label: "Category", icon: <ListFilter size={16} /> },
+  { id: "image", label: "Image", icon: <ImageIcon size={16} /> },
 ]
 
 // Define the template type
@@ -154,13 +195,68 @@ function EditDashboardDemo() {
   const { data: session } = useSession()
   const userRole = session?.user?.role
   
-  const [widgets, setWidgets] = useState<ExtendedWidget[]>([])
-  const [layout, setLayout] = useState<Layout[]>([])
+  // Screen management state
+  const [screens, setScreens] = useState<Array<{
+    id: string
+    name: string
+    widgets: ExtendedWidget[]
+    layout: Layout[]
+    widgetSettings: Record<string, WidgetSettings>
+  }>>([{
+    id: 'screen-1',
+    name: 'Screen 1',
+    widgets: [],
+    layout: [],
+    widgetSettings: {}
+  }])
+  const [currentScreenIndex, setCurrentScreenIndex] = useState(0)
+  
+  // Current screen data (derived from screens array)
+  const currentScreen = screens[currentScreenIndex]
+  const widgets = currentScreen?.widgets || []
+  const layout = currentScreen?.layout || []
+  const widgetSettings = currentScreen?.widgetSettings || {}
+  
+  const setWidgets = (newWidgets: ExtendedWidget[] | ((prev: ExtendedWidget[]) => ExtendedWidget[])) => {
+    setScreens(prevScreens => {
+      const newScreens = [...prevScreens]
+      const newWidgetsArray = typeof newWidgets === 'function' ? newWidgets(newScreens[currentScreenIndex]?.widgets || []) : newWidgets
+      newScreens[currentScreenIndex] = {
+        ...newScreens[currentScreenIndex],
+        widgets: newWidgetsArray
+      }
+      return newScreens
+    })
+  }
+  
+  const setLayout = (newLayout: Layout[] | ((prev: Layout[]) => Layout[])) => {
+    setScreens(prevScreens => {
+      const newScreens = [...prevScreens]
+      const newLayoutArray = typeof newLayout === 'function' ? newLayout(newScreens[currentScreenIndex]?.layout || []) : newLayout
+      newScreens[currentScreenIndex] = {
+        ...newScreens[currentScreenIndex],
+        layout: newLayoutArray
+      }
+      return newScreens
+    })
+  }
+  
+  const setWidgetSettings = (newSettings: Record<string, WidgetSettings> | ((prev: Record<string, WidgetSettings>) => Record<string, WidgetSettings>)) => {
+    setScreens(prevScreens => {
+      const newScreens = [...prevScreens]
+      const newSettingsObj = typeof newSettings === 'function' ? newSettings(newScreens[currentScreenIndex]?.widgetSettings || {}) : newSettings
+      newScreens[currentScreenIndex] = {
+        ...newScreens[currentScreenIndex],
+        widgetSettings: newSettingsObj
+      }
+      return newScreens
+    })
+  }
+  
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>(null)
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false)
   const [categories, setCategories] = useState<TCategoriesWithNotices[]>([])
   const [activeSettingsWidget, setActiveSettingsWidget] = useState<string | null>(null)
-  const [widgetSettings, setWidgetSettings] = useState<Record<string, WidgetSettings>>({})
 
   // New state for draggable settings panel
   const [settingsPosition, setSettingsPosition] = useState({ x: 0, y: 0 })
@@ -214,16 +310,20 @@ function EditDashboardDemo() {
     
     if (savedState) {
       try {
-        const { selectedRatio: savedRatio, widgets: savedWidgets, layout: savedLayout } = savedState
+        const { selectedRatio: savedRatio, screens: savedScreens, currentScreenIndex: savedScreenIndex } = savedState
         
-        // Check if there was previous content (widgets or layout)
-        if (savedWidgets && savedWidgets.length > 0 || savedLayout && savedLayout.length > 0) {
+        // Check if there was previous content (screens with widgets)
+        if (savedScreens && savedScreens.length > 0 && savedScreens.some(screen => screen.widgets.length > 0)) {
           // Show confirmation dialog instead of clearing immediately
           setPendingSavedState(savedState)
           setShowConfirmationDialog(true)
         } else {
-          // No previous content, just load the ratio
+          // No previous content, just load the ratio and screens structure
           setSelectedRatio(savedRatio)
+          if (savedScreens) {
+            setScreens(savedScreens)
+            setCurrentScreenIndex(savedScreenIndex || 0)
+          }
           localStorageUtils.removeItem('dashboardState')
         }
       } catch (error) {
@@ -238,39 +338,79 @@ function EditDashboardDemo() {
     // Only run on client side
     if (typeof window === 'undefined') return
     
-    if (widgets.length > 0 || layout.length > 0) {
-      // Create a lightweight version of widgets without large file data
-      const lightweightWidgets = widgets.map(widget => ({
+    // Create a lightweight version of screens without large file data
+    const lightweightScreens = screens.map((screen: any) => ({
+      ...screen,
+      widgets: screen.widgets.map((widget: any) => ({
         ...widget,
-          // Don't include file, url (base64 data), or other large properties
+        // Don't include file, url (base64 data), or other large properties
       }))
-      
-      const stateToSave = {
-        widgets: lightweightWidgets,
-        layout,
-        selectedRatio,
-        widgetSettings
-      }
-      
-      const success = localStorageUtils.setItem('dashboardState', stateToSave)
-      if (!success) {
-        console.warn('Failed to save dashboard state to localStorage (quota exceeded or data too large)')
-      }
-    } else if (selectedRatio) {
-      // Only save the selected ratio if no widgets exist
-      const stateToSave = {
-        selectedRatio
-      }
-      const success = localStorageUtils.setItem('dashboardState', stateToSave)
-      if (!success) {
-        console.warn('Failed to save dashboard state to localStorage')
-      }
+    }))
+    
+    const stateToSave = {
+      screens: lightweightScreens,
+      currentScreenIndex,
+      selectedRatio
     }
-  }, [widgets, layout, selectedRatio, widgetSettings])
+    
+    const success = localStorageUtils.setItem('dashboardState', stateToSave)
+    if (!success) {
+      console.warn('Failed to save dashboard state to localStorage (quota exceeded or data too large)')
+    }
+  }, [screens, currentScreenIndex, selectedRatio])
+
+  // Debug useEffect to log state changes
+  useEffect(() => {
+    console.log("State updated:", {
+      screens: screens.length,
+      currentScreenIndex,
+      widgets: widgets.length,
+      layout: layout.length,
+      selectedRatio
+    })
+  }, [screens, currentScreenIndex, widgets.length, layout.length, selectedRatio])
 
   // Add function to clear saved state
   const clearSavedState = () => {
     localStorageUtils.removeItem('dashboardState')
+  }
+
+  // Screen management functions
+  const addScreen = () => {
+    const newScreenId = `screen-${screens.length + 1}`
+    const newScreen = {
+      id: newScreenId,
+      name: `Screen ${screens.length + 1}`,
+      widgets: [],
+      layout: [],
+      widgetSettings: {}
+    }
+    setScreens([...screens, newScreen])
+    setCurrentScreenIndex(screens.length) // Switch to the new screen
+  }
+
+  const removeScreen = (screenIndex: number) => {
+    if (screens.length <= 1) {
+      toast.error("Cannot remove the last screen")
+      return
+    }
+    
+    const newScreens = screens.filter((_, index) => index !== screenIndex)
+    setScreens(newScreens)
+    
+    // Adjust current screen index if needed
+    if (currentScreenIndex >= screenIndex) {
+      setCurrentScreenIndex(Math.max(0, currentScreenIndex - 1))
+    }
+  }
+
+  const renameScreen = (screenIndex: number, newName: string) => {
+    const newScreens = [...screens]
+    newScreens[screenIndex] = {
+      ...newScreens[screenIndex],
+      name: newName
+    }
+    setScreens(newScreens)
   }
 
   // Handle confirmation dialog actions
@@ -286,19 +426,26 @@ function EditDashboardDemo() {
 
   const handleCancelClear = () => {
     if (pendingSavedState) {
-      // Load the saved state (widgets will be lightweight version)
-      setWidgets(pendingSavedState.widgets || [])
-      setLayout(pendingSavedState.layout || [])
+      // Load the saved state (screens will be lightweight version)
+      setScreens(pendingSavedState.screens || [{
+        id: 'screen-1',
+        name: 'Screen 1',
+        widgets: [],
+        layout: [],
+        widgetSettings: {}
+      }])
+      setCurrentScreenIndex(pendingSavedState.currentScreenIndex || 0)
       setSelectedRatio(pendingSavedState.selectedRatio)
-      setWidgetSettings(pendingSavedState.widgetSettings || {})
       
       // Check if there are image widgets that need to be re-uploaded
-      const hasImageWidgets = pendingSavedState.widgets?.some((widget: any) => 
-        widget.type === 'notice' && widget.images?.length > 0
+      const hasImageWidgets = pendingSavedState.screens?.some((screen: any) => 
+        screen.widgets?.some((widget: any) => 
+          widget.type === 'notice' && widget.images?.length > 0
+        )
       )
       
       if (hasImageWidgets) {
-        toast.info("Dashboard restored! Note: Image widgets need to be re-uploaded due to storage limitations.")
+        toast.info("Dashboard restored! Note: Image displays need to be re-uploaded due to storage limitations.")
       } else {
         toast.success("Dashboard restored successfully!", { duration: 1500 })
       }
@@ -330,105 +477,218 @@ function EditDashboardDemo() {
       if (dashboardId) {
         try {
           setIsLoadingExistingDashboard(true)
-          const response = await fetch('/api/dashboard/get-by-id/' + dashboardId)
+          
+          // Get all screens for this dashboard
+          const response = await fetch('/api/dashboard/get-screens/' + dashboardId)
           const data = await response.json()
           
-          if (data.success && data.result) {
-            const dashboard = data.result
+          if (data.success && data.result && data.result.length > 0) {
+            const dashboards = data.result
             
-            // Set the aspect ratio
-            setSelectedRatio(dashboard.aspectRatio as AspectRatio)
+            // Set the aspect ratio from the first dashboard
+            setSelectedRatio(dashboards[0].aspectRatio as AspectRatio)
             
-            // Convert containers to widgets and layout
-            const newWidgets: ExtendedWidget[] = []
-            const newLayout: Layout[] = []
-            const newWidgetSettings: Record<string, WidgetSettings> = {}
-            
-            // First, collect all notice and image IDs from containers
-            const allNoticeIds: string[] = []
-            const allImageIds: string[] = []
-            
-            dashboard.containers.forEach((container: any) => {
-              if (container.type === "image" && container.imageIds) {
-                allImageIds.push(...container.imageIds)
-              } else if (container.noticeIds) {
-                allNoticeIds.push(...container.noticeIds)
-              }
-            })
-            
-            // Fetch all notices and images in parallel
-            const [noticesResponse, imagesResponse] = await Promise.all([
-              allNoticeIds.length > 0 ? fetch('/api/notice/get-all') : Promise.resolve(null),
-              allImageIds.length > 0 ? fetch('/api/image/get-all') : Promise.resolve(null)
-            ])
-            
-            const noticesData = noticesResponse ? await noticesResponse.json() : { success: false, result: [] }
-            const imagesData = imagesResponse ? await imagesResponse.json() : { success: false, result: [] }
-            
-            const allNotices = noticesData.success ? noticesData.result : []
-            const allImages = imagesData.success ? imagesData.result : []
-            
-            dashboard.containers.forEach((container: any, index: number) => {
-              const widgetId = container.id
+            // Create screens array from the dashboards
+            const newScreens = await Promise.all(dashboards.map(async (dashboard: any) => {
+              // Convert containers to widgets and layout
+              const newWidgets: ExtendedWidget[] = []
+              const newLayout: Layout[] = []
+              const newWidgetSettings: Record<string, WidgetSettings> = {}
               
-              // Get notices for this widget
-              const widgetNotices = container.noticeIds 
-                ? allNotices.filter((notice: any) => container.noticeIds.includes(notice.id))
-                : []
+              // First, collect all notice IDs from containers (both notice and image widgets use noticeIds)
+              const allNoticeIds: string[] = []
               
-              // Get images for this widget
-              const widgetImages = container.type === 'image' && container.imageIds
-                ? allImages.filter((image: any) => container.imageIds.includes(image.id))
-                : []
-              
-              // Create widget with actual content
-              const widget: ExtendedWidget = {
-                id: widgetId,
-                title: container.title || `Widget ${index + 1}`,
-                type: container.type || 'notice',
-                content: container.title,
-                category: container.category,
-                categoryId: container.categoryId,
-                notices: widgetNotices,
-                topNotices: widgetNotices.slice(0, container.settings?.noticeCount || 3),
-                images: container.type === 'image' ? widgetImages.map((img: any) => ({
-                  id: img.id,
-                  url: img.imageUrl,
-                  title: img.title,
-                  file: new File([], img.title), // Placeholder file object
-                  dbId: img.id
-                })) : undefined
-              }
-              
-              newWidgets.push(widget)
-              
-              // Create layout item
-              const layoutItem: Layout = {
-                i: widgetId,
-                x: container.x,
-                y: container.y,
-                w: container.w,
-                h: container.h
-              }
-              
-              newLayout.push(layoutItem)
-              
-              // Set widget settings
-              if (container.settings) {
-                newWidgetSettings[widgetId] = {
-                  ...DEFAULT_WIDGET_SETTINGS,
-                  ...container.settings
+              dashboard.containers.forEach((container: any) => {
+                if (container.noticeIds) {
+                  allNoticeIds.push(...container.noticeIds)
                 }
-              } else {
-                newWidgetSettings[widgetId] = { ...DEFAULT_WIDGET_SETTINGS }
+              })
+              
+              // Fetch all notices
+              const noticesResponse = allNoticeIds.length > 0 ? await fetch('/api/notice/get-all') : null
+              const noticesData = noticesResponse ? await noticesResponse.json() : { success: false, result: [] }
+              
+              const allNotices = noticesData.success ? noticesData.result : []
+              
+              dashboard.containers.forEach((container: any, index: number) => {
+                const widgetId = container.id
+                
+                // Get notices for this widget
+                const widgetNotices = container.noticeIds 
+                  ? allNotices.filter((notice: any) => container.noticeIds.includes(notice.id))
+                  : []
+                
+                // For image widgets, extract image data from notices
+                let widgetImages = undefined
+                if (container.type === 'image' && widgetNotices.length > 0) {
+                  widgetImages = widgetNotices.map((notice: any) => ({
+                    id: notice.id,
+                    url: reconstructImageUrl(notice),
+                    title: notice.title,
+                    file: new File([], notice.title), // Placeholder file object
+                    dbId: notice.id
+                  }))
+                }
+                
+                // Create widget with actual content
+                const widget: ExtendedWidget = {
+                  id: widgetId,
+                  title: container.title || `Widget ${index + 1}`,
+                  type: container.type || 'notice',
+                  content: container.title,
+                  category: container.category,
+                  categoryId: container.categoryId,
+                  notices: widgetNotices,
+                  topNotices: widgetNotices.slice(0, container.settings?.noticeCount || 3),
+                  images: widgetImages
+                }
+                
+                newWidgets.push(widget)
+                
+                // Create layout item
+                const layoutItem: Layout = {
+                  i: widgetId,
+                  x: container.x,
+                  y: container.y,
+                  w: container.w,
+                  h: container.h
+                }
+                
+                newLayout.push(layoutItem)
+                
+                // Set widget settings
+                if (container.settings) {
+                  newWidgetSettings[widgetId] = {
+                    ...DEFAULT_WIDGET_SETTINGS,
+                    ...container.settings
+                  }
+                } else {
+                  newWidgetSettings[widgetId] = { ...DEFAULT_WIDGET_SETTINGS }
+                }
+              })
+              
+              return {
+                id: dashboard.id,
+                name: dashboard.screenName || `Screen ${dashboard.screenIndex + 1}`,
+                widgets: newWidgets,
+                layout: newLayout,
+                widgetSettings: newWidgetSettings
               }
-            })
+            }))
             
-            setWidgets(newWidgets)
-            setLayout(newLayout)
-            setWidgetSettings(newWidgetSettings)
+            // Set the loaded screens
+            setScreens(newScreens)
+            setCurrentScreenIndex(0)
             
-            toast.success('Existing dashboard loaded successfully!', { duration: 1500 })
+            toast.success(`Dashboard loaded successfully! ${newScreens.length} screen${newScreens.length > 1 ? 's' : ''} found.`, { duration: 1500 })
+          } else {
+            // Fallback to single dashboard loading for backward compatibility
+            const singleResponse = await fetch('/api/dashboard/get-by-id/' + dashboardId)
+            const singleData = await singleResponse.json()
+            
+            if (singleData.success && singleData.result) {
+              const dashboard = singleData.result
+              
+              // Set the aspect ratio
+              setSelectedRatio(dashboard.aspectRatio as AspectRatio)
+              
+              // Convert containers to widgets and layout
+              const newWidgets: ExtendedWidget[] = []
+              const newLayout: Layout[] = []
+              const newWidgetSettings: Record<string, WidgetSettings> = {}
+              
+              // First, collect all notice IDs from containers (both notice and image widgets use noticeIds)
+              const allNoticeIds: string[] = []
+              
+              dashboard.containers.forEach((container: any) => {
+                if (container.noticeIds) {
+                  allNoticeIds.push(...container.noticeIds)
+                }
+              })
+              
+              // Fetch all notices
+              const noticesResponse = allNoticeIds.length > 0 ? await fetch('/api/notice/get-all') : null
+              const noticesData = noticesResponse ? await noticesResponse.json() : { success: false, result: [] }
+              
+              const allNotices = noticesData.success ? noticesData.result : []
+              
+              dashboard.containers.forEach((container: any, index: number) => {
+                const widgetId = container.id
+                
+                // Get notices for this widget
+                const widgetNotices = container.noticeIds 
+                  ? allNotices.filter((notice: any) => container.noticeIds.includes(notice.id))
+                  : []
+                
+                // For image widgets, extract image data from notices
+                let widgetImages = undefined
+                if (container.type === 'image' && widgetNotices.length > 0) {
+                  widgetImages = widgetNotices.map((notice: any) => ({
+                    id: notice.id,
+                    url: reconstructImageUrl(notice),
+                    title: notice.title,
+                    file: new File([], notice.title), // Placeholder file object
+                    dbId: notice.id
+                  }))
+                }
+                
+                // Create widget with actual content
+                const widget: ExtendedWidget = {
+                  id: widgetId,
+                  title: container.title || `Widget ${index + 1}`,
+                  type: container.type || 'notice',
+                  content: container.title,
+                  category: container.category,
+                  categoryId: container.categoryId,
+                  notices: widgetNotices,
+                  topNotices: widgetNotices.slice(0, container.settings?.noticeCount || 3),
+                  images: widgetImages
+                }
+                
+                newWidgets.push(widget)
+                
+                // Create layout item
+                const layoutItem: Layout = {
+                  i: widgetId,
+                  x: container.x,
+                  y: container.y,
+                  w: container.w,
+                  h: container.h
+                }
+                
+                newLayout.push(layoutItem)
+                
+                // Set widget settings
+                if (container.settings) {
+                  newWidgetSettings[widgetId] = {
+                    ...DEFAULT_WIDGET_SETTINGS,
+                    ...container.settings
+                  }
+                } else {
+                  newWidgetSettings[widgetId] = { ...DEFAULT_WIDGET_SETTINGS }
+                }
+              })
+              
+              // Create a single screen for backward compatibility
+              const singleScreen = {
+                id: dashboard.id,
+                name: 'Screen 1',
+                widgets: newWidgets,
+                layout: newLayout,
+                widgetSettings: newWidgetSettings
+              }
+              
+              setScreens([singleScreen])
+              setCurrentScreenIndex(0)
+              
+              toast.success('Existing dashboard loaded successfully!', { duration: 1500 })
+            } else {
+              toast.error('Failed to load existing dashboard')
+              // Redirect back to view page if dashboard not found
+              setTimeout(() => {
+                window.location.href = `/dashboard/view-dashboard/${dashboardId}`
+              }, 2000)
+            }
           }
         } catch (error) {
           console.error('Error loading existing dashboard:', error)
@@ -611,9 +871,12 @@ function EditDashboardDemo() {
     if (!selectedRatio) return
 
     const newWidgetId = `widget-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    const widgetTitle = type === "image" ? "Image Display" : 
+                       `Notice Widget ${widgets.length + 1}`
+    
     const newWidget: ExtendedWidget = {
       id: newWidgetId,
-      title: `Widget ${widgets.length + 1}`,
+      title: widgetTitle,
       type: type,
     }
 
@@ -631,26 +894,24 @@ function EditDashboardDemo() {
       [newWidgetId]: { ...DEFAULT_WIDGET_SETTINGS },
     }))
 
-    setWidgets([...widgets, newWidget])
-    setLayout([...layout, newLayout])
+    console.log("Adding widget:", newWidget, "Layout:", newLayout, "Current widgets:", widgets.length)
+    setWidgets(prev => [...prev, newWidget])
+    setLayout(prev => [...prev, newLayout])
 
-            toast.success("Widget added successfully!", { duration: 1200 })
+    toast.success("Widget added successfully!", { duration: 1200 })
   }
 
   const removeWidget = (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     e.stopPropagation()
 
-    const updatedWidgets = widgets.filter((widget) => widget.id !== id)
-    const updatedLayout = layout.filter((item) => item.i !== id)
-
-    // Also remove settings for this widget
-    const updatedSettings = { ...widgetSettings }
-    delete updatedSettings[id]
-
-    setWidgets(updatedWidgets)
-    setLayout(updatedLayout)
-    setWidgetSettings(updatedSettings)
+    setWidgets(prev => prev.filter((widget) => widget.id !== id))
+    setLayout(prev => prev.filter((item) => item.i !== id))
+    setWidgetSettings(prev => {
+      const updatedSettings = { ...prev }
+      delete updatedSettings[id]
+      return updatedSettings
+    })
     setActiveSettingsWidget(null)
 
             toast.success("Widget removed", { duration: 1200 })
@@ -661,28 +922,31 @@ function EditDashboardDemo() {
     setIsRatioDropdownOpen(false)
     
     // Instead of clearing everything, adjust the layout to fit the new ratio
-    if (layout.length > 0) {
-      const newLayout = layout.map(item => {
-        // Keep the same relative position but ensure it fits within the new dimensions
-        const newX = Math.min(item.x, 11) // Ensure x doesn't exceed 11 (12 columns - 1)
-        const newY = Math.min(item.y, 11) // Ensure y doesn't exceed 11
-        const newW = Math.min(item.w, 12 - newX) // Ensure width fits within remaining space
-        const newH = Math.min(item.h, 12 - newY) // Ensure height fits within remaining space
+    setLayout(prev => {
+      if (prev.length > 0) {
+        const newLayout = prev.map(item => {
+          // Keep the same relative position but ensure it fits within the new dimensions
+          const newX = Math.min(item.x, 11) // Ensure x doesn't exceed 11 (12 columns - 1)
+          const newY = Math.min(item.y, 11) // Ensure y doesn't exceed 11
+          const newW = Math.min(item.w, 12 - newX) // Ensure width fits within remaining space
+          const newH = Math.min(item.h, 12 - newY) // Ensure height fits within remaining space
+          
+          return {
+            ...item,
+            x: newX,
+            y: newY,
+            w: newW,
+            h: newH
+          }
+        })
         
-        return {
-          ...item,
-          x: newX,
-          y: newY,
-          w: newW,
-          h: newH
-        }
-      })
-      
-      setLayout(newLayout)
-      toast(`Display ratio adjusted to ${ratio} while preserving widgets`)
-    } else {
-      toast(`Display ratio set to ${ratio}`)
-    }
+        toast(`Display ratio adjusted to ${ratio} while preserving widgets`)
+        return newLayout
+      } else {
+        toast(`Display ratio set to ${ratio}`)
+        return prev
+      }
+    })
   }
 
   const handleDragStart2 = (e: React.DragEvent, category: TCategoriesWithNotices) => {
@@ -752,7 +1016,7 @@ function EditDashboardDemo() {
     const categoryId = e.dataTransfer.getData("categoryId")
     const categoryName = e.dataTransfer.getData("categoryName")
     
-    console.log("Drop event - categoryId:", categoryId, "categoryName:", categoryName, "widgetId:", widgetId)
+    console.log("Drop event - categoryId:", categoryId, "categoryName:", categoryName, "widgetId:", widgetId, "Current widgets:", widgets.length)
 
     const category = categories.find((cat) => cat.id === categoryId)
     if (!category) {
@@ -768,8 +1032,8 @@ function EditDashboardDemo() {
       // Limit the number of notices to prevent overflow
       const topNotices = [...category.notices].slice(0, noticeCount)
 
-      setWidgets(
-        widgets.map((widget) =>
+      setWidgets(prev =>
+        prev.map((widget) =>
           widget.id === widgetId
             ? {
                 ...widget,
@@ -853,10 +1117,11 @@ function EditDashboardDemo() {
       [newWidgetId]: { ...DEFAULT_WIDGET_SETTINGS },
     }))
 
-    setWidgets([...widgets, newWidget])
-    setLayout([...layout, newLayout])
+    console.log("Creating widget from category:", newWidget, "Layout:", newLayout, "Current widgets:", widgets.length)
+    setWidgets(prev => [...prev, newWidget])
+    setLayout(prev => [...prev, newLayout])
 
-            toast.success(`Created new widget with ${category.name} category!`, { duration: 1200 })
+    toast.success(`Created new widget with ${category.name} category!`, { duration: 1200 })
   }
 
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
@@ -865,7 +1130,7 @@ function EditDashboardDemo() {
     const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
     const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
 
-    const colWidth = (containerWidth - 11 * 12 * 2) / 12 // Updated for 12 columns
+    const colWidth = (containerWidth - 11 * 24) / 12 // Fixed: 11 gaps between 12 columns, each gap is 24px
     const rowHeight = 50 // Match the new rowHeight
 
     const widgetWidth = ((widgetLayout.w * colWidth + (widgetLayout.w - 1) * 24) / containerWidth) * 100
@@ -878,123 +1143,264 @@ function EditDashboardDemo() {
   }
 
   const handleSave = async () => {
-    const positions = calculatePercentagePositions()
     const urlParams = new URLSearchParams(window.location.search)
     const dashboardId = urlParams.get('id')
     
-    const dashboard = {
-      aspectRatio: selectedRatio,
-      containers: [...positions],
-    }
-
     try {
-      let result
       if (dashboardId) {
-        // Update existing dashboard
-        result = await fetch(`/api/dashboard/update/${dashboardId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(dashboard)
-        })
-        const data = await result.json()
-        if (data.success) {
-          clearSavedState() // Clear saved state after successful save
-          toast.success("Dashboard Updated Successfully!", { duration: 1500 })
-        } else {
-          toast.error("Failed to update dashboard!", { duration: 2000 })
-        }
-      } else {
-        // Create new dashboard
-        result = await createDashboard(dashboard)
-      if (result.success) {
-        clearSavedState() // Clear saved state after successful save
-        toast.success("Dashboard Created Successfully!", { duration: 1500 })
-      } else {
-        toast.error("Something went wrong!")
+        // Update existing dashboards - delete old ones and create new ones
+        // First, delete existing dashboards for this ID
+        try {
+          const deleteResponse = await fetch(`/api/dashboard/delete/${dashboardId}`, {
+            method: 'DELETE',
+          })
+          const deleteResult = await deleteResponse.json()
+          console.log("Delete result:", deleteResult)
+          
+          if (!deleteResult.success) {
+            console.warn("Failed to delete existing dashboard:", deleteResult.error)
+            // Continue with creation even if delete fails
+          }
+        } catch (error) {
+          console.warn("Error deleting existing dashboard:", error)
+          // Continue with creation even if delete fails
         }
       }
+
+      // Create a separate dashboard record for each screen
+      const dashboardResults = []
+      
+      for (let screenIndex = 0; screenIndex < screens.length; screenIndex++) {
+        const screen = screens[screenIndex]
+        
+        // Calculate positions for this screen
+        const positions = await Promise.all(screen.widgets.map(async (widget) => {
+          const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
+          if (!specificLayout) return null
+
+          const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32
+          const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height
+
+          const colWidth = (containerWidth - 11 * 24) / 12
+          const rowHeight = 50
+
+          const leftPx = specificLayout.x * (colWidth + 24)
+          const topPx = specificLayout.y * (rowHeight + 24)
+
+          const leftPercent = (leftPx / containerWidth) * 100
+          const topPercent = (topPx / containerHeight) * 100
+
+          const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
+          const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
+
+          const settings = screen.widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
+
+          // Handle different widget types
+          if (widget.type === "image" && widget.images && widget.images.length > 0) {
+            // For image displays, create notices for each image and collect their IDs
+            const imageNoticeIds = []
+            
+            // Use a default category for image displays (first available category or create a generic one)
+            let imageCategoryId = ""
+            try {
+              const categories = await getCategories()
+              if (categories.result && categories.result.length > 0) {
+                // Use the first available category
+                imageCategoryId = categories.result[0].id
+              } else {
+                // Create a default category if none exist
+                const createCategoryResult = await createCategory({ name: "General" })
+                if (createCategoryResult.success) {
+                  const newCategories = await getCategories()
+                  if (newCategories.result && newCategories.result.length > 0) {
+                    imageCategoryId = newCategories.result[0].id
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("Error handling image display category:", error)
+            }
+            
+            for (const image of widget.images) {
+              try {
+                // Create a notice for this image
+                const noticeData = {
+                  title: image.title || "Image Notice",
+                  content: `Image: ${image.title}`,
+                  category: "Image", // Use generic category name
+                  categoryId: imageCategoryId,
+                  imageUrl: image.url, // Store the full data URL for display
+                  imageFileName: image.title,
+                  imageData: image.url.split(',')[1], // Store only the base64 data without the prefix
+                }
+                
+                // Create the notice using the server action directly
+                const noticeResult = await createNotice(noticeData)
+                
+                if (noticeResult.success) {
+                  imageNoticeIds.push(noticeResult.message.id)
+                  console.log(`Created notice for image: ${image.title} with ID: ${noticeResult.message.id}`)
+                } else {
+                  console.error(`Failed to create notice for image: ${image.title}`, noticeResult)
+                }
+              } catch (error) {
+                console.error(`Error creating notice for image: ${image.title}`, error)
+              }
+            }
+            
+            return {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title || "Image Display",
+              category: "Image", // Use generic category name
+              type: "image",
+              noticeIds: imageNoticeIds, // Use the created notice IDs
+              settings: {
+                backgroundColor: settings.backgroundColor,
+                backgroundOpacity: settings.backgroundOpacity,
+                cardOpacity: settings.cardOpacity,
+                borderColor: settings.borderColor,
+                borderWidth: settings.borderWidth,
+                fontColor: settings.fontColor,
+                noticeCount: settings.noticeCount,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                fontWeight: settings.fontWeight,
+                autoScroll: settings.autoScroll,
+                showFullContent: settings.showFullContent,
+                categoryFont: settings.categoryFont,
+                categoryFontSize: settings.categoryFontSize,
+                categoryFontWeight: settings.categoryFontWeight,
+                categoryFontColor: settings.categoryFontColor,
+                categoryBackgroundColor: settings.categoryBackgroundColor,
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
+                // Add image-specific settings
+                imageFit: settings.imageFit,
+                imageBorderRadius: settings.imageBorderRadius,
+                showImageTitle: settings.showImageTitle,
+                imageTitleColor: settings.imageTitleColor,
+                imageTitleFontSize: settings.imageTitleFontSize,
+                imageTitleFontWeight: settings.imageTitleFontWeight,
+                imageOverlay: settings.imageOverlay,
+                imageOverlayOpacity: settings.imageOverlayOpacity,
+                imageShadow: settings.imageShadow,
+                imageShadowColor: settings.imageShadowColor,
+                imageShadowBlur: settings.imageShadowBlur,
+                imageShadowOffset: settings.imageShadowOffset,
+                imageZoom: settings.imageZoom,
+                imageRotation: settings.imageRotation,
+                imageBrightness: settings.imageBrightness,
+                imageContrast: settings.imageContrast,
+                imageSaturation: settings.imageSaturation,
+                imageBlur: settings.imageBlur,
+                imageGrayscale: settings.imageGrayscale,
+                imageSepia: settings.imageSepia,
+                imageInvert: settings.imageInvert,
+              },
+            }
+          } else {
+            // For notice widgets, use existing logic
+            const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
+
+            return {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title,
+              category: widget.category,
+              type: "notice",
+              noticeIds: noticeIds,
+              settings: {
+                backgroundColor: settings.backgroundColor,
+                backgroundOpacity: settings.backgroundOpacity,
+                cardOpacity: settings.cardOpacity,
+                borderColor: settings.borderColor,
+                borderWidth: settings.borderWidth,
+                fontColor: settings.fontColor,
+                noticeCount: settings.noticeCount,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                fontWeight: settings.fontWeight,
+                autoScroll: settings.autoScroll,
+                showFullContent: settings.showFullContent,
+                categoryFont: settings.categoryFont,
+                categoryFontSize: settings.categoryFontSize,
+                categoryFontWeight: settings.categoryFontWeight,
+                categoryFontColor: settings.categoryFontColor,
+                categoryBackgroundColor: settings.categoryBackgroundColor,
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
+              },
+            }
+          }
+        }))
+
+        // Filter out null positions
+        const validPositions = positions.filter(Boolean)
+
+        // Create dashboard data for this screen
+        const dashboardData = {
+          aspectRatio: selectedRatio,
+          containers: validPositions,
+          screenName: screen.name,
+          screenIndex: screenIndex,
+          totalScreens: screens.length
+        }
+
+        // Create the dashboard record
+        console.log("Saving dashboard data:", dashboardData)
+        const result = await createDashboard(dashboardData)
+        console.log("Save result:", result)
+        dashboardResults.push(result)
+        
+        if (!result.success) {
+          console.error("Failed to save screen:", result.result)
+          toast.error(`Failed to save screen ${screenIndex + 1}: ${screen.name} - ${result.result}`)
+          return
+        }
+      }
+
+      // Check if all screens were saved successfully
+      const allSuccessful = dashboardResults.every(result => result.success)
+      
+      if (allSuccessful) {
+        clearSavedState() // Clear saved state after successful save
+        toast.success(`Dashboard saved successfully! ${screens.length} screen${screens.length > 1 ? 's' : ''} created.`, { duration: 2000 })
+        console.log("All screens saved successfully:", dashboardResults)
+      } else {
+        toast.error("Some screens failed to save!")
+        console.error("Some screens failed to save:", dashboardResults)
+      }
+      
     } catch (error) {
-      toast.error(`${error}`)
+      console.error("Error saving dashboard:", error)
+      toast.error(`Error saving dashboard: ${error}`)
     }
   }
 
-  const calculatePercentagePositions = () => {
-    const containers = widgets
-      .map((widget) => {
-        const specificLayout = layout.filter((item) => widget.id === item.i)[0]
-        if (!specificLayout) return null
 
-        const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32
-        const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height
-
-        const colWidth = (containerWidth - 11 * 12 * 2) / 12 // Updated for 12 columns
-        const rowHeight = 50 // Match the new rowHeight
-
-        const leftPx = specificLayout.x * (colWidth + 24)
-        const topPx = specificLayout.y * (rowHeight + 24)
-
-        const leftPercent = (leftPx / containerWidth) * 100
-        const topPercent = (topPx / containerHeight) * 100
-
-        const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
-        const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
-
-        // Get complete widget settings or use defaults
-        const settings = widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
-
-          // For notice widgets, include notice data
-        const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
-
-        return {
-          id: specificLayout.i,
-          x: specificLayout.x,
-          y: specificLayout.y,
-          w: specificLayout.w,
-          h: specificLayout.h,
-          leftPx: `${leftPx.toFixed(1)}px`,
-          topPx: `${topPx.toFixed(1)}px`,
-          leftPercent: `${leftPercent.toFixed(2)}%`,
-          topPercent: `${topPercent.toFixed(2)}%`,
-          width: `${widgetWidth.toFixed(2)}%`,
-          height: `${widgetHeight.toFixed(2)}%`,
-          title: widget.content || widget.title,
-          category: widget.category,
-            type: "notice",
-          noticeIds: noticeIds,
-          settings: {
-            // Include all settings properties explicitly to ensure nothing is missed
-            backgroundColor: settings.backgroundColor,
-            backgroundOpacity: settings.backgroundOpacity,
-            cardOpacity: settings.cardOpacity,
-            borderColor: settings.borderColor,
-            borderWidth: settings.borderWidth,
-            fontColor: settings.fontColor,
-            noticeCount: settings.noticeCount,
-            fontFamily: settings.fontFamily,
-            fontSize: settings.fontSize,
-            fontWeight: settings.fontWeight,
-            autoScroll: settings.autoScroll,
-            showFullContent: settings.showFullContent,
-            // New category styling properties
-            categoryFont: settings.categoryFont,
-            categoryFontSize: settings.categoryFontSize,
-            categoryFontWeight: settings.categoryFontWeight,
-            categoryFontColor: settings.categoryFontColor,
-            categoryBackgroundColor: settings.categoryBackgroundColor,
-            categoryHeight: settings.categoryHeight,
-            categoryBorderColor: settings.categoryBorderColor,
-            categoryBorderWidth: settings.categoryBorderWidth,
-            // Custom category name
-            customCategoryName: settings.customCategoryName,
-          },
-        }
-      })
-      .filter(Boolean)
-
-    return containers
-  }
 
   const toggleWidgetSettings = (widgetId: string) => {
     if (activeSettingsWidget === widgetId) {
@@ -1015,20 +1421,21 @@ function EditDashboardDemo() {
 
     // If this is a notice count change and the widget has a category, update topNotices
     if (setting === "noticeCount") {
-      const widget = widgets.find((w) => w.id === widgetId)
-      if (widget && widget.notices) {
-        const topNotices = [...widget.notices].slice(0, value)
-        setWidgets(
-          widgets.map((w) =>
+      setWidgets(prev => {
+        const widget = prev.find((w) => w.id === widgetId)
+        if (widget && widget.notices) {
+          const topNotices = [...widget.notices].slice(0, value)
+          return prev.map((w) =>
             w.id === widgetId
               ? {
                   ...w,
                   topNotices: topNotices,
                 }
               : w,
-          ),
-        )
-      }
+          )
+        }
+        return prev
+      })
     }
   }
 
@@ -1174,6 +1581,69 @@ function EditDashboardDemo() {
     }
   }
 
+  // Enhanced image upload for image displays with professional features
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, widgetId: string) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Enhanced file validation
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file (JPG, PNG, GIF, WebP)')
+      return
+    }
+
+    // File size validation (10MB limit)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      toast.error('Image file size must be less than 10MB')
+      return
+    }
+
+    // Show loading toast
+    const loadingToast = toast.loading('Processing image...')
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      // Create image element to get dimensions
+      const img = new Image()
+      img.onload = () => {
+      const imageData = {
+        id: `img-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        url: event.target?.result as string,
+        title: file.name,
+        file: file,
+          width: img.width,
+          height: img.height,
+          size: file.size,
+          type: file.type,
+      }
+
+      setWidgets(prev => prev.map(widget => 
+        widget.id === widgetId 
+          ? { ...widget, images: [imageData] }
+          : widget
+      ))
+
+        toast.dismiss(loadingToast)
+        toast.success(`Image uploaded successfully! (${img.width}×${img.height})`, {
+          description: `${(file.size / 1024 / 1024).toFixed(1)}MB`
+        })
+      }
+      img.onerror = () => {
+        toast.dismiss(loadingToast)
+        toast.error('Failed to process image. Please try again.')
+      }
+      img.src = event.target?.result as string
+    }
+    reader.onerror = () => {
+      toast.dismiss(loadingToast)
+      toast.error('Failed to read image file. Please try again.')
+    }
+    reader.readAsDataURL(file)
+  }
+
+
+
   useEffect(() => {
     const autoScrollWidgets = widgets.filter((widget) => widgetSettings[widget.id]?.autoScroll)
 
@@ -1288,10 +1758,17 @@ function EditDashboardDemo() {
       }
     })
 
-    setWidgets(newWidgets)
-    setLayout(template.layout)
-    setWidgetSettings(newWidgetSettings)
-    toast.success(`Applied "${template.name}" template while preserving all categories and content!`, { duration: 1500 })
+    // Update the current screen with the new template data
+    const newScreens = [...screens]
+    newScreens[currentScreenIndex] = {
+      ...newScreens[currentScreenIndex],
+      widgets: newWidgets,
+      layout: template.layout,
+      widgetSettings: newWidgetSettings
+    }
+    setScreens(newScreens)
+    
+    toast.success(`Applied "${template.name}" template to current screen while preserving all categories and content!`, { duration: 1500 })
   }
 
   const createDashboardFromTemplate = async (template: DashboardTemplate) => {
@@ -1300,30 +1777,251 @@ function EditDashboardDemo() {
       return
     }
 
-    // Apply template without preserving notices
-    setWidgets(template.widgets)
-    setLayout(template.layout)
-    setWidgetSettings(template.widgetSettings)
+    // Apply template without preserving notices to the current screen
+    const newScreens = [...screens]
+    newScreens[currentScreenIndex] = {
+      ...newScreens[currentScreenIndex],
+      widgets: template.widgets,
+      layout: template.layout,
+      widgetSettings: template.widgetSettings
+    }
+    setScreens(newScreens)
 
     // Wait a moment for the state to update
     setTimeout(async () => {
       try {
-        const positions = calculatePercentagePositions()
-        const dashboard = {
-          aspectRatio: selectedRatio,
-          containers: [...positions],
-          templateId: template.id,
-          templateName: template.name,
+        // Create a separate dashboard record for each screen
+        const dashboardResults = []
+        
+        // Use the updated screens state
+        const updatedScreens = newScreens
+        
+        for (let screenIndex = 0; screenIndex < updatedScreens.length; screenIndex++) {
+          const screen = updatedScreens[screenIndex]
+          
+          // Calculate positions for this screen
+          const positions = await Promise.all(screen.widgets.map(async (widget) => {
+            const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
+            if (!specificLayout) return null
+
+            const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32
+            const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height
+
+            const colWidth = (containerWidth - 11 * 24) / 12
+            const rowHeight = 50
+
+            const leftPx = specificLayout.x * (colWidth + 24)
+            const topPx = specificLayout.y * (rowHeight + 24)
+
+            const leftPercent = (leftPx / containerWidth) * 100
+            const topPercent = (topPx / containerHeight) * 100
+
+            const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
+            const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
+
+            const settings = screen.widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
+
+            // Handle different widget types
+            if (widget.type === "image" && widget.images && widget.images.length > 0) {
+              // For image displays, create notices for each image and collect their IDs
+              const imageNoticeIds = []
+              
+              // Use a default category for image displays (first available category or create a generic one)
+              let imageCategoryId = ""
+              try {
+                const categories = await getCategories()
+                if (categories.result && categories.result.length > 0) {
+                  // Use the first available category
+                  imageCategoryId = categories.result[0].id
+                } else {
+                  // Create a default category if none exist
+                  const createCategoryResult = await createCategory({ name: "General" })
+                  if (createCategoryResult.success) {
+                    const newCategories = await getCategories()
+                    if (newCategories.result && newCategories.result.length > 0) {
+                      imageCategoryId = newCategories.result[0].id
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error("Error handling image display category:", error)
+              }
+              
+              for (const image of widget.images) {
+                try {
+                                  // Create a notice for this image
+                const noticeData = {
+                  title: image.title || "Image Title",
+                  content: `Image: ${image.title}`,
+                  category: "Image", // Use generic category name
+                  categoryId: imageCategoryId,
+                  imageUrl: image.url, // Store the full data URL for display
+                  imageFileName: image.title,
+                  imageData: image.url.split(',')[1], // Store only the base64 data without the prefix
+                }
+                  
+                  // Create the notice using the server action directly
+                  const noticeResult = await createNotice(noticeData)
+                  
+                  if (noticeResult.success) {
+                    imageNoticeIds.push(noticeResult.message.id)
+                    console.log(`Created notice for image: ${image.title} with ID: ${noticeResult.message.id}`)
+                  } else {
+                    console.error(`Failed to create notice for image: ${image.title}`, noticeResult)
+                  }
+                } catch (error) {
+                  console.error(`Error creating notice for image: ${image.title}`, error)
+                }
+              }
+              
+              return {
+                id: specificLayout.i,
+                x: specificLayout.x,
+                y: specificLayout.y,
+                w: specificLayout.w,
+                h: specificLayout.h,
+                leftPx: `${leftPx.toFixed(1)}px`,
+                topPx: `${topPx.toFixed(1)}px`,
+                leftPercent: `${leftPercent.toFixed(2)}%`,
+                topPercent: `${topPercent.toFixed(2)}%`,
+                width: `${widgetWidth.toFixed(2)}%`,
+                height: `${widgetHeight.toFixed(2)}%`,
+                title: widget.content || widget.title || "Image Display",
+                category: "Image", // Use generic category name
+                type: "image",
+                noticeIds: imageNoticeIds, // Use the created notice IDs
+                settings: {
+                  backgroundColor: settings.backgroundColor,
+                  backgroundOpacity: settings.backgroundOpacity,
+                  cardOpacity: settings.cardOpacity,
+                  borderColor: settings.borderColor,
+                  borderWidth: settings.borderWidth,
+                  fontColor: settings.fontColor,
+                  noticeCount: settings.noticeCount,
+                  fontFamily: settings.fontFamily,
+                  fontSize: settings.fontSize,
+                  fontWeight: settings.fontWeight,
+                  autoScroll: settings.autoScroll,
+                  showFullContent: settings.showFullContent,
+                  categoryFont: settings.categoryFont,
+                  categoryFontSize: settings.categoryFontSize,
+                  categoryFontWeight: settings.categoryFontWeight,
+                  categoryFontColor: settings.categoryFontColor,
+                  categoryBackgroundColor: settings.categoryBackgroundColor,
+                  categoryHeight: settings.categoryHeight,
+                  categoryBorderColor: settings.categoryBorderColor,
+                  categoryBorderWidth: settings.categoryBorderWidth,
+                  customCategoryName: settings.customCategoryName,
+                  // Add image-specific settings
+                  imageFit: settings.imageFit,
+                  imageBorderRadius: settings.imageBorderRadius,
+                  showImageTitle: settings.showImageTitle,
+                  imageTitleColor: settings.imageTitleColor,
+                  imageTitleFontSize: settings.imageTitleFontSize,
+                  imageTitleFontWeight: settings.imageTitleFontWeight,
+                  imageOverlay: settings.imageOverlay,
+                  imageOverlayOpacity: settings.imageOverlayOpacity,
+                  imageShadow: settings.imageShadow,
+                  imageShadowColor: settings.imageShadowColor,
+                  imageShadowBlur: settings.imageShadowBlur,
+                  imageShadowOffset: settings.imageShadowOffset,
+                  imageZoom: settings.imageZoom,
+                  imageRotation: settings.imageRotation,
+                  imageBrightness: settings.imageBrightness,
+                  imageContrast: settings.imageContrast,
+                  imageSaturation: settings.imageSaturation,
+                  imageBlur: settings.imageBlur,
+                  imageGrayscale: settings.imageGrayscale,
+                  imageSepia: settings.imageSepia,
+                  imageInvert: settings.imageInvert,
+                },
+              }
+            } else {
+              // For notice widgets, use existing logic
+              const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
+
+              return {
+                id: specificLayout.i,
+                x: specificLayout.x,
+                y: specificLayout.y,
+                w: specificLayout.w,
+                h: specificLayout.h,
+                leftPx: `${leftPx.toFixed(1)}px`,
+                topPx: `${topPx.toFixed(1)}px`,
+                leftPercent: `${leftPercent.toFixed(2)}%`,
+                topPercent: `${topPercent.toFixed(2)}%`,
+                width: `${widgetWidth.toFixed(2)}%`,
+                height: `${widgetHeight.toFixed(2)}%`,
+                title: widget.content || widget.title,
+                category: widget.category,
+                type: "notice",
+                noticeIds: noticeIds,
+                settings: {
+                  backgroundColor: settings.backgroundColor,
+                  backgroundOpacity: settings.backgroundOpacity,
+                  cardOpacity: settings.cardOpacity,
+                  borderColor: settings.borderColor,
+                  borderWidth: settings.borderWidth,
+                  fontColor: settings.fontColor,
+                  noticeCount: settings.noticeCount,
+                  fontFamily: settings.fontFamily,
+                  fontSize: settings.fontSize,
+                  fontWeight: settings.fontWeight,
+                  autoScroll: settings.autoScroll,
+                  showFullContent: settings.showFullContent,
+                  categoryFont: settings.categoryFont,
+                  categoryFontSize: settings.categoryFontSize,
+                  categoryFontWeight: settings.categoryFontWeight,
+                  categoryFontColor: settings.categoryFontColor,
+                  categoryBackgroundColor: settings.categoryBackgroundColor,
+                  categoryHeight: settings.categoryHeight,
+                  categoryBorderColor: settings.categoryBorderColor,
+                  categoryBorderWidth: settings.categoryBorderWidth,
+                  customCategoryName: settings.customCategoryName,
+                },
+              }
+            }
+          }))
+
+          // Filter out null positions
+          const validPositions = positions.filter(Boolean)
+
+          // Create dashboard data for this screen
+          const dashboardData = {
+            aspectRatio: selectedRatio,
+            containers: validPositions,
+            screenName: screen.name,
+            screenIndex: screenIndex,
+            totalScreens: updatedScreens.length
+          }
+
+          // Create the dashboard record
+          console.log("Saving dashboard data from template:", dashboardData)
+          const result = await createDashboard(dashboardData)
+          console.log("Save result from template:", result)
+          dashboardResults.push(result)
+          
+          if (!result.success) {
+            console.error("Failed to save screen from template:", result.result)
+            toast.error(`Failed to save screen ${screenIndex + 1}: ${screen.name} - ${result.result}`)
+            return
+          }
         }
 
-        const result = await createDashboard(dashboard)
-        if (result.success) {
-          toast.success(`Dashboard Created from "${template.name}" Template!`, { duration: 1500 })
+        // Check if all screens were saved successfully
+        const allSuccessful = dashboardResults.every(result => result.success)
+        
+        if (allSuccessful) {
+          toast.success(`Dashboard created from "${template.name}" template! ${updatedScreens.length} screen${updatedScreens.length > 1 ? 's' : ''} created.`, { duration: 2000 })
+          console.log("All screens created from template successfully:", dashboardResults)
         } else {
-          toast.error("Something went wrong!")
+          toast.error("Some screens failed to save!")
+          console.error("Some screens failed to save from template:", dashboardResults)
         }
+        
       } catch (error) {
-        toast.error(`${error}`)
+        console.error("Error creating dashboard from template:", error)
+        toast.error(`Error creating dashboard: ${error}`)
       }
     }, 500)
   }
@@ -1339,7 +2037,7 @@ function EditDashboardDemo() {
   const [templateDescription, setTemplateDescription] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState("all")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list")
+  
   
   // Enhanced template management state
   const [showViewAllModal, setShowViewAllModal] = useState(false)
@@ -1409,6 +2107,9 @@ function EditDashboardDemo() {
           </div>
         </div>
       )}
+
+
+
       <div className="mb-6 flex flex-wrap gap-4 ml-4">
         {isEditing && (
           <Link href={`/dashboard/view-dashboard/${new URLSearchParams(window.location.search).get('id')}`}>
@@ -1421,20 +2122,21 @@ function EditDashboardDemo() {
         <div className="relative">
           <button
             onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center gap-2 transition-all shadow hover:shadow-md"
+            className="bg-slate-700 text-white px-4 py-2.5 rounded-lg hover:bg-slate-800 flex items-center gap-2 transition-all shadow-sm hover:shadow-md border border-slate-600"
           >
-            <span className="flex items-center gap-2">
-              Select Display {selectedRatio ? `(${selectedRatio})` : ""}
-              <ChevronDown size={16} />
+            <span className="flex items-center gap-2 font-medium">
+              <LayoutIcon size={16} />
+              Display: {selectedRatio ? selectedRatio : "Select"}
+              <ChevronDown size={14} />
             </span>
           </button>
           {isRatioDropdownOpen && (
-            <div className="absolute top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-              {(["4:3", "16:9", "16:10", "21:9"] as AspectRatio[]).map((ratio) => (
+            <div className="absolute top-full mt-2 bg-white rounded-lg shadow-xl border border-slate-200 z-10 min-w-[120px]">
+              {(["4:3", "16:9", "16:10"] as AspectRatio[]).map((ratio) => (
                 <button
                   key={ratio}
                   onClick={() => handleRatioSelect(ratio)}
-                  className="block w-full text-left px-4 py-2 hover:bg-indigo-50 transition-colors"
+                  className="block w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700 first:rounded-t-lg last:rounded-b-lg"
                 >
                   {ratio}
                 </button>
@@ -1442,17 +2144,31 @@ function EditDashboardDemo() {
             </div>
           )}
         </div>
-        <div className="relative">
-        <button
+        <div className="flex items-center gap-3">
+          <button
             onClick={() => addWidget("notice")}
-          disabled={!selectedRatio}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ${
-            selectedRatio ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-          }`}
-        >
-            <Plus size={20} /> Create Notice Widget
-        </button>
+            disabled={!selectedRatio}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md font-medium ${
+              selectedRatio ? "bg-blue-600 text-white hover:bg-blue-700 border border-blue-500" : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
+            }`}
+          >
+            <Plus size={18} /> Create Notice Widget
+          </button>
+          
+          <button
+            onClick={() => addWidget("image")}
+            disabled={!selectedRatio}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md font-medium ${
+              selectedRatio ? "bg-green-600 text-white hover:bg-green-700 border border-green-500" : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
+            }`}
+          >
+            <ImageIcon size={18} /> Create Image Display
+          </button>
+          
+
         </div>
+        
+
 
         
 
@@ -1462,35 +2178,109 @@ function EditDashboardDemo() {
 
         <button
           onClick={handleSave}
-          disabled={!selectedRatio || widgets.length === 0}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all shadow hover:shadow-md ml-auto ${
-            selectedRatio && widgets.length > 0
-              ? "bg-green-600 text-white hover:bg-green-700"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          disabled={!selectedRatio || screens.every(screen => screen.widgets.length === 0)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md ml-auto font-medium ${
+            selectedRatio && screens.some(screen => screen.widgets.length > 0)
+              ? "bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-500"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
           }`}
         >
-          {new URLSearchParams(window.location.search).get('id') ? 'Update Dashboard' : 'Save Dashboard'}
+          {new URLSearchParams(window.location.search).get('id') ? 'Update Dashboard' : `Save Dashboard (${screens.length} screen${screens.length > 1 ? 's' : ''})`}
         </button>
       </div>
 
-      <div className="mb-4 p-3 bg-white rounded-lg shadow-sm border border-gray-200 w-full">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="p-1.5 bg-blue-100 rounded-md">
-            <GripVertical className="w-4 h-4 text-blue-600" />
+      {/* Screen Management Section */}
+      <div className="mb-8 p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+              <Layers className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-slate-800">Screen Management</h3>
+              <p className="text-slate-600 text-sm mt-1">Organize and manage multiple display screens</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800">Notice Categories</h3>
-            <p className="text-xs text-gray-500">Drag categories to widgets to populate with notices</p>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-2xl font-bold text-blue-600">{screens.length}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wide">Active Screens</div>
+            </div>
+            <button
+              onClick={addScreen}
+              className="group relative bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl border-0 transform hover:scale-105 active:scale-95"
+            >
+              <div className="flex items-center gap-2">
+                <div className="p-1 bg-white bg-opacity-20 rounded-lg group-hover:bg-opacity-30 transition-all">
+                  <Plus size={18} className="text-white" />
+                </div>
+                <span>Add New Screen</span>
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-sm"></div>
+            </button>
           </div>
         </div>
         
-        <div className="flex flex-wrap gap-2">
-          {categories.length === 0 ? (
-            <div className="w-full text-center py-4">
-              <div className="inline-flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full mb-2">
-                <ListFilter className="w-4 h-4 text-gray-400" />
+        {/* Screen Tabs with Enhanced Design */}
+        <div className="relative">
+          <div className="flex items-center gap-3 overflow-x-auto pb-3 scrollbar-hide">
+            {screens.map((screen, index) => (
+              <div
+                key={screen.id}
+                className={`group relative flex items-center gap-3 px-5 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 min-w-fit ${
+                  index === currentScreenIndex
+                    ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-lg shadow-blue-200/50'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-slate-50 hover:shadow-md'
+                }`}
+                onClick={() => setCurrentScreenIndex(index)}
+              >
+                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  index === currentScreenIndex 
+                    ? 'bg-blue-500 shadow-sm shadow-blue-400' 
+                    : 'bg-slate-300 group-hover:bg-blue-400'
+                }`} />
+                <span className="font-semibold text-sm whitespace-nowrap">{screen.name}</span>
+                {screens.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeScreen(index)
+                    }}
+                    className="ml-2 p-1.5 hover:bg-red-100 rounded-lg transition-all duration-200 group/remove opacity-0 group-hover:opacity-100"
+                    title="Remove screen"
+                  >
+                    <X size={14} className="text-red-500 group-hover/remove:text-red-700" />
+                  </button>
+                )}
+                {index === currentScreenIndex && (
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"></div>
+                )}
               </div>
-              <p className="text-gray-500 text-sm">No categories available</p>
+            ))}
+          </div>
+          
+
+        </div>
+      </div>
+
+      <div className="mb-6 p-5 bg-white rounded-xl shadow-sm border border-slate-200 w-full">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-slate-100 rounded-lg">
+            <GripVertical className="w-5 h-5 text-slate-600" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-slate-800">Notice Categories</h3>
+            <p className="text-sm text-slate-500 mt-1">Drag categories to widgets to populate with notices</p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap gap-3">
+          {categories.length === 0 ? (
+            <div className="w-full text-center py-8">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-slate-100 rounded-full mb-3">
+                <ListFilter className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-slate-500 text-sm font-medium">No categories available</p>
             </div>
           ) : (
             categories.map((category) => (
@@ -1498,19 +2288,19 @@ function EditDashboardDemo() {
                 key={category.id}
                 draggable
                 onDragStart={(e) => handleDragStart2(e, category)}
-                className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-lg cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="group relative bg-slate-50 hover:bg-blue-50 px-4 py-3 rounded-xl cursor-move border border-slate-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105"
               >
-                <div className="flex items-center gap-2">
-                  <div className="p-1 bg-blue-100 group-hover:bg-blue-200 rounded-md transition-colors">
-                    <GripVertical className="w-3 h-3 text-blue-600" />
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-slate-200 group-hover:bg-blue-200 rounded-lg transition-colors">
+                    <GripVertical className="w-4 h-4 text-slate-600 group-hover:text-blue-600" />
                   </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-800 group-hover:text-blue-800 transition-colors text-sm">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-800 group-hover:text-blue-800 transition-colors text-sm truncate">
                       {category.name}
                     </div>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
-                      <span className="text-xs text-gray-500">
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                      <span className="text-xs text-slate-600 font-medium">
                         {category.notices.length} {category.notices.length === 1 ? 'notice' : 'notices'}
                       </span>
                     </div>
@@ -1521,20 +2311,22 @@ function EditDashboardDemo() {
           )}
         </div>
         
-        {categories.length > 0 && (
-          <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-100">
-            <div className="flex items-center gap-2 text-xs text-blue-700">
-              <div className="w-1 h-1 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="font-medium">Tip:</span>
-              <span>Drag categories onto existing widgets to assign Notice, or drop them anywhere on the dashboard to automatically create new widgets</span>
-            </div>
-          </div>
-        )}
+
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Main Dashboard Area - Left Side (3/4 width) */}
         <div className="xl:col-span-3">
+          {/* Current Screen Indicator */}
+          <div className="mb-3 px-4">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+              <span>Editing:</span>
+              <span className="text-blue-600 font-medium">{currentScreen?.name}</span>
+              <span className="text-gray-400">({currentScreenIndex + 1} of {screens.length})</span>
+            </div>
+          </div>
+          
       {selectedRatio && (
         <div
           className={`border-4 border-dashed rounded-lg mx-auto overflow-hidden bg-white p-4 relative transition-all duration-200 ${
@@ -1557,7 +2349,7 @@ function EditDashboardDemo() {
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
                   <Plus className="w-6 h-6 text-blue-600" />
                 </div>
-                <p className="text-blue-700 font-medium">Drop to create new widget</p>
+                <p className="text-blue-700 font-medium">Drop category to create notice widget</p>
               </div>
             </div>
           )}
@@ -1653,97 +2445,244 @@ function EditDashboardDemo() {
                         fontWeight: settings.categoryFontWeight,
                       }}
                     >
-                      {settings.customCategoryName || widget.content || widget.title}
-                      {widget.topNotices && widget.topNotices.length > 0 && (
+                      {settings.customCategoryName || 
+                        (widget.type === "image" ? "Image Display" : 
+                         widget.content || widget.title)}
+                      {widget.type === "notice" && widget.topNotices && widget.topNotices.length > 0 && (
                         <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
                           {widget.topNotices.length} notices
                         </span>
                       )}
-                      {widget.images && widget.images.length > 0 && (
+                      {widget.type === "image" && widget.images && widget.images.length > 0 && (
                         <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                           {widget.images.length} image{widget.images.length > 1 ? 's' : ''}
                         </span>
                       )}
+
                     </h3>
                   </div>
 
                   {/* Widget Content - Flex grow to fill available space */}
                   <div className="p-2 flex-grow flex flex-col overflow-hidden">
-                    {/* Notice Widget Content */}
-                    {widget.topNotices ? (
-                      <div className="flex flex-col h-full">
-                        <div className="bg-indigo-50 py-1 px-2 rounded mb-2 text-center flex-shrink-0">
-                          <span className="text-sm font-medium text-indigo-600">
-                            Top {widget.topNotices.length} Notices
-                          </span>
-                        </div>
-                        <div
-                          className="notices-container flex-grow overflow-auto"
-                          style={{
-                            height: `${noticesContainerHeight}px`,
-                            maxHeight: `${noticesContainerHeight}px`,
-                          }}
-                        >
-                          <div className="space-y-2">
-                            {widget.topNotices.map((notice) => (
-                              <div
-                                key={notice.id}
-                                className="rounded shadow p-2"
-                                style={{
-                                  backgroundColor: cardBgColor,
-                                  borderLeft: `3px solid ${settings.borderColor}`,
-                                  fontFamily: settings.fontFamily,
-                                }}
-                              >
-                                <p
-                                  className="text-sm font-medium"
-                                  style={{
-                                    color: settings.fontColor,
-                                    fontSize: `${settings.fontSize}px`,
-                                    fontWeight: settings.fontWeight,
-                                    wordBreak: "break-word", // Prevent long words from overflowing
-                                  }}
-                                >
-                                  {notice.title}
-                                </p>
-                                {settings.showFullContent && notice.content && (
-                                  <p
-                                    className="text-xs mt-1"
+                    {/* Widget Content based on type */}
+                    {widget.type === "notice" && (
+                      <>
+                        {/* Notice Widget Content */}
+                        {widget.topNotices ? (
+                          <div className="flex flex-col h-full">
+                            <div className="bg-indigo-50 py-1 px-2 rounded mb-2 text-center flex-shrink-0">
+                              <span className="text-sm font-medium text-indigo-600">
+                                Top {widget.topNotices.length} Notices
+                              </span>
+                            </div>
+                            <div
+                              className="notices-container flex-grow overflow-auto"
+                              style={{
+                                height: `${noticesContainerHeight}px`,
+                                maxHeight: `${noticesContainerHeight}px`,
+                              }}
+                            >
+                              <div className="space-y-2">
+                                {widget.topNotices.map((notice) => (
+                                  <div
+                                    key={notice.id}
+                                    className="rounded shadow p-2"
                                     style={{
-                                      color: settings.fontColor,
-                                      opacity: 0.7,
+                                      backgroundColor: cardBgColor,
+                                      borderLeft: `3px solid ${settings.borderColor}`,
                                       fontFamily: settings.fontFamily,
-                                      wordBreak: "break-word", // Prevent long words from overflowing
                                     }}
                                   >
-                                    {notice.content}
-                                  </p>
-                                )}
+                                    <p
+                                      className="text-sm font-medium"
+                                      style={{
+                                        color: settings.fontColor,
+                                        fontSize: `${settings.fontSize}px`,
+                                        fontWeight: settings.fontWeight,
+                                        wordBreak: "break-word", // Prevent long words from overflowing
+                                      }}
+                                    >
+                                      {notice.title}
+                                    </p>
+                                    {settings.showFullContent && notice.content && (
+                                      <div
+                                        className="text-xs mt-1"
+                                        style={{
+                                          color: settings.fontColor,
+                                          opacity: 0.7,
+                                          fontFamily: settings.fontFamily,
+                                          wordBreak: "break-word", // Prevent long words from overflowing
+                                        }}
+                                      >
+                                        <div 
+                                          dangerouslySetInnerHTML={{ __html: notice.content }}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            </div>
+                            {widget.notices && (
+                              <p
+                                className="text-xs mt-1 text-right flex-shrink-0"
+                                style={{ color: settings.fontColor, opacity: 0.6 }}
+                              >
+                                Total: {widget.notices.length} notices
+                              </p>
+                            )}
                           </div>
-                        </div>
-                        {widget.notices && (
-                          <p
-                            className="text-xs mt-1 text-right flex-shrink-0"
-                            style={{ color: settings.fontColor, opacity: 0.6 }}
+                        ) : (
+                          <div
+                            className="flex items-center justify-center h-full border-2 border-dashed rounded-lg"
+                            style={{
+                              borderColor: settings.fontColor,
+                              opacity: 0.4,
+                              fontFamily: settings.fontFamily,
+                            }}
                           >
-                            Total: {widget.notices.length} notices
-                          </p>
+                            <p style={{ color: settings.fontColor }}>Drag a category here</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Enhanced Professional Image Display Content */}
+                    {widget.type === "image" && (
+                      <div className="flex flex-col h-full">
+                        {widget.images && widget.images.length > 0 ? (
+                          <div className="flex-grow flex items-center justify-center relative overflow-hidden">
+                            <div className="relative w-full h-full group">
+                              {/* Professional Image Container with Enhanced Styling */}
+                              <div
+                                className="w-full h-full relative overflow-hidden"
+                                style={{
+                                  borderRadius: `${settings.imageBorderRadius}px`,
+                                  boxShadow: settings.imageShadow 
+                                    ? `${settings.imageShadowOffset}px ${settings.imageShadowOffset}px ${settings.imageShadowBlur}px ${settings.imageShadowColor}`
+                                    : 'none',
+                                }}
+                              >
+                                {/* Image with Professional Filters */}
+                              <img
+                                src={widget.images[0].url}
+                                alt={widget.images[0].title}
+                                  className="w-full h-full transition-all duration-300"
+                                style={{
+                                  objectFit: settings.imageFit as any,
+                                  borderRadius: `${settings.imageBorderRadius}px`,
+                                    transform: `rotate(${settings.imageRotation}deg)`,
+                                    filter: `
+                                      brightness(${settings.imageBrightness}%) 
+                                      contrast(${settings.imageContrast}%) 
+                                      saturate(${settings.imageSaturation}%) 
+                                      blur(${settings.imageBlur}px)
+                                      ${settings.imageGrayscale ? 'grayscale(100%)' : ''}
+                                      ${settings.imageSepia ? 'sepia(100%)' : ''}
+                                      ${settings.imageInvert ? 'invert(100%)' : ''}
+                                    `,
+                                    cursor: settings.imageZoom ? 'zoom-in' : 'default',
+                                }}
+                                onError={() => {
+                                  toast.error('Image could not be loaded')
+                                }}
+                              />
+                                
+                                {/* Professional Overlay */}
+                                {settings.imageOverlay && (
+                                  <div
+                                    className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
+                                    style={{
+                                      opacity: settings.imageOverlayOpacity,
+                                    }}
+                                  />
+                                )}
+                                
+                                {/* Enhanced Image Title */}
+                              {settings.showImageTitle && (
+                                <div
+                                    className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent"
+                                  style={{
+                                    color: settings.imageTitleColor,
+                                    fontSize: `${settings.imageTitleFontSize}px`,
+                                    fontWeight: settings.imageTitleFontWeight,
+                                  }}
+                                >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="truncate font-medium">{widget.images[0].title}</p>
+                                        {widget.images[0].width && widget.images[0].height && (
+                                          <p className="text-xs opacity-75 mt-1">
+                                            {widget.images[0].width} × {widget.images[0].height}
+                                            {widget.images[0].size && (
+                                              <span className="ml-2">
+                                                ({(widget.images[0].size / 1024 / 1024).toFixed(1)}MB)
+                                              </span>
+                                            )}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                </div>
+                              )}
+                              </div>
+                              
+                              {/* Professional Control Overlay */}
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <div className="bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-2xl border border-gray-200">
+                                  <div className="flex items-center gap-3">
+                                    <label className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                                      <Upload size={16} />
+                                      Replace
+                                                    <input
+                                                      type="file"
+                                                      accept="image/*"
+                                                      onChange={(e) => handleImageUpload(e, widget.id)}
+                                                      className="hidden"
+                                                    />
+                                                  </label>
+                                    <button
+                                      onClick={() => toggleWidgetSettings(widget.id)}
+                                      className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                                    >
+                                      <Settings size={16} />
+                                      Settings
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-xl transition-all duration-300 hover:border-blue-400 hover:bg-blue-50/30"
+                            style={{
+                              borderColor: settings.fontColor,
+                              opacity: 0.6,
+                              fontFamily: settings.fontFamily,
+                            }}
+                          >
+                            <div className="text-center flex flex-col items-center justify-center h-full">
+                              <p className="text-sm opacity-75 mb-6" style={{ color: settings.fontColor }}>
+                                JPG, PNG, GIF, WebP • Max 10MB
+                              </p>
+                              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 hover:border-blue-400 hover:text-blue-600 transition-all duration-200 text-xs font-medium">
+                                <Upload size={12} />
+                                Browse Files
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload(e, widget.id)}
+                                  className="hidden"
+                            />
+                              </label>
+                            </div>
+                          </div>
                         )}
                       </div>
-                    ) : (
-                      <div
-                        className="flex items-center justify-center h-full border-2 border-dashed rounded-lg"
-                        style={{
-                          borderColor: settings.fontColor,
-                          opacity: 0.4,
-                          fontFamily: settings.fontFamily,
-                        }}
-                      >
-                        <p style={{ color: settings.fontColor }}>Drag a category here</p>
-                      </div>
                     )}
+
+
                   </div>
                 </div>
               )
@@ -1776,8 +2715,8 @@ function EditDashboardDemo() {
               </div>
             </div>
 
-            {/* Search and Filter */}
-            <div className="space-y-2 mb-4">
+            {/* Search */}
+            <div className="mb-4">
               <input
                 type="text"
                 placeholder="Search templates..."
@@ -1785,109 +2724,106 @@ function EditDashboardDemo() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <div className="flex items-center gap-2">
-                {/* Removed Types dropdown menu */}
-                <button
-                  onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
-                  className="p-1 border border-gray-300 rounded text-xs"
-                >
-                  {viewMode === "list" ? "Grid" : "List"}
-                </button>
-              </div>
             </div>
 
             {/* Templates List */}
             <div className="space-y-2">
+              {/* Template Count Header */}
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                {widgets.length === 0 ? (
+                  <span className="text-amber-600">
+                    Add widgets to see available templates
+                  </span>
+                ) : (
+                  <>
+                    <span>
+                      {templates.filter(t => t.widgets.length === widgets.length).length} template{templates.filter(t => t.widgets.length === widgets.length).length !== 1 ? 's' : ''} available for {widgets.length} widget{widgets.length !== 1 ? 's' : ''}
+                    </span>
+                    {templates.length > templates.filter(t => t.widgets.length === widgets.length).length && (
+                      <span className="text-gray-400">
+                        {templates.length - templates.filter(t => t.widgets.length === widgets.length).length} other template{templates.length - templates.filter(t => t.widgets.length === widgets.length).length !== 1 ? 's' : ''} available
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
               {isLoadingTemplates ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
                 </div>
-              ) : templates.length === 0 ? (
+              ) : templates.filter(template => template.widgets.length === widgets.length).length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
-                  <p className="text-sm">No templates available</p>
-                  <p className="text-xs text-gray-400 mt-1">Create your first template</p>
+                  <p className="text-sm">No templates available for {widgets.length} widget{widgets.length !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-gray-400 mt-1">Create a template with {widgets.length} widget{widgets.length !== 1 ? 's' : ''} or add more widgets</p>
                 </div>
               ) : (
-                <div className={`space-y-2 max-h-96 overflow-y-auto ${
-                  viewMode === "grid" ? "grid grid-cols-1 gap-2" : ""
-                }`}>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
                   {templates
-                    .filter(template => 
-                      template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      template.description?.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
+                    .filter(template => {
+                      // Filter by search term
+                      const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        template.description?.toLowerCase().includes(searchTerm.toLowerCase());
+                      
+                      // Filter by widget count to match current screen
+                      const matchesWidgetCount = template.widgets.length === widgets.length;
+                      
+                      return matchesSearch && matchesWidgetCount;
+                    })
                     .map((template) => (
                       <div
                         key={template.id}
-                        className={`border border-gray-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-sm transition-all ${
-                          viewMode === "grid" ? "text-center" : ""
-                        }`}
+                        className="border border-gray-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-sm transition-all"
                       >
-                        {viewMode === "grid" ? (
-                          <div className="space-y-2">
-                            <div className="w-full h-16 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg mb-2"></div>
-                            <h4 className="font-medium text-gray-900 text-sm truncate">{template.name}</h4>
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => applyTemplate(template)}
-                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-                              >
-                                Apply
-                              </button>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">{template.name}</h4>
+                            {template.description && (
+                              <p className="text-xs text-gray-600 mt-1">{template.description}</p>
+                            )}
+                            <div className="text-xs text-gray-500 mt-1">
+                              {template.widgets.length} widgets
                             </div>
                           </div>
-                        ) : (
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-gray-900 text-sm">{template.name}</h4>
-                              {template.description && (
-                                <p className="text-xs text-gray-600 mt-1">{template.description}</p>
-                              )}
-                              <div className="text-xs text-gray-500 mt-1">
-                                {template.widgets.length} widgets
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleViewTemplate(template)}
-                                className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
-                                title="View Template"
-                              >
-                                View
-                              </button>
-                              <button
-                                onClick={() => applyTemplate(template)}
-                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-                                title="Apply Template"
-                              >
-                                Apply
-                              </button>
-                              {userRole !== 'MODERATOR' && (
-                                <>
-                                  <button
-                                    onClick={() => handleEditTemplate(template)}
-                                    className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
-                                    title="Edit Template"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTemplate(template.id)}
-                                    className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                                    title="Delete Template"
-                                  >
-                                    Delete
-                                  </button>
-                                </>
-                              )}
-                            </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleViewTemplate(template)}
+                              className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
+                              title="View Template"
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => applyTemplate(template)}
+                              className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                              title="Apply Template"
+                            >
+                              Apply
+                            </button>
+                            {userRole !== 'MODERATOR' && (
+                              <>
+                                <button
+                                  onClick={() => handleEditTemplate(template)}
+                                  className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
+                                  title="Edit Template"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTemplate(template.id)}
+                                  className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                                  title="Delete Template"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     ))}
                 </div>
@@ -2557,6 +3493,378 @@ function EditDashboardDemo() {
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Image Tab - Only show for image displays */}
+            {activeSettingsTab === "image" && (
+              <div className="space-y-6 animate-in fade-in-0 slide-in-from-left-2 duration-300">
+                {/* Image Display Settings */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <ImageIcon size={16} /> Display Settings
+                  </label>
+                  <div className="space-y-4">
+                    {/* Image Fit */}
+                    <div>
+                      <span className="text-xs text-gray-500 block mb-2">Image Fit</span>
+                      <select
+                        value={widgetSettings[activeSettingsWidget]?.imageFit || DEFAULT_WIDGET_SETTINGS.imageFit}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageFit", e.target.value)}
+                        className="w-full text-sm border border-gray-300 rounded-md p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      >
+                        <option value="cover">Cover (Fill)</option>
+                        <option value="contain">Contain (Fit)</option>
+                        <option value="fill">Fill (Stretch)</option>
+                        <option value="none">None (Original)</option>
+                        <option value="scale-down">Scale Down</option>
+                      </select>
+                    </div>
+
+                    {/* Border Radius */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Border Radius</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.imageBorderRadius || DEFAULT_WIDGET_SETTINGS.imageBorderRadius}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="50"
+                        value={widgetSettings[activeSettingsWidget]?.imageBorderRadius || DEFAULT_WIDGET_SETTINGS.imageBorderRadius}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageBorderRadius", Number.parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+
+                    {/* Show Image Title */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Show Image Title</span>
+                        <button
+                          onClick={() =>
+                            updateWidgetSetting(
+                              activeSettingsWidget,
+                              "showImageTitle",
+                              !(widgetSettings[activeSettingsWidget]?.showImageTitle || false),
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                            widgetSettings[activeSettingsWidget]?.showImageTitle ? "bg-blue-600" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              widgetSettings[activeSettingsWidget]?.showImageTitle ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Image Effects */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Palette size={16} /> Image Effects
+                  </label>
+                  <div className="space-y-4">
+                    {/* Brightness */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Brightness</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.imageBrightness || DEFAULT_WIDGET_SETTINGS.imageBrightness}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="200"
+                        value={widgetSettings[activeSettingsWidget]?.imageBrightness || DEFAULT_WIDGET_SETTINGS.imageBrightness}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageBrightness", Number.parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+
+                    {/* Contrast */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Contrast</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.imageContrast || DEFAULT_WIDGET_SETTINGS.imageContrast}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="200"
+                        value={widgetSettings[activeSettingsWidget]?.imageContrast || DEFAULT_WIDGET_SETTINGS.imageContrast}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageContrast", Number.parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+
+                    {/* Saturation */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Saturation</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.imageSaturation || DEFAULT_WIDGET_SETTINGS.imageSaturation}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="200"
+                        value={widgetSettings[activeSettingsWidget]?.imageSaturation || DEFAULT_WIDGET_SETTINGS.imageSaturation}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageSaturation", Number.parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+
+                    {/* Blur */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Blur</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.imageBlur || DEFAULT_WIDGET_SETTINGS.imageBlur}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        value={widgetSettings[activeSettingsWidget]?.imageBlur || DEFAULT_WIDGET_SETTINGS.imageBlur}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageBlur", Number.parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+
+                    {/* Rotation */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Rotation</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.imageRotation || DEFAULT_WIDGET_SETTINGS.imageRotation}°
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        value={widgetSettings[activeSettingsWidget]?.imageRotation || DEFAULT_WIDGET_SETTINGS.imageRotation}
+                        onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageRotation", Number.parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Image Filters */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Layers size={16} /> Image Filters
+                  </label>
+                  <div className="space-y-3">
+                    {/* Grayscale */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Grayscale</span>
+                        <button
+                          onClick={() =>
+                            updateWidgetSetting(
+                              activeSettingsWidget,
+                              "imageGrayscale",
+                              !(widgetSettings[activeSettingsWidget]?.imageGrayscale || false),
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                            widgetSettings[activeSettingsWidget]?.imageGrayscale ? "bg-blue-600" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              widgetSettings[activeSettingsWidget]?.imageGrayscale ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sepia */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Sepia</span>
+                        <button
+                          onClick={() =>
+                            updateWidgetSetting(
+                              activeSettingsWidget,
+                              "imageSepia",
+                              !(widgetSettings[activeSettingsWidget]?.imageSepia || false),
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                            widgetSettings[activeSettingsWidget]?.imageSepia ? "bg-blue-600" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              widgetSettings[activeSettingsWidget]?.imageSepia ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Invert */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Invert Colors</span>
+                        <button
+                          onClick={() =>
+                            updateWidgetSetting(
+                              activeSettingsWidget,
+                              "imageInvert",
+                              !(widgetSettings[activeSettingsWidget]?.imageInvert || false),
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                            widgetSettings[activeSettingsWidget]?.imageInvert ? "bg-blue-600" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              widgetSettings[activeSettingsWidget]?.imageInvert ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Image Overlay & Shadow */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                    <Box size={16} /> Overlay & Shadow
+                  </label>
+                  <div className="space-y-4">
+                    {/* Image Overlay */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Image Overlay</span>
+                        <button
+                          onClick={() =>
+                            updateWidgetSetting(
+                              activeSettingsWidget,
+                              "imageOverlay",
+                              !(widgetSettings[activeSettingsWidget]?.imageOverlay || false),
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                            widgetSettings[activeSettingsWidget]?.imageOverlay ? "bg-blue-600" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              widgetSettings[activeSettingsWidget]?.imageOverlay ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Overlay Opacity */}
+                    {widgetSettings[activeSettingsWidget]?.imageOverlay && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-500">Overlay Opacity</span>
+                          <span className="text-xs text-gray-600">
+                            {Math.round((widgetSettings[activeSettingsWidget]?.imageOverlayOpacity || DEFAULT_WIDGET_SETTINGS.imageOverlayOpacity) * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={widgetSettings[activeSettingsWidget]?.imageOverlayOpacity || DEFAULT_WIDGET_SETTINGS.imageOverlayOpacity}
+                          onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageOverlayOpacity", Number.parseFloat(e.target.value))}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                      </div>
+                    )}
+
+                    {/* Image Shadow */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Image Shadow</span>
+                        <button
+                          onClick={() =>
+                            updateWidgetSetting(
+                              activeSettingsWidget,
+                              "imageShadow",
+                              !(widgetSettings[activeSettingsWidget]?.imageShadow || false),
+                            )
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                            widgetSettings[activeSettingsWidget]?.imageShadow ? "bg-blue-600" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              widgetSettings[activeSettingsWidget]?.imageShadow ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Shadow Blur */}
+                    {widgetSettings[activeSettingsWidget]?.imageShadow && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-500">Shadow Blur</span>
+                          <span className="text-xs text-gray-600">
+                            {widgetSettings[activeSettingsWidget]?.imageShadowBlur || DEFAULT_WIDGET_SETTINGS.imageShadowBlur}px
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="20"
+                          value={widgetSettings[activeSettingsWidget]?.imageShadowBlur || DEFAULT_WIDGET_SETTINGS.imageShadowBlur}
+                          onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageShadowBlur", Number.parseInt(e.target.value))}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                      </div>
+                    )}
+
+                    {/* Shadow Offset */}
+                    {widgetSettings[activeSettingsWidget]?.imageShadow && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-500">Shadow Offset</span>
+                          <span className="text-xs text-gray-600">
+                            {widgetSettings[activeSettingsWidget]?.imageShadowOffset || DEFAULT_WIDGET_SETTINGS.imageShadowOffset}px
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="20"
+                          value={widgetSettings[activeSettingsWidget]?.imageShadowOffset || DEFAULT_WIDGET_SETTINGS.imageShadowOffset}
+                          onChange={(e) => updateWidgetSetting(activeSettingsWidget, "imageShadowOffset", Number.parseInt(e.target.value))}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -16,6 +16,15 @@ export type Widget = {
   category?: string
   notices?: TNotice[]
   topNotices?: TNotice[]
+  type?: "notice" | "image"
+  images?: Array<{
+    id: string
+    url: string
+    title: string
+    file: File
+    dbId?: string
+  }>
+
 }
 
 // Add the WidgetSettings type
@@ -50,6 +59,22 @@ export type WidgetSettings = {
   imageTitleColor: string
   imageTitleFontSize: number
   imageTitleFontWeight: string
+  imageOverlay: boolean
+  imageOverlayOpacity: number
+  imageShadow: boolean
+  imageShadowColor: string
+  imageShadowBlur: number
+  imageShadowOffset: number
+  imageZoom: boolean
+  imageRotation: number
+  imageBrightness: number
+  imageContrast: number
+  imageSaturation: number
+  imageBlur: number
+  imageGrayscale: boolean
+  imageSepia: boolean
+  imageInvert: boolean
+
 }
 
 // Add the Layout type from react-grid-layout

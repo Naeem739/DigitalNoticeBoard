@@ -84,11 +84,64 @@
     width: 100% !important;
     height: 100% !important;
     overflow: hidden !important;
+    display: grid !important;
+    grid-auto-rows: minmax(auto, 1fr) !important;
+    align-items: stretch !important;
   }
 
   .notice-grid-container * {
     max-width: 100% !important;
     overflow: hidden !important;
+  }
+
+  /* Dynamic grid improvements */
+  .notice-grid-container {
+    grid-template-rows: repeat(auto-fit, minmax(120px, 1fr)) !important;
+    grid-auto-flow: dense !important;
+  }
+
+  /* Ensure widgets fill available space */
+  .notice-grid-container > div {
+    min-height: 120px !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* Remove empty space between grid items */
+  .notice-grid-container > div:empty {
+    display: none !important;
+  }
+
+  /* Responsive grid adjustments */
+  @media (max-width: 640px) {
+    .notice-grid-container {
+      grid-template-rows: repeat(auto-fit, minmax(100px, 1fr)) !important;
+    }
+    
+    .notice-grid-container > div {
+      min-height: 100px !important;
+    }
+  }
+
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .notice-grid-container {
+      grid-template-rows: repeat(auto-fit, minmax(140px, 1fr)) !important;
+    }
+    
+    .notice-grid-container > div {
+      min-height: 140px !important;
+    }
+  }
+
+  @media (min-width: 1025px) {
+    .notice-grid-container {
+      grid-template-rows: repeat(auto-fit, minmax(160px, 1fr)) !important;
+    }
+    
+    .notice-grid-container > div {
+      min-height: 160px !important;
+    }
   }
 
   /* Additional rules to prevent any overflow */
@@ -107,10 +160,6 @@
     .notice-page-container {
       padding: 0 !important;
       margin: 0 !important;
-    }
-    
-    .notice-page-container * {
-      font-size: clamp(10px, 4vw, 16px) !important;
     }
   }
 
@@ -188,6 +237,8 @@
     overflow: hidden !important;
     height: 100vh !important;
     width: 100vw !important;
+    font-size: clamp(14px, 1.2vw, 30px);
+    font-weight: bold !important;
   }
 
   h1 {

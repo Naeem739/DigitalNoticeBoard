@@ -953,12 +953,26 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                       Notice Content
                     </label>
                     <div className="space-y-4">
-                      <textarea
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 bg-white text-gray-900"
-                        value={editingNotice.content || ''}
-                        onChange={(e) => setEditingNotice({...editingNotice, content: e.target.value})}
-                        rows={6}
-                        placeholder="Enter notice content"
+                      <div
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all duration-200 bg-white text-gray-900 min-h-[150px]"
+                        contentEditable
+                        dangerouslySetInnerHTML={{ __html: editingNotice.content || '' }}
+                        onInput={(e) => {
+                          const target = e.target as HTMLDivElement;
+                          setEditingNotice({...editingNotice, content: target.innerHTML || ''});
+                        }}
+                        onBlur={(e) => {
+                          const target = e.target as HTMLDivElement;
+                          setEditingNotice({...editingNotice, content: target.innerHTML || ''});
+                        }}
+                        style={{
+                          fontFamily: "Inter, system-ui, sans-serif",
+                          fontSize: "14px",
+                          lineHeight: "1.6",
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'break-word'
+                        }}
                       />
                     </div>
                   </div>
@@ -1159,9 +1173,15 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             <div className="p-6 overflow-y-auto flex-grow">
               <div className="prose prose-lg max-w-none">
                 <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                  <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-                    {selectedContent.content}
-                  </div>
+                  <div 
+                    className="text-gray-800 leading-relaxed whitespace-pre-wrap"
+                    style={{ 
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word'
+                    }}
+                    dangerouslySetInnerHTML={{ __html: selectedContent.content }}
+                  />
                 </div>
               </div>
             </div>

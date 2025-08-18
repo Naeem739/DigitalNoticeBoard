@@ -60,6 +60,9 @@ model Dashboard {
   id          String    @id @default(uuid())
   aspectRatio String
   containers  Json
+  screenName  String?
+  screenIndex Int?
+  totalScreens Int?
   createdAt   DateTime? @default(now())
 }
 
