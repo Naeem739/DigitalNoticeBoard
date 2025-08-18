@@ -50,32 +50,37 @@ export const createCategory = async(formData:Record<string,string>) =>{
 
 export const getCategories = async() =>{
     try{
-        const result = await prisma.category.findMany();
+        const result = await prisma.category.findMany({
+            where: {
+                name: {
+                    not: "Image Widget" // Filter out Image Widget category
+                }
+            }
+        });
 
         return {success:true, result}
-
     }
     catch(error){
         return {success:false, result:error};
-
     }
-    
 }
 
 export const getCategoriesWithNotices = async() =>{
     try{
         const result = await prisma.category.findMany({
+            where: {
+                name: {
+                    not: "Image Widget" // Filter out Image Widget category
+                }
+            },
             include:{
                 notices:true
             }
         });
 
         return {success:true, result}
-
     }
     catch(error){
         return {success:false, result:error};
-
     }
-    
 }

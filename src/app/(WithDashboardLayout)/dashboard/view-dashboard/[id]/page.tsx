@@ -22,6 +22,9 @@ type TNotice = {
   title: string
   content?: string
   categoryName?: string
+  imageUrl?: string
+  imageFileName?: string
+  imageData?: string
 }
 
 type TImage = {
@@ -59,14 +62,11 @@ export default function ViewDashboard() {
         if (foundDashboard) {
           setDashboard(foundDashboard)
           
-          // Extract notice and image IDs from containers
+          // Extract notice IDs from containers (both notice and image widgets now use noticeIds)
           const noticeIds: string[] = []
-          const imageIds: string[] = []
           
           foundDashboard.containers.forEach((container: any) => {
-            if (container.type === "image" && container.imageIds) {
-              imageIds.push(...container.imageIds)
-            } else if (container.noticeIds) {
+            if (container.noticeIds) {
               noticeIds.push(...container.noticeIds)
             }
           })
@@ -87,21 +87,8 @@ export default function ViewDashboard() {
             }
           }
           
-          // Fetch images if any
-          if (imageIds.length > 0) {
-            try {
-              const imagesResponse = await fetch('/api/image/get-all')
-              const imagesData = await imagesResponse.json()
-              if (imagesData.success) {
-                const filteredImages = imagesData.result.filter((image: TImage) => 
-                  imageIds.includes(image.id)
-                )
-                setImages(filteredImages)
-              }
-            } catch (error) {
-              console.error('Error fetching images:', error)
-            }
-          }
+          // Clear images array since images are now stored as notices
+          setImages([])
         } else {
           toast.error('Dashboard not found')
           setDashboard(null)
@@ -125,6 +112,22 @@ export default function ViewDashboard() {
 
   const getImageById = (imageId: string) => {
     return images.find(image => image.id === imageId)
+  }
+
+  // Helper function to reconstruct image URL from notice data
+  const reconstructImageUrl = (notice: TNotice) => {
+    let imageUrl = notice.imageUrl
+    if (!imageUrl && notice.imageData) {
+      // If we only have base64 data, reconstruct the full data URL
+      // We need to determine the image type from the notice data
+      const imageType = notice.imageFileName ? 
+        notice.imageFileName.split('.').pop()?.toLowerCase() : 'jpeg'
+      const mimeType = imageType === 'png' ? 'image/png' : 
+                     imageType === 'gif' ? 'image/gif' : 
+                     imageType === 'webp' ? 'image/webp' : 'image/jpeg'
+      imageUrl = `data:${mimeType};base64,${notice.imageData}`
+    }
+    return imageUrl || ''
   }
 
   if (loading) {
@@ -297,17 +300,17 @@ export default function ViewDashboard() {
                       </div>
                     )}
 
-                    {container.type === 'image' && container.imageIds && (
+                    {container.type === 'image' && container.noticeIds && (
                       <div className="h-full flex items-center justify-center">
-                        {container.imageIds.slice(0, 1).map((imageId: string) => {
-                          const image = getImageById(imageId)
-                          if (!image) return null
+                        {container.noticeIds.slice(0, 1).map((noticeId: string) => {
+                          const notice = getNoticeById(noticeId)
+                          if (!notice || !notice.imageUrl) return null
                           
                           return (
-                            <div key={imageId} className="w-full h-full relative">
+                            <div key={noticeId} className="w-full h-full relative">
                               <img
-                                src={image.imageUrl}
-                                alt={image.title}
+                                src={reconstructImageUrl(notice)}
+                                alt={notice.title}
                                 className="w-full h-full object-cover rounded"
                                 style={{
                                   objectFit: settings.imageFit || 'cover',
@@ -325,7 +328,7 @@ export default function ViewDashboard() {
                                       fontFamily: settings.fontFamily || 'Inter'
                                     }}
                                   >
-                                    {image.title}
+                                    {notice.title}
                                   </p>
                                 </div>
                               )}
@@ -335,8 +338,7 @@ export default function ViewDashboard() {
                       </div>
                     )}
 
-                    {(!container.noticeIds || container.noticeIds.length === 0) && 
-                     (!container.imageIds || container.imageIds.length === 0) && (
+                    {(!container.noticeIds || container.noticeIds.length === 0) && (
                       <div className="flex items-center justify-center h-full">
                         <p className="text-gray-500 text-center">
                           No content available

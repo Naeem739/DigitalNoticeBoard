@@ -14,16 +14,18 @@ export async function GET() {
       }
     });
 
-    // Transform the data to include notice count
-    const categoriesWithCount = categories.map(category => ({
-      id: category.id,
-      name: category.name,
-      icon: category.icon,
-      editedName: category.editedName,
-      createdAt: category.createdAt,
-      updatedAt: category.updatedAt,
-      noticeCount: category.notices.length
-    }));
+    // Transform the data to include notice count and filter out Image Widget category
+    const categoriesWithCount = categories
+      .filter(category => category.name !== "Image Widget") // Filter out Image Widget category
+      .map(category => ({
+        id: category.id,
+        name: category.name,
+        icon: category.icon,
+        editedName: category.editedName,
+        createdAt: category.createdAt,
+        updatedAt: category.updatedAt,
+        noticeCount: category.notices.length
+      }));
 
     return NextResponse.json({
       success: true,

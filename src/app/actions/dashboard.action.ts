@@ -108,10 +108,40 @@ export const getDashboards = async() => {
 // Get all dashboard records for pagination
 export const getAllDashboards = async() => {
     try{
+        // Get all dashboards with proper ordering
+        // First priority: createdAt DESC (latest first)
+        // Second priority: screenIndex ASC (1, 2, 3...) when creation time is the same
         const result = await prisma.dashboard.findMany({
-            orderBy:{
-                createdAt:"desc"
+            orderBy: [
+                { createdAt: 'desc' },    // Primary: Order by creation time (latest first)
+                { screenIndex: 'asc' }    // Secondary: Order by screen index (1, 2, 3...)
+            ]
+        });
+
+        // Additional sorting to ensure proper screen order when creation time is the same
+        // This handles cases where Prisma might not handle null values correctly
+        result.sort((a, b) => {
+            // First, compare by creation time (latest first)
+            if (a.createdAt && b.createdAt) {
+                const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
+                // If time difference is more than 1 second, use time-based ordering
+                if (Math.abs(timeDiff) > 1000) {
+                    return timeDiff;
+                }
             }
+            
+            // If creation time is the same (within 1 second), order by screenIndex
+            // Handle null values: null screenIndex goes last
+            const aIndex = a.screenIndex !== null ? a.screenIndex : 999999;
+            const bIndex = b.screenIndex !== null ? b.screenIndex : 999999;
+            
+            // Ensure ascending order: 1, 2, 3, 4...
+            if (aIndex !== bIndex) {
+                return aIndex - bIndex;
+            }
+            
+            // If screenIndex is the same, order by ID for consistency
+            return a.id.localeCompare(b.id);
         });
 
         return {

@@ -20,6 +20,9 @@ type TDashboard = {
   aspectRatio: string
   containers: any[]
   createdAt?: Date
+  screenName?: string
+  screenIndex?: number
+  totalScreens?: number
 }
 
 type TNotice = {
@@ -66,6 +69,7 @@ export default function PublicNoticePage() {
   const [pagination, setPagination] = useState<TPagination | null>(null)
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
   const [countdown, setCountdown] = useState(300) // 5 minutes = 300 seconds
+  const [viewportWidth, setViewportWidth] = useState(0)
 
   // Initialize component
   useEffect(() => {
@@ -82,14 +86,14 @@ export default function PublicNoticePage() {
     }
   }, [])
 
-  // Auto-refresh every 30 minutes
+  // Auto-refresh every 10 minutes
   useEffect(() => {
     if (!mounted) return
 
     const interval = setInterval(() => {
       refreshSettings()
       fetchDashboards()
-    }, 1800000) // 30 minutes (30 * 60 * 1000 ms)
+    }, 600000) // 10 minutes (10 * 60 * 1000 ms)
 
     return () => clearInterval(interval)
   }, [mounted, refreshSettings])
@@ -104,6 +108,39 @@ export default function PublicNoticePage() {
 
     return () => clearInterval(timer)
   }, [mounted])
+
+  // Track viewport width for responsive font sizing
+  useEffect(() => {
+    if (!mounted) return
+
+    const updateViewportWidth = () => {
+      setViewportWidth(window.innerWidth)
+    }
+
+    updateViewportWidth()
+    window.addEventListener('resize', updateViewportWidth)
+    return () => window.removeEventListener('resize', updateViewportWidth)
+  }, [mounted])
+
+  // Responsive font-size mapping for notice titles
+  const getResponsiveTitleFontSize = () => {
+    const w = viewportWidth
+    if (!w) return 14 // default until measured
+    if (w < 640) return 14 // Mobile
+    if (w < 1700) return 20 // Typical laptops (13–15.6")
+    if (w < 3400) return 24 // Medium monitors (32–44")
+    return 30 // Large displays (60"+)
+  }
+
+  // Responsive notice card height (in em)
+  const getResponsiveNoticeHeight = () => {
+    const w = viewportWidth
+    if (!w) return '8.125em' // 130px equivalent at 16px base
+    if (w <= 640) return '8.125em' // Mobile: 130px equivalent
+    if (w <= 1366) return '9.0625em' // Laptops: 145px equivalent
+    if (w <= 2560) return '9.0625em' // Medium monitors: 145px equivalent
+    return '9.0625em' // Large monitors: 145px equivalent
+  }
 
   // Auto-pagination every 5 minutes
   useEffect(() => {
@@ -210,6 +247,20 @@ export default function PublicNoticePage() {
       const data = await response.json()
       
       if (data.success) {
+        console.log('Fetched dashboards:', data.result)
+        console.log('Dashboard ordering details:')
+        data.result.forEach((dashboard: any, index: number) => {
+          console.log(`${index + 1}. Dashboard ID: ${dashboard.id}, Created: ${dashboard.createdAt}, Screen: ${dashboard.screenIndex || 'N/A'}, Total Screens: ${dashboard.totalScreens || 1}`)
+        })
+        
+        // Additional debug: Check if screen ordering is correct
+        console.log('=== SCREEN ORDERING CHECK ===')
+        const multiScreenDashboards = data.result.filter((d: any) => d.totalScreens && d.totalScreens > 1);
+        multiScreenDashboards.forEach((dashboard: any) => {
+          console.log(`Multi-screen dashboard: ${dashboard.screenName || dashboard.id}, Screen ${dashboard.screenIndex}, Total: ${dashboard.totalScreens}`);
+        });
+        console.log('=== END SCREEN ORDERING CHECK ===')
+        
         setDashboards(data.result || [])
         setPagination(data.pagination || null)
         
@@ -227,14 +278,11 @@ export default function PublicNoticePage() {
 
   const fetchDashboardContent = async (dashboard: TDashboard) => {
     try {
-      // Extract notice and image IDs from containers
+      // Extract notice IDs from containers (both notice and image widgets now use noticeIds)
       const noticeIds: string[] = []
-      const imageIds: string[] = []
       
       dashboard.containers.forEach((container: any) => {
-        if (container.type === "image" && container.imageIds) {
-          imageIds.push(...container.imageIds)
-        } else if (container.noticeIds) {
+        if (container.noticeIds) {
           noticeIds.push(...container.noticeIds)
         }
       })
@@ -257,23 +305,8 @@ export default function PublicNoticePage() {
         setNotices([])
       }
       
-      // Fetch images if any
-      if (imageIds.length > 0) {
-        try {
-          const imagesResponse = await fetch('/api/image/get-all')
-          const imagesData = await imagesResponse.json()
-          if (imagesData.success) {
-            const filteredImages = imagesData.result.filter((image: TImage) => 
-              imageIds.includes(image.id)
-            )
-            setImages(filteredImages)
-          }
-        } catch (error) {
-          console.error('Error fetching images:', error)
-        }
-      } else {
-        setImages([])
-      }
+      // Clear images array since images are now stored as notices
+      setImages([])
     } catch (error) {
       console.error('Error fetching dashboard content:', error)
     }
@@ -285,6 +318,22 @@ export default function PublicNoticePage() {
 
   const getImageById = (imageId: string) => {
     return images.find(image => image.id === imageId)
+  }
+
+  // Helper function to reconstruct image URL from notice data
+  const reconstructImageUrl = (notice: TNotice) => {
+    let imageUrl = notice.imageUrl
+    if (!imageUrl && notice.imageData) {
+      // If we only have base64 data, reconstruct the full data URL
+      // We need to determine the image type from the notice data
+      const imageType = notice.imageFileName ? 
+        notice.imageFileName.split('.').pop()?.toLowerCase() : 'jpeg'
+      const mimeType = imageType === 'png' ? 'image/png' : 
+                     imageType === 'gif' ? 'image/gif' : 
+                     imageType === 'webp' ? 'image/webp' : 'image/jpeg'
+      imageUrl = `data:${mimeType};base64,${notice.imageData}`
+    }
+    return imageUrl || ''
   }
 
   const goToNextDashboard = () => {
@@ -421,14 +470,14 @@ export default function PublicNoticePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="w-full px-3 py-2">
+        <div className="w-full px-2 sm:px-3 py-1 sm:py-2">
           {/* Main Header Row */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
             {/* Left side - Logo and Title */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               {settings?.logo && (
                 <motion.div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md overflow-hidden bg-white/10 backdrop-blur-sm"
+                  className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shadow-md overflow-hidden bg-white/10 backdrop-blur-sm"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2 }}
@@ -440,9 +489,9 @@ export default function PublicNoticePage() {
                   />
                 </motion.div>
               )}
-              <div>
+              <div className="min-w-0 flex-1">
                 <motion.h1 
-                  className="text-lg font-bold text-white truncate"
+                  className="text-sm sm:text-lg font-bold text-white truncate"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
@@ -460,39 +509,87 @@ export default function PublicNoticePage() {
               </div>
             </div>
 
-            {/* Center - Emergency Contact Info */}
-            {(settings?.emergencyNumber || settings?.emergencyContact) && (
-              <motion.div 
-                className="hidden md:flex items-center space-x-4 text-white"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
+            {/* Center - Emergency Contact Info, Current Screen, and Pagination */}
+            <motion.div 
+              className="flex flex-col sm:flex-row items-center justify-center sm:justify-start space-y-1 sm:space-y-0 sm:space-x-2 lg:space-x-4 text-white text-xs sm:text-xs"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              {/* Current Screen Display */}
+              {currentDashboard?.screenName && (
+                <div className="flex items-center space-x-1 bg-white/10 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 sm:py-1.5 border border-white/20">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-semibold text-blue-100">
+                    {currentDashboard.screenName}
+                  </span>
+                </div>
+              )}
+              
+              {/* Emergency Contact Info - Responsive Layout */}
+              <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
                 {settings?.emergencyNumber && (
                   <div className="flex items-center space-x-1">
-                    <Phone className="w-3 h-3 text-red-400" />
-                    <span className="text-xs font-semibold">Emergency: {settings.emergencyNumber}</span>
+                    <Phone className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-red-400 flex-shrink-0" />
+                    <span className="text-xs font-semibold hidden xs:inline">Emergency:</span>
+                    <span className="text-xs font-semibold">{settings.emergencyNumber}</span>
                   </div>
                 )}
                 {settings?.emergencyContact && (
                   <div className="flex items-center space-x-1">
-                    <User className="w-3 h-3 text-blue-400" />
-                    <span className="text-xs font-semibold">Contact: {settings.emergencyContact}</span>
+                    <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-blue-400 flex-shrink-0" />
+                    <span className="text-xs font-semibold hidden xs:inline">Contact:</span>
+                    <span className="text-xs font-semibold">{settings.emergencyContact}</span>
                   </div>
                 )}
                 {settings?.departmentName && (
                   <div className="flex items-center space-x-1">
-                    <Building className="w-3 h-3 text-green-400" />
-                    <span className="text-xs font-semibold">{settings.departmentName}</span>
+                    <Building className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-400 flex-shrink-0" />
+                    <span className="text-xs font-semibold hidden sm:inline">{settings.departmentName}</span>
                   </div>
                 )}
-              </motion.div>
-            )}
+              </div>
+
+              {/* Dashboard Navigation - Integrated into header */}
+              {dashboards.length > 1 && (
+                <div className="flex items-center space-x-1 sm:space-x-2 sm:ml-2 lg:ml-4 sm:pl-2 lg:pl-4 sm:border-l sm:border-white/20">
+                  <button
+                    onClick={goToPrevDashboard}
+                    disabled={currentDashboardIndex === 0}
+                    className="p-0.5 sm:p-1 rounded-full bg-white/10 backdrop-blur-sm text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-all"
+                  >
+                    <ChevronLeft className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                  </button>
+                  
+                  <div className="flex items-center space-x-0.5 sm:space-x-1">
+                    {dashboards.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => goToDashboard(index)}
+                        className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full transition-all ${
+                          index === currentDashboardIndex 
+                            ? 'bg-white' 
+                            : 'bg-white/30 hover:bg-white/50'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={goToNextDashboard}
+                    disabled={currentDashboardIndex === dashboards.length - 1}
+                    className="p-0.5 sm:p-1 rounded-full bg-white/10 backdrop-blur-sm text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-all"
+                  >
+                    <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                  </button>
+                </div>
+              )}
+            </motion.div>
 
             {/* Right side - Time and Date */}
-            <div className="text-right text-white">
+            <div className="text-center sm:text-right text-white">
               <motion.div 
-                className="text-lg font-bold font-mono"
+                className="text-sm sm:text-lg font-bold font-mono"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 }}
@@ -512,88 +609,12 @@ export default function PublicNoticePage() {
             </div>
           </div>
 
-          {/* Auto-refresh and Pagination Controls */}
-          <motion.div 
-            className="mt-2 pt-2 border-t border-white/20 flex items-center justify-center space-x-2 md:space-x-4"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            {/* Auto-refresh indicator */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-full px-2 md:px-3 py-1 flex items-center space-x-2 text-white">
-              <RefreshCw className="w-3 h-3 animate-spin" />
-              <span className="text-xs font-medium hidden sm:inline">Auto-refreshing every 30 minutes</span>
-              <span className="text-xs font-medium sm:hidden">Auto-refresh</span>
-            </div>
 
-            {/* Auto-pagination toggle */}
-            {dashboards.length > 1 && (
-              <button
-                onClick={toggleAutoPagination}
-                className="bg-white/10 backdrop-blur-sm rounded-full px-2 md:px-3 py-1 flex items-center space-x-2 text-white hover:bg-white/20 transition-all"
-                title={autoPaginationEnabled ? 'Disable auto-pagination' : 'Enable auto-pagination'}
-              >
-                {autoPaginationEnabled ? (
-                  <>
-                    <Pause className="w-3 h-3" />
-                    <span className="text-xs font-medium">Auto: {formatCountdown(countdown)}</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3 h-3" />
-                    <span className="text-xs font-medium">Manual Mode</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {/* Dashboard Navigation */}
-            {dashboards.length > 1 && (
-              <div className="flex items-center space-x-2 md:space-x-3">
-                <button
-                  onClick={goToPrevDashboard}
-                  disabled={currentDashboardIndex === 0}
-                  className="p-1 rounded-full bg-white/10 backdrop-blur-sm text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-all"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                
-                <div className="flex items-center space-x-1">
-                  {dashboards.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => goToDashboard(index)}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        index === currentDashboardIndex 
-                          ? 'bg-white' 
-                          : 'bg-white/30 hover:bg-white/50'
-                      }`}
-                    />
-                  ))}
-                </div>
-                
-                <button
-                  onClick={goToNextDashboard}
-                  disabled={currentDashboardIndex === dashboards.length - 1}
-                  className="p-1 rounded-full bg-white/10 backdrop-blur-sm text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-all"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-                
-                <div className="text-white text-xs font-medium hidden sm:inline">
-                  Page {currentDashboardIndex + 1} of {dashboards.length}
-                </div>
-                <div className="text-white text-xs font-medium sm:hidden">
-                  {currentDashboardIndex + 1}/{dashboards.length}
-                </div>
-              </div>
-            )}
-          </motion.div>
         </div>
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 p-2 md:p-6 overflow-hidden">
+      <main className="flex-1 p-1 sm:p-2 md:p-3 overflow-hidden">
         <div className="w-full h-full overflow-hidden">
           {/* Dashboard Content */}
           {dashboardLoading ? (
@@ -602,14 +623,15 @@ export default function PublicNoticePage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <div className="text-center text-white">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mx-auto mb-4"></div>
-                <p className="text-xl font-semibold">Loading Dashboard Content...</p>
+              <div className="text-center text-white px-4">
+                <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-white border-t-transparent mx-auto mb-3 sm:mb-4"></div>
+                <p className="text-lg sm:text-xl font-semibold">Loading Dashboard Content...</p>
+                <p className="text-xs sm:text-sm opacity-70 mt-2">Ordering: Latest first, then by screen order (1, 2, 3...)</p>
               </div>
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className="w-full h-full rounded-lg shadow-lg p-2 md:p-6"
+              className="w-full h-full rounded-lg shadow-lg p-1 sm:p-2 md:p-3"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
@@ -618,12 +640,12 @@ export default function PublicNoticePage() {
                 className="relative w-full h-full overflow-hidden rounded-lg shadow-lg"
                 style={{
                   aspectRatio: currentDashboard.aspectRatio,
-                  minHeight: '300px',
+                  minHeight: '250px',
                   maxHeight: '100%'
                 }}
               >
                 {/* Grid Layout for Widgets */}
-                <div className="grid gap-2 md:gap-4 p-2 md:p-4 h-full notice-grid-container" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
+                <div className="grid gap-1 sm:gap-2 md:gap-4 p-1 sm:p-2 md:p-4 h-full notice-grid-container" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
                   {currentDashboard.containers.map((container, index) => {
                     const settings = container.settings || {}
                     const bgColor = settings.backgroundColor || '#ffffff'
@@ -631,14 +653,20 @@ export default function PublicNoticePage() {
                     const borderColor = settings.borderColor || '#e2e8f0'
                     const borderWidth = settings.borderWidth || 1
                     
+                    // Calculate grid position using x, y coordinates from database
+                    const gridX = container.x || 0
+                    const gridY = container.y || 0
+                    const gridW = Math.min(container.w || 1, 12)
+                    const gridH = Math.min(container.h || 1, 6)
+                    
                     return (
                       <motion.div
                         key={container.id}
                         id={container.id}
                         className="relative rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
                         style={{
-                          gridColumn: `span ${Math.min(container.w, 12)}`,
-                          gridRow: `span ${Math.min(container.h, 6)}`,
+                          gridColumn: `${gridX + 1} / span ${gridW}`,
+                          gridRow: `${gridY + 1} / span ${gridH}`,
                           backgroundColor: `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
                           border: `${borderWidth}px solid ${borderColor}`,
                           position: 'relative',
@@ -656,7 +684,7 @@ export default function PublicNoticePage() {
                       >
                         {/* Widget Header */}
                         <div 
-                          className="px-2 md:px-4 py-2 md:py-3 border-b relative overflow-hidden flex-shrink-0"
+                          className="px-1 sm:px-2 md:px-4 py-1 sm:py-2 md:py-3 border-b relative overflow-hidden flex-shrink-0"
                           style={{
                             backgroundColor: settings.categoryBackgroundColor || '#f8fafc',
                             borderBottomColor: settings.categoryBorderColor || '#e2e8f0',
@@ -675,11 +703,11 @@ export default function PublicNoticePage() {
                           
                           <div className="relative flex items-center justify-center">
                             <h3 
-                              className="text-sm md:text-lg font-bold text-center truncate px-2 md:px-4 py-1 md:py-2 rounded-xl relative overflow-hidden"
+                              className="text-xs sm:text-sm md:text-lg font-bold text-center truncate px-1 sm:px-2 md:px-4 py-0.5 sm:py-1 md:py-2 rounded-xl relative overflow-hidden"
                             style={{
                               color: settings.categoryFontColor || '#1e293b',
                               fontFamily: settings.categoryFont || 'Inter',
-                              fontSize: `clamp(12px, ${settings.categoryFontSize || 16}px, 18px)`,
+                              fontSize: `clamp(10px, ${settings.categoryFontSize || 16}px, 18px)`,
                               fontWeight: settings.categoryFontWeight || 'bold',
                               textShadow: '0 2px 4px rgba(0,0,0,0.15)',
                               backgroundColor: `${settings.categoryBackgroundColor || '#f8fafc'}90`,
@@ -701,13 +729,13 @@ export default function PublicNoticePage() {
                             </span>
                             {/* Decorative elements */}
                             <div 
-                              className="absolute top-0 left-0 w-2 h-2 rounded-full opacity-60"
+                              className="absolute top-0 left-0 w-1 h-1 sm:w-2 sm:h-2 rounded-full opacity-60"
                               style={{
                                 backgroundColor: settings.accentColor || '#3b82f6'
                               }}
                             />
                             <div 
-                              className="absolute bottom-0 right-0 w-2 h-2 rounded-full opacity-60"
+                              className="absolute bottom-0 right-0 w-1 h-1 sm:w-2 sm:h-2 rounded-full opacity-60"
                               style={{
                                 backgroundColor: settings.accentColor || '#3b82f6'
                               }}
@@ -726,9 +754,9 @@ export default function PublicNoticePage() {
 
                         {/* Widget Content */}
                         <div 
-                          className="p-2 md:p-4 flex-1 flex flex-col justify-center overflow-hidden" 
+                          className="p-1 sm:p-2 md:p-4 flex-1 flex flex-col justify-center overflow-hidden" 
                           style={{ 
-                            minHeight: '150px'
+                            minHeight: '120px'
                           }}
                         >
                           {container.type === 'notice' && container.noticeIds && (
@@ -747,8 +775,9 @@ export default function PublicNoticePage() {
                                       borderLeft: `3px solid ${borderColor}`,
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
-                                      minHeight: '100px',
-                                      maxHeight: '140px',
+                                      height: getResponsiveNoticeHeight(),
+                                      minHeight: getResponsiveNoticeHeight(),
+                                      maxHeight: getResponsiveNoticeHeight(),
                                       width: '100%',
                                       overflow: 'hidden'
                                     }}
@@ -761,23 +790,23 @@ export default function PublicNoticePage() {
                                     }}
                                   >
                                     {/* QR Code - Responsive Size */}
-                                    <div className="qr-code-container responsive-qr-code">
-                                      <NoticeQRCode 
-                                        notice={notice}
-                                        imageData={notice.imageData}
-                                        imageTitle={notice.imageFileName || notice.title}
-                                        size={64}
-                                        className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
-                                      />
-                                    </div>
+                                                                         <div className="qr-code-container responsive-qr-code">
+                                       <NoticeQRCode 
+                                         notice={notice}
+                                         imageData={notice.imageData}
+                                         imageTitle={notice.imageFileName || notice.title}
+                                         size={viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80}
+                                         className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
+                                       />
+                                     </div>
                                     {/* Notice Header */}
-                                    <div className="p-2 md:p-4 pb-2 pr-16 md:pr-20 lg:pr-24 xl:pr-28">
+                                    <div className="p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 pr-16 sm:pr-20 md:pr-24 lg:pr-28 xl:pr-32">
                                       {/* Notice Title */}
                                       <h4 
                                         className="text-xs md:text-sm font-semibold leading-tight mb-2 line-clamp-2 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
-                                          fontSize: `clamp(10px, ${settings.fontSize || 14}px, 16px)`,
+                                          fontSize: `${getResponsiveTitleFontSize()}px`,
                                           fontWeight: settings.fontWeight || 'semibold',
                                           fontFamily: settings.fontFamily || 'Inter',
                                           lineHeight: '1.3',
@@ -792,7 +821,7 @@ export default function PublicNoticePage() {
                                       <div className="flex items-center gap-2 flex-wrap">
                                                                                     {/* Category Badge */}
                                             {(container.settings?.customCategoryName || notice.categoryName) && (
-                                              <div className="inline-flex items-center px-2 md:px-3 py-1 md:py-1.5 rounded-full text-xs font-semibold relative overflow-hidden group"
+                                              <div className="inline-flex items-center px-1.5 sm:px-2 md:px-3 py-0.5 sm:py-1 md:py-1.5 rounded-full text-xs font-semibold relative overflow-hidden group"
                                                 style={{
                                                   backgroundColor: `${borderColor}15`,
                                                   color: settings.fontColor || '#1e293b',
@@ -821,7 +850,7 @@ export default function PublicNoticePage() {
                                                 {/* Icon for custom category names */}
                                                 {container.settings?.customCategoryName && (
                                                   <svg 
-                                                    className="w-3 h-3 mr-1 md:mr-1.5 relative z-10" 
+                                                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1 md:mr-1.5 relative z-10" 
                                                     fill="currentColor" 
                                                     viewBox="0 0 20 20"
                                                   >
@@ -918,15 +947,15 @@ export default function PublicNoticePage() {
                             </div>
                           )}
 
-                          {container.type === 'image' && container.imageIds && (
+                          {container.type === 'image' && container.noticeIds && (
                             <div className="h-full flex items-center justify-center p-2 md:p-4">
-                              {container.imageIds.slice(0, 1).map((imageId: string) => {
-                                const image = getImageById(imageId)
-                                if (!image) return null
+                              {container.noticeIds.slice(0, 1).map((noticeId: string) => {
+                                const notice = getNoticeById(noticeId)
+                                if (!notice || !notice.imageUrl) return null
                                 
                                 return (
                                   <motion.div 
-                                    key={imageId} 
+                                    key={noticeId} 
                                     className="w-full h-full relative group overflow-hidden rounded-lg shadow-md"
                                     style={{
                                       borderRadius: `${settings.imageBorderRadius || 12}px`
@@ -937,8 +966,8 @@ export default function PublicNoticePage() {
                                     whileHover={{ scale: 1.02 }}
                                   >
                                     <img
-                                      src={image.imageUrl}
-                                      alt={image.title}
+                                      src={reconstructImageUrl(notice)}
+                                      alt={notice.title}
                                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                       style={{
                                         objectFit: settings.imageFit || 'cover',
@@ -957,13 +986,13 @@ export default function PublicNoticePage() {
                                           className="text-xs md:text-sm font-semibold text-white truncate"
                                           style={{
                                             color: settings.imageTitleColor || '#ffffff',
-                                            fontSize: `clamp(10px, ${settings.imageTitleFontSize || 14}px, 16px)`,
+                                            fontSize: `${getResponsiveTitleFontSize()}px`,
                                                 fontWeight: settings.imageTitleFontWeight || 'semibold',
                                                 fontFamily: settings.fontFamily || 'Inter',
                                                 textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                                           }}
                                         >
-                                          {image.title}
+                                          {notice.title}
                                         </p>
                                           </div>
                                           <div className="flex-shrink-0 ml-2">
@@ -983,22 +1012,21 @@ export default function PublicNoticePage() {
                             </div>
                           )}
 
-                          {(!container.noticeIds || container.noticeIds.length === 0) && 
-                           (!container.imageIds || container.imageIds.length === 0) && (
-                            <div className="flex items-center justify-center h-full p-4 md:p-6">
+                          {(!container.noticeIds || container.noticeIds.length === 0) && (
+                            <div className="flex items-center justify-center h-full p-2 sm:p-4 md:p-6">
                               <div className="text-center">
-                                <div className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 rounded-full flex items-center justify-center opacity-30"
+                                <div className="w-8 h-8 sm:w-12 sm:h-12 md:w-16 md:h-16 mx-auto mb-2 sm:mb-4 rounded-full flex items-center justify-center opacity-30"
                                   style={{
                                     backgroundColor: `${borderColor}20`,
                                     border: `2px dashed ${borderColor}40`
                                   }}
                                 >
-                                  <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-4 h-4 sm:w-6 sm:h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                   </svg>
                                 </div>
                                 <p 
-                                  className="text-xs md:text-sm font-medium opacity-60"
+                                  className="text-xs sm:text-xs md:text-sm font-medium opacity-60"
                                   style={{
                                     color: settings.fontColor || '#1e293b'
                                   }}
@@ -1029,9 +1057,10 @@ export default function PublicNoticePage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <div className="text-center text-white">
-                <h2 className="text-xl md:text-2xl font-bold mb-4">No Dashboards Available</h2>
-                <p className="text-base md:text-lg opacity-80">Please create dashboard interfaces first.</p>
+              <div className="text-center text-white px-4">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-4">No Dashboards Available</h2>
+                <p className="text-sm sm:text-base md:text-lg opacity-80 mb-1 sm:mb-2">Please create dashboard interfaces first.</p>
+                <p className="text-xs sm:text-sm opacity-60">Dashboards will be displayed with the latest created first, then by screen order (1, 2, 3...).</p>
               </div>
             </motion.div>
           )}
@@ -1049,9 +1078,9 @@ export default function PublicNoticePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.9 }}
       >
-        <div className="w-full px-3 md:px-6 py-2 md:py-4">
-          <div className="flex items-center justify-between text-white text-xs md:text-sm">
-            <div className="flex items-center space-x-2 md:space-x-4">
+        <div className="w-full px-2 sm:px-3 md:px-6 py-1 sm:py-2 md:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-white text-xs sm:text-xs md:text-sm gap-1 sm:gap-0">
+            <div className="flex items-center justify-center sm:justify-start space-x-2 md:space-x-4">
               <span>
                 © {new Date().getFullYear()} {settings?.title || "Smart Notice Board"}
               </span>
@@ -1060,10 +1089,10 @@ export default function PublicNoticePage() {
                 {settings?.departmentName || "Information Technology Department"}
               </span>
             </div>
-            <div className="flex items-center space-x-2 md:space-x-4 text-white/80">
-              <span className="hidden md:inline">Last updated: {new Date().toLocaleString()}</span>
-              <span className="text-white/60 hidden md:inline">•</span>
-              <span>Auto-refresh enabled</span>
+            <div className="flex items-center justify-center sm:justify-end space-x-2 md:space-x-4 text-white/80">
+              <span className="hidden lg:inline">Last updated: {new Date().toLocaleString()}</span>
+              <span className="text-white/60 hidden lg:inline">•</span>
+              <span className="text-center sm:text-right">Auto-refresh every 10 minutes</span>
             </div>
           </div>
         </div>
