@@ -65,9 +65,10 @@
     display: none;  /* Safari and Chrome */
   }
 
-  /* Prevent scrolling on notice page */
+  /* Allow vertical scrolling on notice page */
   .notice-page-container {
-    overflow: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
     width: 100vw !important;
     height: 100vh !important;
     max-width: 100vw !important;
@@ -79,11 +80,11 @@
     box-sizing: border-box !important;
   }
 
-  /* Ensure grid items don't overflow */
+  /* Ensure grid can grow vertically and be scrolled by parent */
   .notice-grid-container {
     width: 100% !important;
-    height: 100% !important;
-    overflow: hidden !important;
+    height: auto !important;
+    overflow: visible !important;
     display: grid !important;
     grid-auto-rows: minmax(auto, 1fr) !important;
     align-items: stretch !important;
@@ -91,7 +92,6 @@
 
   .notice-grid-container * {
     max-width: 100% !important;
-    overflow: hidden !important;
   }
 
   /* Dynamic grid improvements */
@@ -144,7 +144,7 @@
     }
   }
 
-  /* Additional rules to prevent any overflow */
+  /* Ensure inner containers don't clip vertical overflow */
   .notice-page-container .motion-div,
   .notice-page-container .motion-header,
   .notice-page-container .motion-footer,
@@ -152,7 +152,8 @@
   .notice-page-container .grid {
     max-width: 100% !important;
     max-height: 100% !important;
-    overflow: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
   }
 
   /* Ensure responsive behavior */

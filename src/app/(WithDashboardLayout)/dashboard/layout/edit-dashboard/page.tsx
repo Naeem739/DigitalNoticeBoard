@@ -2193,19 +2193,6 @@ function EditDashboardDemo() {
       <div className="mb-8 p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-              <Layers className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-slate-800">Screen Management</h3>
-              <p className="text-slate-600 text-sm mt-1">Organize and manage multiple display screens</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-2xl font-bold text-blue-600">{screens.length}</div>
-              <div className="text-xs text-slate-500 uppercase tracking-wide">Active Screens</div>
-            </div>
             <button
               onClick={addScreen}
               className="group relative bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl border-0 transform hover:scale-105 active:scale-95"
@@ -2218,6 +2205,12 @@ function EditDashboardDemo() {
               </div>
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-sm"></div>
             </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-2xl font-bold text-blue-600">{screens.length}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-wide">Active Screens</div>
+            </div>
           </div>
         </div>
         

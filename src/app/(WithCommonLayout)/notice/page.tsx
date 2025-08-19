@@ -74,16 +74,7 @@ export default function PublicNoticePage() {
   // Initialize component
   useEffect(() => {
     setMounted(true)
-    
-    // Add classes to prevent scrolling
-    document.body.classList.add('notice-page-active')
-    document.documentElement.classList.add('notice-page-active')
-    
-    // Cleanup function to remove classes
-    return () => {
-      document.body.classList.remove('notice-page-active')
-      document.documentElement.classList.remove('notice-page-active')
-    }
+    return () => {}
   }, [])
 
   // Auto-refresh every 10 minutes
@@ -614,8 +605,8 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 p-1 sm:p-2 md:p-3 overflow-hidden">
-        <div className="w-full h-full overflow-hidden">
+      <main className="flex-1 min-h-0 p-1 sm:p-2 md:p-3 overflow-hidden">
+        <div className="w-full h-full">
           {/* Dashboard Content */}
           {dashboardLoading ? (
             <motion.div 
@@ -637,15 +628,13 @@ export default function PublicNoticePage() {
               transition={{ delay: 0.8 }}
             >
               <div 
-                className="relative w-full h-full overflow-hidden rounded-lg shadow-lg"
+                className="relative w-full h-full overflow-y-auto rounded-lg shadow-lg"
                 style={{
-                  aspectRatio: currentDashboard.aspectRatio,
-                  minHeight: '250px',
-                  maxHeight: '100%'
+                  minHeight: '250px'
                 }}
               >
                 {/* Grid Layout for Widgets */}
-                <div className="grid gap-1 sm:gap-2 md:gap-4 p-1 sm:p-2 md:p-4 h-full notice-grid-container" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
+                <div className="grid gap-1 sm:gap-2 md:gap-4 p-1 sm:p-2 md:p-4 notice-grid-container" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
                   {currentDashboard.containers.map((container, index) => {
                     const settings = container.settings || {}
                     const bgColor = settings.backgroundColor || '#ffffff'
