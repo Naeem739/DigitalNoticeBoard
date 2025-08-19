@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  role      UserRole @default(USER)
+  id                  String               @id @default(cuid())
+  name                String?
+  email               String               @unique
+  password            String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  role                UserRole             @default(USER)
+  ModeratorPermission ModeratorPermission?
 }
 
 model Notice {
@@ -57,13 +58,13 @@ model Category {
 }
 
 model Dashboard {
-  id          String    @id @default(uuid())
-  aspectRatio String
-  containers  Json
-  screenName  String?
-  screenIndex Int?
+  id           String    @id @default(uuid())
+  aspectRatio  String
+  containers   Json
+  screenName   String?
+  screenIndex  Int?
   totalScreens Int?
-  createdAt   DateTime? @default(now())
+  createdAt    DateTime? @default(now())
 }
 
 model Template {
@@ -121,6 +122,15 @@ model PublicNoticeTemplate {
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
   fontColor               String   @default("#ffffff")
+}
+
+model ModeratorPermission {
+  id            String   @id @default(cuid())
+  moderatorId   String   @unique
+  moderator     User     @relation(fields: [moderatorId], references: [id])
+  allowedRoutes String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 enum UserRole {

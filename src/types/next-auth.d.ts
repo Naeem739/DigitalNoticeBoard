@@ -8,6 +8,8 @@ declare module 'next-auth' {
             name?: string | null;
             email?:string | null;
             role?: string;
+            // Optional list of routes a moderator is allowed to access
+            allowedRoutes?: string[];
         } & DefaultSession['user']
        
 
@@ -27,6 +29,7 @@ declare module 'next-auth' {
         sub:string;
         id:string;
         role?: string;
+        allowedRoutes?: string[];
     }
 
 }
