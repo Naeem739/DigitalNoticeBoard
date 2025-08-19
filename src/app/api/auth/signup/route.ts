@@ -45,6 +45,17 @@ export async function POST(req: Request) {
       },
     })
 
+    // If created user is a moderator, initialize empty permission row for DX
+    if (user.role === UserRole.MODERATOR) {
+      try {
+        await prisma.moderatorPermission.upsert({
+          where: { moderatorId: user.id },
+          create: { moderatorId: user.id, allowedRoutes: [] },
+          update: {}
+        })
+      } catch {}
+    }
+
     return NextResponse.json({
       success: true,
       user: {

@@ -52,6 +52,11 @@ const handler = NextAuth({
         session.user.email = token.email;
         session.user.id = token.sub;
         session.user.role = token.role;
+        // attach allowed routes for moderator to the client session to avoid hydration issues
+        // keep it undefined for other roles
+        if (Array.isArray((token as any).allowedRoutes)) {
+          (session.user as any).allowedRoutes = (token as any).allowedRoutes as string[];
+        }
       }
 
       // console.log("From session_________________________");
@@ -61,15 +66,35 @@ const handler = NextAuth({
     },
     async jwt({token, user}){
       if(user){
-         token.name = user.name;
-        token.email = user.email;
-         token.id = user.id;
-         token.role = user.role;
+        token.name = user.name as string;
+        token.email = user.email as string;
+        // next-auth sets sub as string id; keep token.id for convenience
+        (token as any).id = (user as any).id as string;
+        (token as any).role = (user as any).role as string;
       }
-      // console.log("token", token);
-      // console.log("user from NextAuth ",user);
 
-      // console.log("_____________________________________________________________");
+      // Enrich moderator token with allowed routes from DB to enable middleware checks
+      try {
+        const role = (token as any).role as string | undefined;
+        if (role === 'MODERATOR') {
+          const moderatorId = ((token as any).id as string) || (token.sub as string);
+          if (moderatorId) {
+            const permission = await prisma.moderatorPermission.findUnique({
+              where: { moderatorId },
+              select: { allowedRoutes: true }
+            });
+            (token as any).allowedRoutes = permission?.allowedRoutes ?? [];
+          }
+        } else {
+          // Remove to keep token small for other roles
+          delete (token as any).allowedRoutes;
+        }
+      } catch (e) {
+        // On any error, default to no extra routes
+        if ((token as any).role === 'MODERATOR') {
+          (token as any).allowedRoutes = [];
+        }
+      }
       return token;
     }
   },

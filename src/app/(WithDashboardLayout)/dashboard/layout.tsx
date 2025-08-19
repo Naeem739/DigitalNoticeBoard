@@ -6,6 +6,9 @@ import Header from './components/Header';
 import SidebarOverlay from './components/SidebarOverlay';
 import { useSession } from "next-auth/react";
 import Loading from '@/app/loading';
+import { Plus_Jakarta_Sans } from 'next/font/google'
+
+const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 
 export default function DashboardLayout({
   children,
@@ -23,7 +26,7 @@ export default function DashboardLayout({
   if (!session) return <p>Access Denied</p>;
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden">
+    <div className={`${jakarta.className} antialiased flex h-screen bg-white overflow-hidden`}>
       <Sidebar isOpen={isSidebarOpen} />
       <div className="flex flex-col flex-1">
         <Header toggleSidebar={toggleSidebar} />

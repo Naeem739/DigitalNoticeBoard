@@ -64,6 +64,7 @@ type TDashboardStats = {
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const [fetchedAllowedRoutes, setFetchedAllowedRoutes] = useState<string[] | null>(null)
   const router = useRouter()
   const [stats, setStats] = useState<TDashboardStats>({
     totalNotices: 0,
@@ -81,6 +82,25 @@ export default function DashboardPage() {
   const [showImageModal, setShowImageModal] = useState(false)
   const [selectedPDF, setSelectedPDF] = useState<any>(null)
   const [showPDFModal, setShowPDFModal] = useState(false)
+
+  // Load fresh permissions for moderators so UI reflects latest checks
+  useEffect(() => {
+    const loadPerms = async () => {
+      if (session?.user?.role !== 'MODERATOR') return
+      const moderatorId = (session?.user as any)?.id as string | undefined
+      if (!moderatorId) return
+      try {
+        const res = await fetch(`/api/admin/permissions/${moderatorId}`)
+        if (res.ok) {
+          const json = await res.json()
+          const routes: string[] = Array.isArray(json.allowedRoutes) ? json.allowedRoutes : []
+          // Ensure home and dashboard are present by default
+          setFetchedAllowedRoutes(Array.from(new Set<string>(['/', '/dashboard', ...routes])))
+        }
+      } catch {}
+    }
+    loadPerms()
+  }, [session?.user?.id, session?.user?.role])
 
   useEffect(() => {
     fetchDashboardStats()
@@ -137,6 +157,29 @@ export default function DashboardPage() {
     }
   }
 
+  // Determine allowed routes (fresh fetch preferred, fallback to session token)
+  const allowedRoutes: string[] = (session?.user?.role === 'MODERATOR')
+    ? (fetchedAllowedRoutes ?? ((session?.user as any)?.allowedRoutes || ['/']))
+    : []
+
+  const isAllowed = (href: string) => {
+    if (session?.user?.role !== 'MODERATOR') return true
+    
+    // Dashboard route is always allowed for moderators
+    if (href === '/dashboard') {
+      return true
+    }
+    
+    // Home visibility depends only on explicit '/'
+    if (href === '/') {
+      return allowedRoutes.includes('/')
+    }
+    
+    // For other routes, check if the href starts with any allowed route
+    const enforceable = allowedRoutes.filter(r => r && r !== '/' && r !== '/dashboard')
+    return enforceable.some(route => href.startsWith(route))
+  }
+
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
@@ -187,6 +230,8 @@ export default function DashboardPage() {
             <p className="text-gray-600 mt-1">
               {session?.user?.role === 'USER' 
                 ? 'Here are the latest notices and updates from your Smart Notice Board'
+                : session?.user?.role === 'MODERATOR'
+                ? 'Here\'s what\'s happening with your Smart Notice Board (Limited Access)'
                 : 'Here\'s what\'s happening with your Smart Notice Board'
               }
             </p>
@@ -198,6 +243,11 @@ export default function DashboardPage() {
               <>
                 <Eye className="w-3 h-3 mr-1" />
                 View Only
+              </>
+            ) : session?.user?.role === 'MODERATOR' ? (
+              <>
+                <Shield className="w-3 h-3 mr-1" />
+                Moderator
               </>
             ) : (
               <>
@@ -213,25 +263,32 @@ export default function DashboardPage() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${session?.user?.role === 'USER' ? '3' : '5'} gap-6`}
+        className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${
+          session?.user?.role === 'USER' ? '3' : 
+          session?.user?.role === 'MODERATOR' ? 
+            [isAllowed('/dashboard/showNotices'), isAllowed('/dashboard/category'), isAllowed('/dashboard/showImageNotices'), isAllowed('/dashboard/showPDFNotices'), isAllowed('/dashboard/noticeInterfaces')].filter(Boolean).length :
+          '5'
+        } gap-6`}
       >
-        <Link href="/dashboard/showNotices">
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <FileText className="w-6 h-6 text-blue-600" />
+        {isAllowed('/dashboard/showNotices') && (
+          <Link href="/dashboard/showNotices">
+            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-100 rounded-lg">
+                    <FileText className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-blue-800">{stats.totalNotices}</div>
+                    <div className="text-sm text-blue-600">Total Notices</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-blue-800">{stats.totalNotices}</div>
-                  <div className="text-sm text-blue-600">Total Notices</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
-        {session?.user?.role !== 'USER' && (
+        {session?.user?.role !== 'USER' && isAllowed('/dashboard/category') && (
           <Link href="/dashboard/category">
             <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-6">
@@ -249,39 +306,43 @@ export default function DashboardPage() {
           </Link>
         )}
 
-        <Link href="/dashboard/showImageNotices">
-          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <Image className="w-6 h-6 text-purple-600" />
+        {isAllowed('/dashboard/showImageNotices') && (
+          <Link href="/dashboard/showImageNotices">
+            <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-purple-100 rounded-lg">
+                    <Image className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-purple-800">{stats.totalImages}</div>
+                    <div className="text-sm text-purple-600">Images</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-purple-800">{stats.totalImages}</div>
-                  <div className="text-sm text-purple-600">Images</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
-        <Link href="/dashboard/showPDFNotices">
-          <Card className="bg-gradient-to-br from-red-50 to-pink-50 border-red-200 hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-red-100 rounded-lg">
-                  <FileText className="w-6 h-6 text-red-600" />
+        {isAllowed('/dashboard/showPDFNotices') && (
+          <Link href="/dashboard/showPDFNotices">
+            <Card className="bg-gradient-to-br from-red-50 to-pink-50 border-red-200 hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-red-100 rounded-lg">
+                    <FileText className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-red-800">{stats.totalPDFs}</div>
+                    <div className="text-sm text-red-600">PDFs</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-red-800">{stats.totalPDFs}</div>
-                  <div className="text-sm text-red-600">PDFs</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
-        {session?.user?.role !== 'USER' && (
+        {session?.user?.role !== 'USER' && isAllowed('/dashboard/noticeInterfaces') && (
           <Link href="/dashboard/noticeInterfaces">
             <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-orange-200 hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-6">
@@ -307,66 +368,88 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
         >
-          <Link href="/dashboard/create-notice">
-            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 group">
-              <CardContent className="p-4 text-center">
-                <div className="p-3 bg-blue-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
-                  <Plus className="w-6 h-6 text-blue-600" />
-                </div>
-                <h3 className="font-semibold text-gray-800">Create Notice</h3>
-                <p className="text-xs text-gray-500 mt-1">Add new notice content</p>
-              </CardContent>
-            </Card>
-          </Link>
+          {(session?.user?.role !== 'MODERATOR' || isAllowed('/dashboard/create-notice')) && (
+            <Link href="/dashboard/create-notice">
+              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 group">
+                <CardContent className="p-4 text-center">
+                  <div className="p-3 bg-blue-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
+                    <Plus className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Create Notice</h3>
+                  <p className="text-xs text-gray-500 mt-1">Add new notice content</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
 
-          <Link href="/dashboard/layout/edit-dashboard">
-            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-green-300 group">
-              <CardContent className="p-4 text-center">
-                <div className="p-3 bg-green-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-green-200 transition-colors">
-                  <Layout className="w-6 h-6 text-green-600" />
-                </div>
-                <h3 className="font-semibold text-gray-800">New Interface</h3>
-                <p className="text-xs text-gray-500 mt-1">Create or customize a dashboard interface</p>
-              </CardContent>
-            </Card>
-          </Link>
+          {(session?.user?.role !== 'MODERATOR' || isAllowed('/dashboard/layout/edit-dashboard')) && (
+            <Link href="/dashboard/layout/edit-dashboard">
+              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-green-300 group">
+                <CardContent className="p-4 text-center">
+                  <div className="p-3 bg-green-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-green-200 transition-colors">
+                    <Layout className="w-6 h-6 text-green-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Create New Dashboard</h3>
+                  <p className="text-xs text-gray-500 mt-1">Create or customize a dashboard interface</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
 
-          <Link href="/dashboard/showNotices">
-            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-purple-300 group">
-              <CardContent className="p-4 text-center">
-                <div className="p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-purple-200 transition-colors">
-                  <Eye className="w-6 h-6 text-purple-600" />
-                </div>
-                <h3 className="font-semibold text-gray-800">View Notices</h3>
-                <p className="text-xs text-gray-500 mt-1">Browse all notices</p>
-              </CardContent>
-            </Card>
-          </Link>
+          {(session?.user?.role !== 'MODERATOR' || isAllowed('/dashboard/showNotices')) && (
+            <Link href="/dashboard/showNotices">
+              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-purple-300 group">
+                <CardContent className="p-4 text-center">
+                  <div className="p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-purple-200 transition-colors">
+                    <Eye className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">View Notices</h3>
+                  <p className="text-xs text-gray-500 mt-1">Browse all notices</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
 
-          <Link href={
-            session?.user?.role === 'ADMIN' 
-              ? "/dashboard/admin/make-moderator" 
-              : session?.user?.role === 'MODERATOR'
-              ? "/dashboard/admin/make-user"
-              : "/dashboard/admin/make-admin"
-          }>
-            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-orange-300 group">
-              <CardContent className="p-4 text-center">
-                <div className="p-3 bg-orange-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-orange-200 transition-colors">
-                  <Crown className="w-6 h-6 text-orange-600" />
-                </div>
-                <h3 className="font-semibold text-gray-800">
-                  {session?.user?.role === 'ADMIN' 
-                    ? 'Manage Moderators' 
-                    : session?.user?.role === 'MODERATOR'
-                    ? 'Manage Users'
-                    : 'Manage Admins'
-                  }
-                </h3>
-                <p className="text-xs text-gray-500 mt-1">User management</p>
-              </CardContent>
-            </Card>
-          </Link>
+          {(session?.user?.role !== 'MODERATOR' || (isAllowed('/dashboard/admin/make-user') || isAllowed('/dashboard/admin/showAllUsers'))) && (
+            <Link href={
+              session?.user?.role === 'ADMIN' 
+                ? "/dashboard/admin/make-moderator" 
+                : session?.user?.role === 'MODERATOR'
+                ? "/dashboard/admin/make-user"
+                : "/dashboard/admin/make-admin"
+            }>
+              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-orange-300 group">
+                <CardContent className="p-4 text-center">
+                  <div className="p-3 bg-orange-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-orange-200 transition-colors">
+                    <Crown className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">
+                    {session?.user?.role === 'ADMIN' 
+                      ? 'Manage Moderators' 
+                      : session?.user?.role === 'MODERATOR'
+                      ? 'Manage Users'
+                      : 'Manage Admins'
+                    }
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">User management</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+
+          {session?.user?.role === 'ADMIN' && (
+            <Link href="/dashboard/admin/set-permission">
+              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 group">
+                <CardContent className="p-4 text-center">
+                  <div className="p-3 bg-blue-100 rounded-lg w-fit mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
+                    <Shield className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Set Moderator Permissions</h3>
+                  <p className="text-xs text-gray-500 mt-1">Control page access for moderators</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
         </motion.div>
       )}
 
@@ -418,210 +501,216 @@ export default function DashboardPage() {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Notices */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <Card className="h-full overflow-hidden">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                Recent Notices
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {stats.recentNotices.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">
-                    {session?.user?.role === 'USER' ? 'No notices available yet' : 'No notices yet'}
-                  </p>
-                  {(session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') && (
-                    <Link href="/dashboard/create-notice">
-                      <Button variant="outline" size="sm" className="mt-2">
-                        <Plus className="w-4 h-4 mr-1" />
-                        Create First Notice
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {stats.recentNotices.map((notice, index) => {
-                    // Truncate content to 6 words to prevent overflow
-                    const words = notice.content?.split(' ') || [];
-                    let truncatedContent = words.length > 6 
-                      ? words.slice(0, 6).join(' ') + '...'
-                      : notice.content || '';
-                    
-                    // Additional character-based truncation as fallback
-                    if (truncatedContent.length > 80) {
-                      truncatedContent = truncatedContent.substring(0, 77) + '...';
-                    }
-                    
-                    return (
-                      <div key={notice.id} className="flex items-start justify-between p-3 bg-white rounded-lg border border-gray-200">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 truncate mb-1">{notice.title}</h4>
-                          {session?.user?.role === 'USER' && notice.content && (
-                            <div className="text-sm text-gray-600 text-truncate-1 leading-tight mb-2">
-                              <div 
-                                dangerouslySetInnerHTML={{ 
-                                  __html: notice.content.length > 100 
-                                    ? notice.content.substring(0, 100) + '...' 
-                                    : notice.content
-                                }} 
-                              />
+        {isAllowed('/dashboard/showNotices') && (
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <Card className="h-full overflow-hidden">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  Recent Notices
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.recentNotices.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">
+                      {session?.user?.role === 'USER' ? 'No notices available yet' : 'No notices yet'}
+                    </p>
+                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/dashboard/create-notice'))) && (
+                      <Link href="/dashboard/create-notice">
+                        <Button variant="outline" size="sm" className="mt-2">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Create First Notice
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {stats.recentNotices.map((notice, index) => {
+                      // Truncate content to 6 words to prevent overflow
+                      const words = notice.content?.split(' ') || [];
+                      let truncatedContent = words.length > 6 
+                        ? words.slice(0, 6).join(' ') + '...'
+                        : notice.content || '';
+                      
+                      // Additional character-based truncation as fallback
+                      if (truncatedContent.length > 80) {
+                        truncatedContent = truncatedContent.substring(0, 77) + '...';
+                      }
+                      
+                      return (
+                        <div key={notice.id} className="flex items-start justify-between p-3 bg-white rounded-lg border border-gray-200">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-gray-900 truncate mb-1">{notice.title}</h4>
+                            {session?.user?.role === 'USER' && notice.content && (
+                              <div className="text-sm text-gray-600 text-truncate-1 leading-tight mb-2">
+                                <div 
+                                  dangerouslySetInnerHTML={{ 
+                                    __html: notice.content.length > 100 
+                                      ? notice.content.substring(0, 100) + '...' 
+                                      : notice.content
+                                  }} 
+                                />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
+                              <Badge variant="outline" className="text-xs">{notice.category}</Badge>
+                              <span>{getTimeAgo(notice.createdAt)}</span>
                             </div>
-                          )}
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
-                            <Badge variant="outline" className="text-xs">{notice.category}</Badge>
-                            <span>{getTimeAgo(notice.createdAt)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="text-center pt-2">
+                      <Link href="/dashboard/showNotices">
+                        <Button variant="outline" size="sm">
+                          View All Notices
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Recent Images */}
+        {isAllowed('/dashboard/showImageNotices') && (
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Image className="w-5 h-5 text-purple-600" />
+                  Recent Images
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.recentImages.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Image className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">
+                      {session?.user?.role === 'USER' ? 'No images available yet' : 'No images uploaded yet'}
+                    </p>
+                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/dashboard/layout/edit-dashboard'))) && (
+                      <Link href="/dashboard/layout/edit-dashboard">
+                        <Button variant="outline" size="sm" className="mt-2">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Images
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {stats.recentImages.map((image, index) => (
+                      <div key={image.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div 
+                            className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => {
+                              setSelectedImage(image)
+                              setShowImageModal(true)
+                            }}
+                          >
+                            <img 
+                              src={`data:image/jpeg;base64,${image.imageData}`}
+                              alt={image.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-gray-900 truncate">{image.imageFileName || image.title}</h4>
+                            <p className="text-xs text-gray-500">{formatDate(image.createdAt)}</p>
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
-                  <div className="text-center pt-2">
-                    <Link href="/dashboard/showNotices">
-                      <Button variant="outline" size="sm">
-                        View All Notices
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Recent Images */}
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Image className="w-5 h-5 text-purple-600" />
-                Recent Images
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {stats.recentImages.length === 0 ? (
-                <div className="text-center py-8">
-                  <Image className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">
-                    {session?.user?.role === 'USER' ? 'No images available yet' : 'No images uploaded yet'}
-                  </p>
-                  {(session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') && (
-                    <Link href="/dashboard/layout/edit-dashboard">
-                      <Button variant="outline" size="sm" className="mt-2">
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Images
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {stats.recentImages.map((image, index) => (
-                    <div key={image.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div 
-                          className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => {
-                            setSelectedImage(image)
-                            setShowImageModal(true)
-                          }}
-                        >
-                          <img 
-                            src={`data:image/jpeg;base64,${image.imageData}`}
-                            alt={image.title}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 truncate">{image.imageFileName || image.title}</h4>
-                          <p className="text-xs text-gray-500">{formatDate(image.createdAt)}</p>
-                        </div>
-                      </div>
+                    ))}
+                    <div className="text-center pt-2">
+                      <Link href="/dashboard/showImageNotices">
+                        <Button variant="outline" size="sm">
+                          View All Images
+                        </Button>
+                      </Link>
                     </div>
-                  ))}
-                  <div className="text-center pt-2">
-                    <Link href="/dashboard/showImageNotices">
-                      <Button variant="outline" size="sm">
-                        View All Images
-                      </Button>
-                    </Link>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Recent PDFs */}
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-red-600" />
-                Recent PDFs
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {stats.recentPDFs.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">
-                    {session?.user?.role === 'USER' ? 'No PDFs available yet' : 'No PDFs uploaded yet'}
-                  </p>
-                  {(session?.user?.role === 'ADMIN' || session?.user?.role === 'MODERATOR') && (
-                    <Link href="/dashboard/create-notice">
-                      <Button variant="outline" size="sm" className="mt-2">
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add PDFs
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {stats.recentPDFs.map((pdf, index) => (
-                    <div key={pdf.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div 
-                          className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => {
-                            setSelectedPDF(pdf)
-                            setShowPDFModal(true)
-                          }}
-                        >
-                          <FileText className="w-6 h-6 text-red-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 truncate">{pdf.pdfFileName || pdf.title}</h4>
-                          <p className="text-xs text-gray-500">{formatDate(pdf.createdAt)}</p>
+        {isAllowed('/dashboard/showPDFNotices') && (
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-red-600" />
+                  Recent PDFs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.recentPDFs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">
+                      {session?.user?.role === 'USER' ? 'No PDFs available yet' : 'No PDFs uploaded yet'}
+                    </p>
+                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/dashboard/create-notice'))) && (
+                      <Link href="/dashboard/create-notice">
+                        <Button variant="outline" size="sm" className="mt-2">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add PDFs
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {stats.recentPDFs.map((pdf, index) => (
+                      <div key={pdf.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div 
+                            className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => {
+                              setSelectedPDF(pdf)
+                              setShowPDFModal(true)
+                            }}
+                          >
+                            <FileText className="w-6 h-6 text-red-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-gray-900 truncate">{pdf.pdfFileName || pdf.title}</h4>
+                            <p className="text-xs text-gray-500">{formatDate(pdf.createdAt)}</p>
+                          </div>
                         </div>
                       </div>
+                    ))}
+                    <div className="text-center pt-2">
+                      <Link href="/dashboard/showPDFNotices">
+                        <Button variant="outline" size="sm">
+                          View All PDFs
+                        </Button>
+                      </Link>
                     </div>
-                  ))}
-                  <div className="text-center pt-2">
-                    <Link href="/dashboard/showPDFNotices">
-                      <Button variant="outline" size="sm">
-                        View All PDFs
-                      </Button>
-                    </Link>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
 
       {/* System Status - Only for Admin and Moderator Users */}
