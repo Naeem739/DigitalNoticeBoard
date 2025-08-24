@@ -57,7 +57,7 @@ const MENU_STRUCTURE = {
   interfaceManagement: {
     title: 'Interface Management',
     items: [
-      { href: '/dashboard/layout/edit-dashboard', icon: LayoutDashboard, label: 'Create New Dashboard' },
+      { href: '/dashboard/layout/edit-dashboard', icon: LayoutDashboard, label: 'New Interface' },
       { href: '/dashboard/noticeInterfaces', icon: Grid3X3, label: 'All Interfaces' }
     ]
   },

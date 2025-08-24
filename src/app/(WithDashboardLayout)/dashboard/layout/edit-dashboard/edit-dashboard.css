@@ -23,3 +23,27 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Safari and Chrome */
 }
+
+/* Enhanced screen container styling for larger size */
+.dashboard-screen-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 1rem;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+/* Responsive adjustments for larger screen */
+@media (max-width: 1400px) {
+  .dashboard-screen-container {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 1200px) {
+  .dashboard-screen-container {
+    padding: 0.25rem;
+  }
+}

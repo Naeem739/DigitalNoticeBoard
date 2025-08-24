@@ -507,15 +507,7 @@ export default function PublicNoticePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
             >
-              {/* Current Screen Display */}
-              {currentDashboard?.screenName && (
-                <div className="flex items-center space-x-1 bg-white/10 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 sm:py-1.5 border border-white/20">
-                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <span className="text-xs font-semibold text-blue-100">
-                    {currentDashboard.screenName}
-                  </span>
-                </div>
-              )}
+
               
               {/* Emergency Contact Info - Responsive Layout */}
               <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
@@ -1068,20 +1060,15 @@ export default function PublicNoticePage() {
         transition={{ duration: 0.5, delay: 0.9 }}
       >
         <div className="w-full px-2 sm:px-3 md:px-6 py-1 sm:py-2 md:py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-white text-xs sm:text-xs md:text-sm gap-1 sm:gap-0">
-            <div className="flex items-center justify-center sm:justify-start space-x-2 md:space-x-4">
+          <div className="flex items-center justify-center text-white text-xs sm:text-xs md:text-sm">
+            <div className="flex items-center space-x-2 md:space-x-4">
               <span>
                 © {new Date().getFullYear()} {settings?.title || "Smart Notice Board"}
               </span>
-              <span className="text-white/60 hidden sm:inline">•</span>
-              <span className="text-white/80 hidden sm:inline">
+              <span className="text-white/60">•</span>
+              <span className="text-white/80">
                 {settings?.departmentName || "Information Technology Department"}
               </span>
-            </div>
-            <div className="flex items-center justify-center sm:justify-end space-x-2 md:space-x-4 text-white/80">
-              <span className="hidden lg:inline">Last updated: {new Date().toLocaleString()}</span>
-              <span className="text-white/60 hidden lg:inline">•</span>
-              <span className="text-center sm:text-right">Auto-refresh every 10 minutes</span>
             </div>
           </div>
         </div>

@@ -58,6 +58,28 @@ const ClientOnlyGridLayout = ({ children, ...props }: any) => {
   return <GridLayout {...props}>{children}</GridLayout>;
 };
 
+// Client-only wrapper for the entire dashboard to prevent hydration issues
+const ClientOnlyDashboard = () => {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen w-full bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard editor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <EditDashboardDemo />;
+};
+
 type TCategoriesWithNotices = {
   id: string
   name: string
@@ -187,6 +209,17 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[]
   { id: "image", label: "Image", icon: <ImageIcon size={16} /> },
 ]
 
+// Function to get appropriate tabs based on widget type
+const getTabsForWidgetType = (widgetType: WidgetType | undefined) => {
+  if (widgetType === "image") {
+    // Image widgets: show style, typography, category, and image tabs
+    return SETTINGS_TABS.filter(tab => tab.id !== "content");
+  } else {
+    // Notice widgets: show style, typography, content, and category tabs
+    return SETTINGS_TABS.filter(tab => tab.id !== "image");
+  }
+}
+
 // Define the template type
 
 // Dynamic template loading - no hardcoded templates
@@ -293,71 +326,296 @@ function EditDashboardDemo() {
   // State for tracking drag over dashboard area
   const [isDragOverDashboard, setIsDragOverDashboard] = useState(false)
 
-  // Add useEffect to load saved state on component mount
+  // Loading states for all buttons
+  const [isSavingDashboard, setIsSavingDashboard] = useState(false)
+  const [isAddingWidget, setIsAddingWidget] = useState(false)
+  const [isRemovingWidget, setIsRemovingWidget] = useState(false)
+  const [isAddingScreen, setIsAddingScreen] = useState(false)
+  const [isRemovingScreen, setIsRemovingScreen] = useState(false)
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false)
+  const [isCreatingFromTemplate, setIsCreatingFromTemplate] = useState(false)
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false)
+  const [isUpdatingTemplate, setIsUpdatingTemplate] = useState(false)
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState<string | null>(null) // widgetId for which image is being uploaded
+
+  // Enhanced localStorage state management
+  const [hasInitialized, setHasInitialized] = useState(false)
+  const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 })
+
+  // Template management state
+  const [templates, setTemplates] = useState<DashboardTemplate[]>([])
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState("")
+  const [templateDescription, setTemplateDescription] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterType, setFilterType] = useState("all")
+  
+  // Additional template management state
+  const [showViewAllModal, setShowViewAllModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<DashboardTemplate | null>(null)
+  const [editingTemplate, setEditingTemplate] = useState<DashboardTemplate | null>(null)
+
+  // Enhanced useEffect to load saved state on component mount
   useEffect(() => {
-    // Only run on client side
+    // Only run on client side and after component has mounted
     if (typeof window === 'undefined') return
     
-    const urlParams = new URLSearchParams(window.location.search)
-    const dashboardId = urlParams.get('id')
-    
-    // Don't show confirmation dialog if we're loading an existing dashboard
-    if (dashboardId) {
-      return
-    }
-    
-    const savedState = localStorageUtils.getItem('dashboardState')
-    
-    if (savedState) {
+    // Use a timeout to ensure we're fully on the client side
+    const timer = setTimeout(() => {
       try {
-        const { selectedRatio: savedRatio, screens: savedScreens, currentScreenIndex: savedScreenIndex } = savedState
+        const urlParams = new URLSearchParams(window.location.search)
+        const dashboardId = urlParams.get('id')
         
-        // Check if there was previous content (screens with widgets)
-        if (savedScreens && savedScreens.length > 0 && savedScreens.some(screen => screen.widgets.length > 0)) {
-          // Show confirmation dialog instead of clearing immediately
-          setPendingSavedState(savedState)
-          setShowConfirmationDialog(true)
-        } else {
-          // No previous content, just load the ratio and screens structure
-          setSelectedRatio(savedRatio)
-          if (savedScreens) {
-            setScreens(savedScreens)
-            setCurrentScreenIndex(savedScreenIndex || 0)
+        // Don't show confirmation dialog if we're loading an existing dashboard
+        if (dashboardId) {
+          setHasInitialized(true)
+          return
+        }
+        
+        // Check if localStorage is available
+        if (typeof localStorage === 'undefined') {
+          setHasInitialized(true)
+          return
+        }
+        
+        // Check if localStorageUtils is available
+        if (!localStorageUtils || typeof localStorageUtils.getItem !== 'function') {
+          setHasInitialized(true)
+          return
+        }
+        
+        const savedState = localStorageUtils.getItem('dashboardState')
+        
+        if (savedState) {
+          const { 
+            selectedRatio: savedRatio, 
+            screens: savedScreens, 
+            currentScreenIndex: savedScreenIndex,
+            activeSettingsTab: savedActiveTab,
+            activeSettingsWidget: savedActiveWidget,
+            settingsPosition: savedSettingsPos,
+            scrollPosition: savedScrollPos,
+            isRatioDropdownOpen: savedRatioDropdown,
+            isTemplateDropdownOpen: savedTemplateDropdown,
+            searchTerm: savedSearchTerm,
+            filterType: savedFilterType,
+            templateName: savedTemplateName,
+            templateDescription: savedTemplateDescription,
+            newTemplateName: savedNewTemplateName,
+            newTemplateDescription: savedNewTemplateDescription
+          } = savedState
+          
+          // Check if there was previous content (screens with widgets)
+          if (savedScreens && savedScreens.length > 0 && savedScreens.some((screen: any) => screen.widgets.length > 0)) {
+            // Show confirmation dialog instead of clearing immediately
+            setPendingSavedState(savedState)
+            setShowConfirmationDialog(true)
+          } else {
+            // No previous content, just load the ratio and screens structure
+            restoreStateFromSaved(savedState)
+            localStorageUtils.removeItem('dashboardState')
           }
-          localStorageUtils.removeItem('dashboardState')
         }
       } catch (error) {
         console.error('Error loading saved dashboard state:', error)
-        localStorageUtils.removeItem('dashboardState')
+        try {
+          localStorageUtils.removeItem('dashboardState')
+        } catch (e) {
+          console.warn('Could not remove localStorage item:', e)
+        }
       }
-    }
+      
+      setHasInitialized(true)
+    }, 100) // Small delay to ensure hydration is complete
+    
+    return () => clearTimeout(timer)
   }, [])
 
-  // Add useEffect to save state whenever it changes
+  // Function to restore state from saved data
+  const restoreStateFromSaved = (savedState: any) => {
+    if (savedState.selectedRatio) setSelectedRatio(savedState.selectedRatio)
+    if (savedState.screens) {
+      setScreens(savedState.screens)
+      setCurrentScreenIndex(savedState.currentScreenIndex || 0)
+    }
+    if (savedState.activeSettingsTab) setActiveSettingsTab(savedState.activeSettingsTab)
+    if (savedState.activeSettingsWidget) setActiveSettingsWidget(savedState.activeSettingsWidget)
+    if (savedState.settingsPosition) setSettingsPosition(savedState.settingsPosition)
+    if (savedState.scrollPosition) {
+      setScrollPosition(savedState.scrollPosition)
+      // Restore scroll position after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        window.scrollTo(savedState.scrollPosition.x, savedState.scrollPosition.y)
+      }, 100)
+    }
+    if (savedState.isRatioDropdownOpen !== undefined) setIsRatioDropdownOpen(savedState.isRatioDropdownOpen)
+    if (savedState.isTemplateDropdownOpen !== undefined) setIsTemplateDropdownOpen(savedState.isTemplateDropdownOpen)
+    if (savedState.searchTerm !== undefined) setSearchTerm(savedState.searchTerm)
+    if (savedState.filterType !== undefined) setFilterType(savedState.filterType)
+    if (savedState.templateName !== undefined) setTemplateName(savedState.templateName)
+    if (savedState.templateDescription !== undefined) setTemplateDescription(savedState.templateDescription)
+    if (savedState.newTemplateName !== undefined) setNewTemplateName(savedState.newTemplateName)
+    if (savedState.newTemplateDescription !== undefined) setNewTemplateDescription(savedState.newTemplateDescription)
+  }
+
+  // Enhanced useEffect to save state whenever it changes
   useEffect(() => {
-    // Only run on client side
-    if (typeof window === 'undefined') return
+    // Only run on client side and after initialization
+    if (typeof window === 'undefined' || !hasInitialized) return
     
-    // Create a lightweight version of screens without large file data
-    const lightweightScreens = screens.map((screen: any) => ({
-      ...screen,
-      widgets: screen.widgets.map((widget: any) => ({
-        ...widget,
-        // Don't include file, url (base64 data), or other large properties
+    // Use a timeout to ensure we're fully on the client side
+    const timer = setTimeout(() => {
+      // Create a lightweight version of screens without large file data
+      const lightweightScreens = screens.map((screen: any) => ({
+        ...screen,
+        widgets: screen.widgets.map((widget: any) => ({
+          ...widget,
+          // Don't include file, url (base64 data), or other large properties
+        }))
       }))
-    }))
+      
+      const stateToSave = {
+        screens: lightweightScreens,
+        currentScreenIndex,
+        selectedRatio,
+        activeSettingsTab,
+        activeSettingsWidget,
+        settingsPosition,
+        scrollPosition,
+        isRatioDropdownOpen,
+        isTemplateDropdownOpen,
+        searchTerm,
+        filterType,
+        templateName,
+        templateDescription,
+        newTemplateName,
+        newTemplateDescription
+      }
+      
+      try {
+        const success = localStorageUtils.setItem('dashboardState', stateToSave)
+        if (!success) {
+          console.warn('Failed to save dashboard state to localStorage (quota exceeded or data too large)')
+        }
+      } catch (error) {
+        console.warn('Error saving to localStorage:', error)
+      }
+    }, 100) // Small delay to ensure hydration is complete
     
-    const stateToSave = {
-      screens: lightweightScreens,
-      currentScreenIndex,
-      selectedRatio
-    }
+    return () => clearTimeout(timer)
+  }, [
+    screens, 
+    currentScreenIndex, 
+    selectedRatio, 
+    activeSettingsTab, 
+    activeSettingsWidget, 
+    settingsPosition, 
+    scrollPosition,
+    isRatioDropdownOpen,
+    isTemplateDropdownOpen,
+    searchTerm,
+    filterType,
+    templateName,
+    templateDescription,
+    newTemplateName,
+    newTemplateDescription,
+    hasInitialized
+  ])
+
+  // Save scroll position on scroll events
+  useEffect(() => {
+    // Only run on client side and after initialization
+    if (typeof window === 'undefined' || !hasInitialized) return
     
-    const success = localStorageUtils.setItem('dashboardState', stateToSave)
-    if (!success) {
-      console.warn('Failed to save dashboard state to localStorage (quota exceeded or data too large)')
+    const handleScroll = () => {
+      setScrollPosition({
+        x: window.scrollX,
+        y: window.scrollY
+      })
     }
-  }, [screens, currentScreenIndex, selectedRatio])
+
+    // Use a timeout to ensure we're fully on the client side
+    const timer = setTimeout(() => {
+      window.addEventListener('scroll', handleScroll, { passive: true })
+    }, 100)
+    
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [hasInitialized])
+
+  // Save state before page unload
+  useEffect(() => {
+    // Only run on client side and after initialization
+    if (typeof window === 'undefined' || !hasInitialized) return
+    
+    const handleBeforeUnload = () => {
+      try {
+        // Force save current state before page unload
+        const stateToSave = {
+          screens: screens.map((screen: any) => ({
+            ...screen,
+            widgets: screen.widgets.map((widget: any) => ({
+              ...widget,
+              // Don't include file, url (base64 data), or other large properties
+            }))
+          })),
+          currentScreenIndex,
+          selectedRatio,
+          activeSettingsTab,
+          activeSettingsWidget,
+          settingsPosition,
+          scrollPosition: {
+            x: window.scrollX,
+            y: window.scrollY
+          },
+          isRatioDropdownOpen,
+          isTemplateDropdownOpen,
+          searchTerm,
+          filterType,
+          templateName,
+          templateDescription,
+          newTemplateName,
+          newTemplateDescription
+        }
+        
+        localStorageUtils.setItem('dashboardState', stateToSave)
+      } catch (error) {
+        console.warn('Error saving state before unload:', error)
+      }
+    }
+
+    // Use a timeout to ensure we're fully on the client side
+    const timer = setTimeout(() => {
+      window.addEventListener('beforeunload', handleBeforeUnload)
+    }, 100)
+    
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [
+    screens, 
+    currentScreenIndex, 
+    selectedRatio, 
+    activeSettingsTab, 
+    activeSettingsWidget, 
+    settingsPosition, 
+    scrollPosition,
+    isRatioDropdownOpen,
+    isTemplateDropdownOpen,
+    searchTerm,
+    filterType,
+    templateName,
+    templateDescription,
+    newTemplateName,
+    newTemplateDescription,
+    hasInitialized
+  ])
 
   // Debug useEffect to log state changes
   useEffect(() => {
@@ -366,9 +624,12 @@ function EditDashboardDemo() {
       currentScreenIndex,
       widgets: widgets.length,
       layout: layout.length,
-      selectedRatio
+      selectedRatio,
+      activeSettingsTab,
+      activeSettingsWidget,
+      scrollPosition
     })
-  }, [screens, currentScreenIndex, widgets.length, layout.length, selectedRatio])
+  }, [screens, currentScreenIndex, widgets.length, layout.length, selectedRatio, activeSettingsTab, activeSettingsWidget, scrollPosition])
 
   // Add function to clear saved state
   const clearSavedState = () => {
@@ -376,7 +637,10 @@ function EditDashboardDemo() {
   }
 
   // Screen management functions
-  const addScreen = () => {
+  const addScreen = async () => {
+    try {
+      setIsAddingScreen(true)
+      
     const newScreenId = `screen-${screens.length + 1}`
     const newScreen = {
       id: newScreenId,
@@ -387,13 +651,22 @@ function EditDashboardDemo() {
     }
     setScreens([...screens, newScreen])
     setCurrentScreenIndex(screens.length) // Switch to the new screen
+    } catch (error) {
+      console.error("Error adding screen:", error)
+      toast.error("Failed to add screen")
+    } finally {
+      setIsAddingScreen(false)
+    }
   }
 
-  const removeScreen = (screenIndex: number) => {
+  const removeScreen = async (screenIndex: number) => {
     if (screens.length <= 1) {
       toast.error("Cannot remove the last screen")
       return
     }
+    
+    try {
+      setIsRemovingScreen(true)
     
     const newScreens = screens.filter((_, index) => index !== screenIndex)
     setScreens(newScreens)
@@ -401,6 +674,12 @@ function EditDashboardDemo() {
     // Adjust current screen index if needed
     if (currentScreenIndex >= screenIndex) {
       setCurrentScreenIndex(Math.max(0, currentScreenIndex - 1))
+      }
+    } catch (error) {
+      console.error("Error removing screen:", error)
+      toast.error("Failed to remove screen")
+    } finally {
+      setIsRemovingScreen(false)
     }
   }
 
@@ -426,16 +705,8 @@ function EditDashboardDemo() {
 
   const handleCancelClear = () => {
     if (pendingSavedState) {
-      // Load the saved state (screens will be lightweight version)
-      setScreens(pendingSavedState.screens || [{
-        id: 'screen-1',
-        name: 'Screen 1',
-        widgets: [],
-        layout: [],
-        widgetSettings: {}
-      }])
-      setCurrentScreenIndex(pendingSavedState.currentScreenIndex || 0)
-      setSelectedRatio(pendingSavedState.selectedRatio)
+      // Use the enhanced restore function to restore all state
+      restoreStateFromSaved(pendingSavedState)
       
       // Check if there are image widgets that need to be re-uploaded
       const hasImageWidgets = pendingSavedState.screens?.some((screen: any) => 
@@ -456,9 +727,17 @@ function EditDashboardDemo() {
 
   useEffect(() => {
     const getData = async () => {
+      try {
+        setIsLoadingCategories(true)
       const categoriesWithNotices = (await getCategoriesWithNotices()) as TResult
       if (categoriesWithNotices.success) {
         setCategories(categoriesWithNotices.result as TCategoriesWithNotices[])
+        }
+      } catch (error) {
+        console.error("Error loading categories:", error)
+        toast.error("Failed to load categories")
+      } finally {
+        setIsLoadingCategories(false)
       }
     }
 
@@ -803,6 +1082,7 @@ function EditDashboardDemo() {
   const handleDeleteTemplate = async (templateId: string) => {
     if (confirm("Are you sure you want to delete this template?")) {
       try {
+        setIsDeletingTemplate(true)
         const success = await deleteDashboardTemplate(templateId)
         if (success) {
           setTemplates(prev => prev.filter(t => t.id !== templateId))
@@ -813,6 +1093,8 @@ function EditDashboardDemo() {
       } catch (error) {
         console.error("Error deleting template:", error)
         toast.error("Error deleting template")
+      } finally {
+        setIsDeletingTemplate(false)
       }
     }
   }
@@ -833,6 +1115,8 @@ function EditDashboardDemo() {
     }
 
     try {
+      setIsUpdatingTemplate(true)
+      
       const updatedTemplate: DashboardTemplate = {
         ...editingTemplate,
         name: templateName,
@@ -859,6 +1143,8 @@ function EditDashboardDemo() {
     } catch (error) {
       console.error("Error updating template:", error)
       toast.error("Error updating template")
+    } finally {
+      setIsUpdatingTemplate(false)
     }
   }
 
@@ -867,8 +1153,11 @@ function EditDashboardDemo() {
     setStartPosition({ x: e.clientX, y: e.clientY })
   }
 
-  const addWidget = (type: WidgetType = "notice") => {
+  const addWidget = async (type: WidgetType = "notice") => {
     if (!selectedRatio) return
+
+    try {
+      setIsAddingWidget(true)
 
     const newWidgetId = `widget-${Date.now()}-${Math.floor(Math.random() * 1000)}`
     const widgetTitle = type === "image" ? "Image Display" : 
@@ -899,11 +1188,20 @@ function EditDashboardDemo() {
     setLayout(prev => [...prev, newLayout])
 
     toast.success("Widget added successfully!", { duration: 1200 })
+    } catch (error) {
+      console.error("Error adding widget:", error)
+      toast.error("Failed to add widget")
+    } finally {
+      setIsAddingWidget(false)
+    }
   }
 
-  const removeWidget = (e: React.MouseEvent, id: string) => {
+  const removeWidget = async (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     e.stopPropagation()
+
+    try {
+      setIsRemovingWidget(true)
 
     setWidgets(prev => prev.filter((widget) => widget.id !== id))
     setLayout(prev => prev.filter((item) => item.i !== id))
@@ -915,6 +1213,12 @@ function EditDashboardDemo() {
     setActiveSettingsWidget(null)
 
             toast.success("Widget removed", { duration: 1200 })
+    } catch (error) {
+      console.error("Error removing widget:", error)
+      toast.error("Failed to remove widget")
+    } finally {
+      setIsRemovingWidget(false)
+    }
   }
 
   const handleRatioSelect = (ratio: AspectRatio) => {
@@ -1080,8 +1384,8 @@ function EditDashboardDemo() {
 
     // Convert pixel position to grid position
     // GridLayout configuration: cols=12, rowHeight=50, margin=[12,12]
-    const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
-    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
+    const containerWidth = (RATIO_DIMENSIONS[selectedRatio].width * 1.3) - 32
+    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height * 1.0 // Fixed: Use 100% height instead of 130%
     
     // Calculate grid cell dimensions
     const colWidth = (containerWidth - 11 * 24) / 12 // 11 gaps between 12 columns, each gap is 24px (12px margin on each side)
@@ -1127,8 +1431,8 @@ function EditDashboardDemo() {
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
     if (!selectedRatio) return { width: "0%", height: "0%" }
 
-    const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
-    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
+    const containerWidth = (RATIO_DIMENSIONS[selectedRatio].width * 1.3) - 32
+    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height * 1.0 // Fixed: Use 100% height instead of 130%
 
     const colWidth = (containerWidth - 11 * 24) / 12 // Fixed: 11 gaps between 12 columns, each gap is 24px
     const rowHeight = 50 // Match the new rowHeight
@@ -1147,6 +1451,8 @@ function EditDashboardDemo() {
     const dashboardId = urlParams.get('id')
     
     try {
+      setIsSavingDashboard(true)
+      
       if (dashboardId) {
         // Update existing dashboards - delete old ones and create new ones
         // First, delete existing dashboards for this ID
@@ -1178,8 +1484,8 @@ function EditDashboardDemo() {
           const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
           if (!specificLayout) return null
 
-          const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32
-          const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height
+          const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
+          const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0 // Fixed: Use 100% height instead of 130%
 
           const colWidth = (containerWidth - 11 * 24) / 12
           const rowHeight = 50
@@ -1397,6 +1703,8 @@ function EditDashboardDemo() {
     } catch (error) {
       console.error("Error saving dashboard:", error)
       toast.error(`Error saving dashboard: ${error}`)
+    } finally {
+      setIsSavingDashboard(false)
     }
   }
 
@@ -1462,7 +1770,7 @@ function EditDashboardDemo() {
   // Around line 650
 
   const handleSaveTemplate = () => {
-    setIsTemplateModalOpen(true)
+    setShowTemplateModal(true)
   }
 
   const handleTemplateSave = async (replaceExisting?: boolean) => {
@@ -1560,7 +1868,7 @@ function EditDashboardDemo() {
       if (result.success) {
         // Update local state
         setCustomTemplates([...customTemplates, newTemplate])
-        setIsTemplateModalOpen(false)
+        setShowTemplateModal(false)
         setNewTemplateName("")
         setNewTemplateDescription("")
         setShowDuplicateNameDialog(false)
@@ -1570,7 +1878,7 @@ function EditDashboardDemo() {
         // Show duplicate name dialog for custom template
         setPendingTemplate(newTemplate)
         setShowDuplicateNameDialog(true)
-        setIsTemplateModalOpen(false)
+        setShowTemplateModal(false)
       } else {
         toast.error("Failed to save template to database", { duration: 2000 })
       }
@@ -1582,7 +1890,7 @@ function EditDashboardDemo() {
   }
 
   // Enhanced image upload for image displays with professional features
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, widgetId: string) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, widgetId: string) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -1598,6 +1906,9 @@ function EditDashboardDemo() {
       toast.error('Image file size must be less than 10MB')
       return
     }
+
+    try {
+      setIsUploadingImage(widgetId)
 
     // Show loading toast
     const loadingToast = toast.loading('Processing image...')
@@ -1640,6 +1951,12 @@ function EditDashboardDemo() {
       toast.error('Failed to read image file. Please try again.')
     }
     reader.readAsDataURL(file)
+    } catch (error) {
+      console.error("Error uploading image:", error)
+      toast.error("Failed to upload image")
+    } finally {
+      setIsUploadingImage(null)
+    }
   }
 
 
@@ -1700,7 +2017,10 @@ function EditDashboardDemo() {
   }
 
   // Add this function inside the EditDashboardDemo component
-  const applyTemplate = (template: DashboardTemplate) => {
+  const applyTemplate = async (template: DashboardTemplate) => {
+    try {
+      setIsApplyingTemplate(true)
+      
     // Store all existing widget data (categories, notices, content) by position
     const existingWidgetData = widgets.map((widget) => ({
       notices: widget.notices || [],
@@ -1769,6 +2089,12 @@ function EditDashboardDemo() {
     setScreens(newScreens)
     
     toast.success(`Applied "${template.name}" template to current screen while preserving all categories and content!`, { duration: 1500 })
+    } catch (error) {
+      console.error("Error applying template:", error)
+      toast.error("Failed to apply template")
+    } finally {
+      setIsApplyingTemplate(false)
+    }
   }
 
   const createDashboardFromTemplate = async (template: DashboardTemplate) => {
@@ -1776,6 +2102,9 @@ function EditDashboardDemo() {
       toast.error("Please select a display ratio first")
       return
     }
+
+    try {
+      setIsCreatingFromTemplate(true)
 
     // Apply template without preserving notices to the current screen
     const newScreens = [...screens]
@@ -1804,8 +2133,8 @@ function EditDashboardDemo() {
             const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
             if (!specificLayout) return null
 
-            const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32
-            const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height
+                      const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
+          const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0 // Fixed: Use 100% height instead of 130%
 
             const colWidth = (containerWidth - 11 * 24) / 12
             const rowHeight = 50
@@ -2022,32 +2351,31 @@ function EditDashboardDemo() {
       } catch (error) {
         console.error("Error creating dashboard from template:", error)
         toast.error(`Error creating dashboard: ${error}`)
+        } finally {
+          setIsCreatingFromTemplate(false)
       }
     }, 500)
+    } catch (error) {
+      console.error("Error creating dashboard from template:", error)
+      toast.error(`Error creating dashboard: ${error}`)
+      setIsCreatingFromTemplate(false)
+    }
   }
 
-  const isEditing = new URLSearchParams(window.location.search).get('id') !== null
-
-
-
-  // Template management state
-  const [templates, setTemplates] = useState<DashboardTemplate[]>([])
-  const [showTemplateModal, setShowTemplateModal] = useState(false)
-  const [templateName, setTemplateName] = useState("")
-  const [templateDescription, setTemplateDescription] = useState("")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [filterType, setFilterType] = useState("all")
+  const [isEditing, setIsEditing] = useState(false)
   
-  
-  // Enhanced template management state
-  const [showViewAllModal, setShowViewAllModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [showViewModal, setShowViewModal] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<DashboardTemplate | null>(null)
-  const [editingTemplate, setEditingTemplate] = useState<DashboardTemplate | null>(null)
+  // Set isEditing on client side only to prevent hydration issues
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      setIsEditing(urlParams.get('id') !== null)
+    }
+  }, [])
+
+
 
   return (
-    <div className="min-h-screen w-full bg-white">
+    <div className="min-h-screen w-full bg-white" suppressHydrationWarning={true}>
       {/* Header for editing mode */}
       {isEditing && (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -2112,7 +2440,7 @@ function EditDashboardDemo() {
 
       <div className="mb-6 flex flex-wrap gap-4 ml-4">
         {isEditing && (
-          <Link href={`/dashboard/view-dashboard/${new URLSearchParams(window.location.search).get('id')}`}>
+          <Link href={`/dashboard/view-dashboard/${typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('id') : ''}`}>
             <Button variant="outline" size="sm" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to View
@@ -2147,22 +2475,70 @@ function EditDashboardDemo() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => addWidget("notice")}
-            disabled={!selectedRatio}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md font-medium ${
-              selectedRatio ? "bg-blue-600 text-white hover:bg-blue-700 border border-blue-500" : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
-            }`}
+            disabled={!selectedRatio || isAddingWidget}
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
+              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 border border-blue-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-600 cursor-not-allowed border border-purple-300 shadow-md"
+            } ${isAddingWidget ? 'animate-pulse' : ''}`}
           >
-            <Plus size={18} /> Create Notice Widget
+            {isAddingWidget ? (
+              <>
+                {/* Professional Loading Animation */}
+                <div className="relative">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-blue-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                </div>
+                <span className="font-medium">Creating Widget...</span>
+                {/* Progress Dots */}
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Plus size={20} className="font-bold" />
+                <span>Create Notice Widget</span>
+              </>
+            )}
+            {/* Shimmer Effect */}
+            {isAddingWidget && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+            )}
           </button>
           
           <button
             onClick={() => addWidget("image")}
-            disabled={!selectedRatio}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md font-medium ${
-              selectedRatio ? "bg-green-600 text-white hover:bg-green-700 border border-green-500" : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
-            }`}
+            disabled={!selectedRatio || isAddingWidget}
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
+              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 border border-green-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-600 cursor-not-allowed border border-orange-300 shadow-md"
+            } ${isAddingWidget ? 'animate-pulse' : ''}`}
           >
-            <ImageIcon size={18} /> Create Image Display
+            {isAddingWidget ? (
+              <>
+                {/* Professional Loading Animation */}
+                <div className="relative">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-green-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                </div>
+                <span className="font-medium">Creating Display...</span>
+                {/* Progress Dots */}
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <ImageIcon size={20} className="font-bold" />
+                <span>Create Image Display</span>
+              </>
+            )}
+            {/* Shimmer Effect */}
+            {isAddingWidget && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+            )}
           </button>
           
 
@@ -2178,133 +2554,193 @@ function EditDashboardDemo() {
 
         <button
           onClick={handleSave}
-          disabled={!selectedRatio || screens.every(screen => screen.widgets.length === 0)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md ml-auto font-medium ${
-            selectedRatio && screens.some(screen => screen.widgets.length > 0)
-              ? "bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-500"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
-          }`}
+          disabled={!selectedRatio || screens.every(screen => screen.widgets.length === 0) || isSavingDashboard}
+          className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 ml-auto font-semibold relative overflow-hidden ${
+            selectedRatio && screens.some(screen => screen.widgets.length > 0) && !isSavingDashboard
+              ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 border border-emerald-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
+              : "bg-gradient-to-r from-rose-100 to-pink-100 text-rose-600 cursor-not-allowed border border-rose-300 shadow-md"
+          } ${isSavingDashboard ? 'animate-pulse' : ''}`}
         >
-          {new URLSearchParams(window.location.search).get('id') ? 'Update Dashboard' : `Save Dashboard (${screens.length} screen${screens.length > 1 ? 's' : ''})`}
+          {isSavingDashboard ? (
+            <>
+              {/* Professional Loading Animation */}
+              <div className="relative">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-emerald-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+              </div>
+              <span className="font-medium">Saving Dashboard...</span>
+              {/* Progress Dots */}
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                <span>{isEditing ? 'Update Dashboard' : `Save Dashboard (${screens.length} screen${screens.length > 1 ? 's' : ''})`}</span>
+              </div>
+            </>
+          )}
+          {/* Shimmer Effect */}
+          {isSavingDashboard && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+          )}
         </button>
       </div>
 
-      {/* Screen Management Section */}
-      <div className="mb-8 p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+      {/* Improved Screen Management Section - Left Side */}
+      <div className="mb-4 flex items-center gap-3">
+        {/* Left Side Screen Management */}
+        <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
+          {/* Add Screen Button */}
             <button
               onClick={addScreen}
-              className="group relative bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl border-0 transform hover:scale-105 active:scale-95"
+              disabled={isAddingScreen}
+            className={`group relative bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-2 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md border-0 transform hover:scale-105 active:scale-95 ${
+                isAddingScreen ? 'opacity-75 cursor-not-allowed' : ''
+              }`}
+            title="Add New Screen"
             >
-              <div className="flex items-center gap-2">
-                <div className="p-1 bg-white bg-opacity-20 rounded-lg group-hover:bg-opacity-30 transition-all">
-                  <Plus size={18} className="text-white" />
-                </div>
-                <span>Add New Screen</span>
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-sm"></div>
+                  {isAddingScreen ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+              <Plus size={16} className="text-white" />
+            )}
+          </button>
+          
+          {/* Navigation Arrows */}
+          {screens.length > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentScreenIndex(currentScreenIndex > 0 ? currentScreenIndex - 1 : screens.length - 1)}
+                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
+                title="Previous Screen"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15,18 9,12 15,6"></polyline>
+                </svg>
+              </button>
+              <button
+                onClick={() => setCurrentScreenIndex(currentScreenIndex < screens.length - 1 ? currentScreenIndex + 1 : 0)}
+                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
+                title="Next Screen"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9,18 15,12 9,6"></polyline>
+                </svg>
             </button>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-2xl font-bold text-blue-600">{screens.length}</div>
-              <div className="text-xs text-slate-500 uppercase tracking-wide">Active Screens</div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Screen Tabs with Enhanced Design */}
-        <div className="relative">
-          <div className="flex items-center gap-3 overflow-x-auto pb-3 scrollbar-hide">
+          )}
+          
+          {/* Screen Tabs - Wider and Safer */}
+          <div className="flex items-center gap-2">
             {screens.map((screen, index) => (
               <div
                 key={screen.id}
-                className={`group relative flex items-center gap-3 px-5 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 min-w-fit ${
+                className={`group relative flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-all duration-200 min-w-[80px] justify-center ${
                   index === currentScreenIndex
-                    ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-lg shadow-blue-200/50'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-slate-50 hover:shadow-md'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'
                 }`}
                 onClick={() => setCurrentScreenIndex(index)}
               >
-                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === currentScreenIndex 
-                    ? 'bg-blue-500 shadow-sm shadow-blue-400' 
-                    : 'bg-slate-300 group-hover:bg-blue-400'
-                }`} />
-                <span className="font-semibold text-sm whitespace-nowrap">{screen.name}</span>
+                {/* Screen Number */}
+                <span className="text-sm font-medium">{index + 1}</span>
+                
+                {/* Remove Button - Only show on hover and when more than 1 screen, positioned at top right corner */}
                 {screens.length > 1 && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       removeScreen(index)
                     }}
-                    className="ml-2 p-1.5 hover:bg-red-100 rounded-lg transition-all duration-200 group/remove opacity-0 group-hover:opacity-100"
+                    disabled={isRemovingScreen}
+                    className={`absolute -top-2 -right-2 p-1.5 hover:bg-red-100 rounded-full transition-all duration-200 opacity-0 group-hover:opacity-100 bg-white border border-red-200 shadow-sm ${
+                      isRemovingScreen ? 'cursor-not-allowed' : ''
+                    }`}
                     title="Remove screen"
                   >
-                    <X size={14} className="text-red-500 group-hover/remove:text-red-700" />
+                    {isRemovingScreen ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-500"></div>
+                    ) : (
+                      <X size={12} className="text-red-500 hover:text-red-700" />
+                    )}
                   </button>
                 )}
+                
+                {/* Active Indicator */}
                 {index === currentScreenIndex && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-blue-500 rounded-full"></div>
                 )}
               </div>
             ))}
           </div>
           
-
+          {/* Screen Count */}
+          <div className="text-sm text-gray-500 font-medium px-1.5">
+            {screens.length} screen{screens.length !== 1 ? 's' : ''}
+          </div>
         </div>
       </div>
 
-      <div className="mb-6 p-5 bg-white rounded-xl shadow-sm border border-slate-200 w-full">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-slate-100 rounded-lg">
-            <GripVertical className="w-5 h-5 text-slate-600" />
+      {/* Minimal Notice Categories Section */}
+      <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-gray-100 rounded-md">
+              <GripVertical className="w-4 h-4 text-gray-600" />
           </div>
-          <div>
-            <h3 className="text-xl font-semibold text-slate-800">Notice Categories</h3>
-            <p className="text-sm text-slate-500 mt-1">Drag categories to widgets to populate with notices</p>
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap gap-3">
-          {categories.length === 0 ? (
-            <div className="w-full text-center py-8">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-slate-100 rounded-full mb-3">
-                <ListFilter className="w-6 h-6 text-slate-400" />
-              </div>
-              <p className="text-slate-500 text-sm font-medium">No categories available</p>
+                      <div>
+              <h3 className="text-sm font-semibold text-gray-800">Notice Categories</h3>
+              <p className="text-xs text-gray-500">Drag to create widgets</p>
             </div>
-          ) : (
-            categories.map((category) => (
-              <div
-                key={category.id}
-                draggable
-                onDragStart={(e) => handleDragStart2(e, category)}
-                className="group relative bg-slate-50 hover:bg-blue-50 px-4 py-3 rounded-xl cursor-move border border-slate-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105"
+          </div>
+          <div className="text-xs text-gray-400 font-medium">
+            {categories.length} category{categories.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+          
+        <div className="flex flex-wrap gap-2">
+            {categories.length === 0 ? (
+            <div className="w-full text-center py-4">
+              <div className="inline-flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full mb-2">
+                <ListFilter className="w-4 h-4 text-gray-500" />
+                </div>
+              <p className="text-gray-500 text-xs">No categories available</p>
+              </div>
+            ) : (
+                          categories.map((category) => (
+                <div
+                  key={category.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart2(e, category)}
+                className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-md cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-1.5 bg-slate-200 group-hover:bg-blue-200 rounded-lg transition-colors">
-                    <GripVertical className="w-4 h-4 text-slate-600 group-hover:text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-800 group-hover:text-blue-800 transition-colors text-sm truncate">
-                      {category.name}
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-gray-200 group-hover:bg-blue-200 rounded transition-colors">
+                    <GripVertical className="w-3 h-3 text-gray-600 group-hover:text-blue-600" />
                     </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                      <span className="text-xs text-slate-600 font-medium">
-                        {category.notices.length} {category.notices.length === 1 ? 'notice' : 'notices'}
-                      </span>
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-800 group-hover:text-blue-800 text-sm truncate">
+                        {category.name}
+                      </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                      <span className="text-xs text-gray-500">
+                          {category.notices.length} {category.notices.length === 1 ? 'notice' : 'notices'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))
           )}
         </div>
-        
-
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -2321,20 +2757,21 @@ function EditDashboardDemo() {
           </div>
           
       {selectedRatio && (
-        <div
-          className={`border-4 border-dashed rounded-lg mx-auto overflow-hidden bg-white p-4 relative transition-all duration-200 ${
-            isDragOverDashboard 
-              ? 'border-blue-400 bg-blue-50 shadow-lg' 
-              : 'border-gray-300'
-          }`}
-          style={{
-            width: RATIO_DIMENSIONS[selectedRatio].width,
-            height: RATIO_DIMENSIONS[selectedRatio].height,
-          }}
-          onDrop={(e) => handleDrop(e)}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-        >
+        <div className="dashboard-screen-container">
+          <div
+            className={`border-4 border-dashed rounded-lg overflow-hidden bg-white p-4 relative transition-all duration-200 ${
+              isDragOverDashboard 
+                ? 'border-blue-400 bg-blue-50 shadow-lg' 
+                : 'border-gray-300'
+            }`}
+            style={{
+              width: RATIO_DIMENSIONS[selectedRatio].width * 1.3, // Increased screen size by 30% for better visibility
+              height: RATIO_DIMENSIONS[selectedRatio].height * 1.0, // Fixed: Use 100% height to maintain aspect ratio without exceeding 100%
+            }}
+            onDrop={(e) => handleDrop(e)}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
           {/* Drop zone indicator */}
           {isDragOverDashboard && (
             <div className="absolute inset-0 pointer-events-none bg-blue-50 bg-opacity-50 border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center">
@@ -2352,7 +2789,7 @@ function EditDashboardDemo() {
             layout={layout}
             cols={12}
             rowHeight={50}
-            width={RATIO_DIMENSIONS[selectedRatio].width - 32}
+            width={(RATIO_DIMENSIONS[selectedRatio].width * 1.3) - 32}
             onLayoutChange={(newLayout: Layout[]) => setLayout(newLayout)}
             margin={[12, 12]}
             draggableHandle=".widget-drag-handle"
@@ -2395,24 +2832,30 @@ function EditDashboardDemo() {
                   onDragOver={handleWidgetDragOver}
                   onDragLeave={handleWidgetDragLeave}
                 >
-                  <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md z-10">
+                  {/* Widget Controls - Responsive positioning for small widgets */}
+                  <div className="absolute top-1 left-1 bg-gray-800 text-white text-xs px-1.5 py-0.5 rounded z-10">
                     {dimensions.width} × {dimensions.height}
                   </div>
 
-                  <div className="absolute top-2 right-10 z-10">
+                  <div className="absolute top-1 right-8 z-10">
                     <button
                       onClick={() => toggleWidgetSettings(widget.id)}
-                      className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                      className="p-0.5 hover:bg-gray-100 rounded transition-colors"
                     >
-                      <Settings size={20} className="text-gray-600" />
+                      <Settings size={16} className="text-gray-600" />
                     </button>
                   </div>
 
                   <button
                     onClick={(e) => removeWidget(e, widget.id)}
-                    className="absolute top-2 right-2 p-1 hover:bg-red-100 rounded-full transition-colors z-10"
+                    disabled={isRemovingWidget}
+                    className="absolute top-1 right-1 p-0.5 hover:bg-red-100 rounded transition-colors z-10"
                   >
-                    <X size={20} className="text-red-500" />
+                    {isRemovingWidget ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-500"></div>
+                    ) : (
+                    <X size={16} className="text-red-500" />
+                    )}
                   </button>
 
                   <div
@@ -2441,16 +2884,6 @@ function EditDashboardDemo() {
                       {settings.customCategoryName || 
                         (widget.type === "image" ? "Image Display" : 
                          widget.content || widget.title)}
-                      {widget.type === "notice" && widget.topNotices && widget.topNotices.length > 0 && (
-                        <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                          {widget.topNotices.length} notices
-                        </span>
-                      )}
-                      {widget.type === "image" && widget.images && widget.images.length > 0 && (
-                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                          {widget.images.length} image{widget.images.length > 1 ? 's' : ''}
-                        </span>
-                      )}
 
                     </h3>
                   </div>
@@ -2624,14 +3057,33 @@ function EditDashboardDemo() {
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
                                 <div className="bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-2xl border border-gray-200">
                                   <div className="flex items-center gap-3">
-                                    <label className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-                                      <Upload size={16} />
-                                      Replace
+                                                                        <label className={`cursor-pointer flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
+                                      isUploadingImage === widget.id ? 'opacity-75 cursor-not-allowed animate-pulse' : ''
+                                    }`}>
+                                      {isUploadingImage === widget.id ? (
+                                        <div className="relative">
+                                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                          <div className="absolute inset-0 w-4 h-4 border-2 border-transparent border-t-blue-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}></div>
+                                        </div>
+                                      ) : (
+                                        <Upload size={18} className="font-bold" />
+                                      )}
+                                      <span className="font-medium">
+                                        {isUploadingImage === widget.id ? 'Processing Image...' : 'Replace Image'}
+                                      </span>
+                                      {isUploadingImage === widget.id && (
+                                        <div className="flex gap-1">
+                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                        </div>
+                                      )}
                                                     <input
                                                       type="file"
                                                       accept="image/*"
                                                       onChange={(e) => handleImageUpload(e, widget.id)}
                                                       className="hidden"
+                                        disabled={isUploadingImage === widget.id}
                                                     />
                                                   </label>
                                     <button
@@ -2659,14 +3111,21 @@ function EditDashboardDemo() {
                               <p className="text-sm opacity-75 mb-6" style={{ color: settings.fontColor }}>
                                 JPG, PNG, GIF, WebP • Max 10MB
                               </p>
-                              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 hover:border-blue-400 hover:text-blue-600 transition-all duration-200 text-xs font-medium">
+                              <label className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 hover:border-blue-400 hover:text-blue-600 transition-all duration-200 text-xs font-medium ${
+                                isUploadingImage === widget.id ? 'opacity-75 cursor-not-allowed' : ''
+                              }`}>
+                                {isUploadingImage === widget.id ? (
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                ) : (
                                 <Upload size={12} />
-                                Browse Files
+                                )}
+                                {isUploadingImage === widget.id ? 'Uploading...' : 'Browse Files'}
                             <input
                               type="file"
                               accept="image/*"
                               onChange={(e) => handleImageUpload(e, widget.id)}
                                   className="hidden"
+                                  disabled={isUploadingImage === widget.id}
                             />
                               </label>
                             </div>
@@ -2681,15 +3140,16 @@ function EditDashboardDemo() {
               )
             })}
                       </ClientOnlyGridLayout>
+          </div>
         </div>
       )}
         </div>
 
         {/* Template Section - Right Side (1/4 width) */}
         <div className="xl:col-span-1">
-          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg p-6 border border-amber-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Templates</h3>
+              <h3 className="text-lg font-semibold text-amber-800">Templates</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleViewAllTemplates}
@@ -2715,7 +3175,7 @@ function EditDashboardDemo() {
                 placeholder="Search templates..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white/80 backdrop-blur-sm shadow-sm"
               />
             </div>
 
@@ -2792,10 +3252,23 @@ function EditDashboardDemo() {
                             </button>
                             <button
                               onClick={() => applyTemplate(template)}
-                              className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                              disabled={isApplyingTemplate}
+                              className={`text-xs bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 px-3 py-1.5 rounded-lg hover:from-blue-200 hover:to-blue-300 transition-all duration-200 font-medium shadow-sm hover:shadow-md ${
+                                isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                              }`}
                               title="Apply Template"
                             >
-                              Apply
+                              {isApplyingTemplate ? (
+                                <div className="flex items-center gap-1">
+                                  <div className="relative">
+                                    <div className="w-3 h-3 border border-blue-400/30 border-t-blue-600 rounded-full animate-spin"></div>
+                                    <div className="absolute inset-0 w-3 h-3 border border-transparent border-t-blue-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}></div>
+                                  </div>
+                                  <span className="text-xs">Applying...</span>
+                                </div>
+                              ) : (
+                                'Apply'
+                              )}
                             </button>
                             {userRole !== 'MODERATOR' && (
                               <>
@@ -2808,10 +3281,17 @@ function EditDashboardDemo() {
                                 </button>
                                 <button
                                   onClick={() => handleDeleteTemplate(template.id)}
-                                  className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                                  disabled={isDeletingTemplate}
+                                  className={`text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 ${
+                                    isDeletingTemplate ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
                                   title="Delete Template"
                                 >
-                                  Delete
+                                  {isDeletingTemplate ? (
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-700"></div>
+                                  ) : (
+                                    'Delete'
+                                  )}
                                 </button>
                               </>
                             )}
@@ -2863,21 +3343,31 @@ function EditDashboardDemo() {
 
           {/* Tabs */}
           <div className="flex border-b border-gray-200 bg-gray-50 animate-in slide-in-from-top-2 duration-300 delay-100">
-            {SETTINGS_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSettingsTab(tab.id)}
-                className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-all duration-200 flex-1 min-w-0
-                  ${
-                    activeSettingsTab === tab.id
-                      ? "text-blue-700 border-b-2 border-blue-600 bg-white shadow-sm"
-                      : "text-gray-600 hover:bg-white hover:text-gray-800"
-                  }`}
-              >
-                {tab.icon}
-                <span className="truncate">{tab.label}</span>
-              </button>
-            ))}
+            {(() => {
+              const activeWidget = widgets.find(w => w.id === activeSettingsWidget);
+              const availableTabs = getTabsForWidgetType(activeWidget?.type);
+              
+              // If current active tab is not available for this widget type, switch to first available tab
+              if (activeSettingsWidget && !availableTabs.find(tab => tab.id === activeSettingsTab)) {
+                setActiveSettingsTab(availableTabs[0].id);
+              }
+              
+              return availableTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSettingsTab(tab.id)}
+                  className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-all duration-200 flex-1 min-w-0
+                    ${
+                      activeSettingsTab === tab.id
+                        ? "text-blue-700 border-b-2 border-blue-600 bg-white shadow-sm"
+                        : "text-gray-600 hover:bg-white hover:text-gray-800"
+                    }`}
+                >
+                  {tab.icon}
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              ));
+            })()}
           </div>
 
           {/* Settings Content with proper scrolling */}
@@ -3156,7 +3646,10 @@ function EditDashboardDemo() {
                     <input
                       type="range"
                       min="1"
-                      max="10"
+                      max={(() => {
+                        const activeWidget = widgets.find(w => w.id === activeSettingsWidget);
+                        return activeWidget && activeWidget.notices ? Math.max(1, activeWidget.notices.length) : 10;
+                      })()}
                       value={widgetSettings[activeSettingsWidget]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount}
                       onChange={(e) =>
                         updateWidgetSetting(activeSettingsWidget, "noticeCount", Number.parseInt(e.target.value))
@@ -3935,9 +4428,19 @@ function EditDashboardDemo() {
                 </button>
                 <button
                   onClick={() => handleTemplateSave()}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  disabled={isSavingTemplate}
+                  className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${
+                    isSavingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                  }`}
                 >
-                  Save Template
+                  {isSavingTemplate ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Template'
+                  )}
                 </button>
               </div>
             </div>
@@ -4174,9 +4677,19 @@ function EditDashboardDemo() {
                       <div className="mt-3 flex gap-2">
                         <button
                           onClick={() => applyTemplate(template)}
-                          className="flex-1 text-xs bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors"
+                          disabled={isApplyingTemplate}
+                          className={`flex-1 text-xs bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors ${
+                            isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                          }`}
                         >
-                          Apply Template
+                          {isApplyingTemplate ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                              Applying...
+                            </>
+                          ) : (
+                            'Apply Template'
+                          )}
                         </button>
                       </div>
                     </div>
@@ -4264,9 +4777,19 @@ function EditDashboardDemo() {
               </button>
               <button
                   onClick={handleUpdateTemplate}
-                  className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                disabled={isUpdatingTemplate}
+                className={`flex-1 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors ${
+                  isUpdatingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
               >
-                  Update Template
+                {isUpdatingTemplate ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Template'
+                )}
               </button>
               </div>
             </div>
@@ -4399,9 +4922,19 @@ function EditDashboardDemo() {
                   setShowViewModal(false)
                   setSelectedTemplate(null)
                 }}
-                className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                disabled={isApplyingTemplate}
+                className={`w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium ${
+                  isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
               >
-                Apply Template
+                {isApplyingTemplate ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Applying Template...
+                  </>
+                ) : (
+                  'Apply Template'
+                )}
               </button>
             </div>
           </div>
@@ -4411,4 +4944,4 @@ function EditDashboardDemo() {
   )
 }
 
-export default EditDashboardDemo
+export default ClientOnlyDashboard
