@@ -1,87 +1,73 @@
 "use client"
 
-import Link from "next/link"
-import { useState, useRef, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
+import type React from "react"
+import { motion } from "framer-motion"
+import { Sidebar as UISidebar, SidebarBody, SidebarLink, useSidebar } from "@/components/ui/sidebar"
 import { 
-  Home, 
-  BarChart2, 
-  Users, 
-  FolderPlus, 
-  FilePenLine, 
-  ChevronDown, 
-  ChevronRight, 
-  Image, 
-  Layout,
-  Megaphone,
+  Home,
+  FolderPlus,
+  FilePenLine,
+  Image,
   Bell,
   Settings,
-  Palette,
   Grid3X3,
-  Eye,
   Plus,
   List,
   Shield,
   UserCheck,
   UserPlus,
   LayoutDashboard,
-  Monitor,
-  Smartphone,
-  QrCode
+  ChevronDown,
+  ChevronRight
 } from "lucide-react"
-import * as Collapsible from "@radix-ui/react-collapsible"
-import type React from "react"
+import { Roboto } from "next/font/google"
 
-// Define the menu structure that matches the manageable pages from the API
+const roboto = Roboto({ subsets: ["latin"], weight: ["400", "500", "700"] })
+
+// Define the menu structure
 const MENU_STRUCTURE = {
-  // Top-level items
-  home: { href: '/', icon: Home, label: 'Home' },
-  dashboard: { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  publicNotices: { href: '/notice', icon: Bell, label: 'Public Notices' },
-  
-  // Individual dashboard items
-  noticeBoardSettings: { href: '/dashboard/manage-public-notice', icon: Settings, label: 'Notice Board Settings' },
-  noticeCategories: { href: '/dashboard/category', icon: FolderPlus, label: 'Notice Categories' },
-  
-  // Dropdown groups
+  home: { href: '/', icon: <Home className="h-5 w-5" />, label: 'Home' },
+  dashboard: { href: '/dashboard', icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard' },
+  publicNotices: { href: '/notice', icon: <Bell className="h-5 w-5" />, label: 'Public Notices' },
+  noticeBoardSettings: { href: '/dashboard/manage-public-notice', icon: <Settings className="h-5 w-5" />, label: 'Notice Board Settings' },
+  noticeCategories: { href: '/dashboard/category', icon: <FolderPlus className="h-5 w-5" />, label: 'Notice Categories' },
   manageNotices: {
     title: 'Manage Notices',
     items: [
-      { href: '/dashboard/create-notice', icon: Plus, label: 'New Notice' },
-      { href: '/dashboard/showNotices', icon: List, label: 'All Notices' },
-      { href: '/dashboard/showImageNotices', icon: Image, label: 'Image-Based Notices' },
-      { href: '/dashboard/showPDFNotices', icon: FilePenLine, label: 'PDF Notices' }
-    ]
+      { href: '/dashboard/create-notice', icon: <Plus className="h-5 w-5" />, label: 'New Notice' },
+      { href: '/dashboard/showNotices', icon: <List className="h-5 w-5" />, label: 'All Notices' },
+      { href: '/dashboard/showImageNotices', icon: <Image className="h-5 w-5" />, label: 'Image-Based Notices' },
+      { href: '/dashboard/showPDFNotices', icon: <FilePenLine className="h-5 w-5" />, label: 'PDF Notices' },
+    ],
   },
-  
   interfaceManagement: {
     title: 'Interface Management',
     items: [
-      { href: '/dashboard/layout/edit-dashboard', icon: LayoutDashboard, label: 'New Interface' },
-      { href: '/dashboard/noticeInterfaces', icon: Grid3X3, label: 'All Interfaces' }
-    ]
+      { href: '/dashboard/layout/edit-dashboard', icon: <LayoutDashboard className="h-5 w-5" />, label: 'New Interface' },
+      { href: '/dashboard/noticeInterfaces', icon: <Grid3X3 className="h-5 w-5" />, label: 'All Interfaces' },
+    ],
   },
-  
   userManagement: {
     title: 'Manage Users',
     adminItems: [
-      { href: '/dashboard/admin/make-moderator', icon: UserPlus, label: 'Add Moderator' },
-      { href: '/dashboard/admin/showAllModerator', icon: UserCheck, label: 'Moderators' },
-      { href: '/dashboard/admin/set-permission', icon: Shield, label: 'Set Permission' }
+      { href: '/dashboard/admin/make-moderator', icon: <UserPlus className="h-5 w-5" />, label: 'Add Moderator' },
+      { href: '/dashboard/admin/showAllModerator', icon: <UserCheck className="h-5 w-5" />, label: 'Moderators' },
+      { href: '/dashboard/admin/set-permission', icon: <Shield className="h-5 w-5" />, label: 'Set Permission' },
     ],
     moderatorItems: [
-      { href: '/dashboard/admin/make-user', icon: UserPlus, label: 'Add User' },
-      { href: '/dashboard/admin/showAllUsers', icon: UserCheck, label: 'All Users' }
+      { href: '/dashboard/admin/make-user', icon: <UserPlus className="h-5 w-5" />, label: 'Add User' },
+      { href: '/dashboard/admin/showAllUsers', icon: <UserCheck className="h-5 w-5" />, label: 'All Users' },
     ],
     superAdminItems: [
-      { href: '/dashboard/admin/make-admin', icon: UserPlus, label: 'Add Administrator' },
-      { href: '/dashboard/admin/showAllAdmin', icon: UserCheck, label: 'Administrators' }
-    ]
-  }
-}
+      { href: '/dashboard/admin/make-admin', icon: <UserPlus className="h-5 w-5" />, label: 'Add Administrator' },
+      { href: '/dashboard/admin/showAllAdmin', icon: <UserCheck className="h-5 w-5" />, label: 'Administrators' },
+    ],
+  },
+} as const
 
-export default function Sidebar({ isOpen }: { isOpen: boolean }) {
-  const [openMenus, setOpenMenus] = useState<string[]>([])
+export default function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen?: React.Dispatch<React.SetStateAction<boolean>> }) {
   const { data: session } = useSession()
   const userRole = session?.user?.role
   const [fetchedAllowedRoutes, setFetchedAllowedRoutes] = useState<string[] | null>(null)
@@ -97,7 +83,6 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
         if (res.ok) {
           const json = await res.json()
           const routes: string[] = Array.isArray(json.allowedRoutes) ? json.allowedRoutes : []
-          // Ensure home and dashboard are present by default
           setFetchedAllowedRoutes(Array.from(new Set<string>(['/', '/dashboard', ...routes])))
         }
       } catch {}
@@ -105,178 +90,186 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
     load()
   }, [session?.user?.id, userRole])
 
-  const allowedRoutes: string[] = userRole === 'MODERATOR'
-    ? (fetchedAllowedRoutes ?? sessionAllowedRoutes)
-    : []
+  const allowedRoutes: string[] = useMemo(() => (
+    userRole === 'MODERATOR' ? (fetchedAllowedRoutes ?? sessionAllowedRoutes) : []
+  ), [fetchedAllowedRoutes, sessionAllowedRoutes, userRole])
 
   const isAllowed = (href: string) => {
     if (userRole !== 'MODERATOR') return true
-    
-    // Dashboard route is always allowed for moderators
-    if (href === '/dashboard') {
-      return true
-    }
-    
-    // Home visibility depends only on explicit '/'
-    if (href === '/') {
-      return allowedRoutes.includes('/')
-    }
-    
-    // For other routes, check if the href starts with any allowed route
+    if (href === '/dashboard') return true
+    if (href === '/') return allowedRoutes.includes('/')
     const enforceable = allowedRoutes.filter(r => r && r !== '/' && r !== '/dashboard')
     return enforceable.some(route => href.startsWith(route))
   }
 
-  const toggleMenu = (menu: string) => {
-    setOpenMenus((prev) => (prev.includes(menu) ? prev.filter((item) => item !== menu) : [...prev, menu]))
-  }
+  const userManagementItems = useMemo(() => {
+    if (userRole === 'SUPER_ADMIN') return MENU_STRUCTURE.userManagement.superAdminItems
+    if (userRole === 'ADMIN') return MENU_STRUCTURE.userManagement.adminItems
+    if (userRole === 'MODERATOR') return MENU_STRUCTURE.userManagement.moderatorItems.filter(item => isAllowed(item.href))
+    return []
+  }, [userRole, allowedRoutes])
 
-  const MenuItem = ({
-    href,
-    icon: Icon,
-    children,
-  }: { href: string; icon: React.ElementType; children: React.ReactNode }) => (
-    <Link href={href} className="block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-700 hover:text-white">
-      <Icon className="inline-block mr-2 w-5 h-5" /> {children}
-    </Link>
-  )
+  const links = useMemo(() => {
+    const top = [
+      MENU_STRUCTURE.home,
+      MENU_STRUCTURE.dashboard,
+      MENU_STRUCTURE.publicNotices,
+    ].filter(link => isAllowed(link.href))
 
-  const DropdownMenu = ({
+    const singles = [
+      MENU_STRUCTURE.noticeBoardSettings,
+      MENU_STRUCTURE.noticeCategories,
+    ].filter(link => isAllowed(link.href))
+
+    const manageNotices = MENU_STRUCTURE.manageNotices.items.filter(item => isAllowed(item.href))
+    const interfaceMgmt = MENU_STRUCTURE.interfaceManagement.items.filter(item => isAllowed(item.href))
+
+    return { top, singles, manageNotices, interfaceMgmt }
+  }, [allowedRoutes, userRole])
+
+  const DropdownSection = ({
     title,
-    items,
-  }: { title: string; items: { href: string; icon: React.ElementType; label: string }[] }) => {
-    const contentRef = useRef<HTMLDivElement>(null)
-    const [contentHeight, setContentHeight] = useState<number | undefined>(undefined)
-
-    useEffect(() => {
-      if (contentRef.current) {
-        setContentHeight(contentRef.current.scrollHeight)
+    icon,
+    children,
+  }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => {
+    const [open, setOpen] = useState(false)
+    const [hoverOpen, setHoverOpen] = useState(false)
+    const sidebar = useSidebar()
+    
+    const handleMouseEnter = () => {
+      if (!sidebar.open) {
+        setTimeout(() => setHoverOpen(true), 100);
       }
-    }, [])
-
+    };
+    
+    const handleMouseLeave = () => {
+      setHoverOpen(false);
+    };
+    
     return (
-      <Collapsible.Root open={openMenus.includes(title)} onOpenChange={() => toggleMenu(title)}>
-        <Collapsible.Trigger className="flex items-center w-full py-2.5 px-4 rounded transition duration-200 hover:bg-gray-700 hover:text-white">
-          {openMenus.includes(title) ? (
-            <ChevronDown className="w-5 h-5 mr-2 transition-transform duration-500 ease-spring" />
-          ) : (
-            <ChevronRight className="w-5 h-5 mr-2 transition-transform duration-500 ease-spring" />
-          )}
-          {title}
-        </Collapsible.Trigger>
-        <Collapsible.Content
-          ref={contentRef}
-          className="overflow-hidden transition-all duration-700 ease-in-out"
-          style={{
-            height: openMenus.includes(title) ? contentHeight : 0,
-            opacity: openMenus.includes(title) ? 1 : 0,
-            transform: openMenus.includes(title) ? "translateY(0)" : "translateY(-10px)",
-          }}
+      <div 
+        className="relative flex flex-col gap-2"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center justify-between text-[18px] leading-6 font-medium text-white py-2 transition-all duration-300"
         >
-          <div className="py-2 pl-6">
-            {items.map((item, index) => (
-              <MenuItem key={index} href={item.href} icon={item.icon}>
-                {item.label}
-              </MenuItem>
-            ))}
-          </div>
-        </Collapsible.Content>
-      </Collapsible.Root>
+          <span className="flex items-center gap-3">
+            <span className="w-6 flex items-center justify-center text-white">{icon}</span>
+            <motion.span 
+              className="text-white"
+              animate={{
+                opacity: sidebar.open ? 1 : 0,
+                width: sidebar.open ? "auto" : 0,
+              }}
+              transition={{
+                duration: 0.3,
+                ease: "easeInOut",
+              }}
+              className="whitespace-nowrap overflow-hidden"
+            >
+              {title}
+            </motion.span>
+          </span>
+          <motion.span 
+            className="ml-3 text-white"
+            animate={{
+              opacity: sidebar.open ? 1 : 0,
+              width: sidebar.open ? "auto" : 0,
+            }}
+            transition={{
+              duration: 0.3,
+              ease: "easeInOut",
+            }}
+          >
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </motion.span>
+        </button>
+        
+        {/* Show dropdown when sidebar is open and menu is clicked */}
+        {sidebar.open && open && (
+          <motion.div 
+            className="pl-7 flex flex-col gap-2"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {children}
+          </motion.div>
+        )}
+        
+        {/* Show hover dropdown when sidebar is collapsed */}
+        {!sidebar.open && hoverOpen && (
+          <motion.div 
+            className="absolute left-full top-0 ml-2 bg-black text-white p-2 rounded-md shadow-lg min-w-[200px] z-50"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="text-sm font-medium mb-2 px-2 py-1 border-b border-gray-600">{title}</div>
+            <div className="flex flex-col gap-1">
+              {React.Children.map(children, (child) => {
+                if (React.isValidElement(child) && child.type === SidebarLink) {
+                  const link = child.props.link;
+                  return (
+                    <a
+                      href={link.href}
+                      className="flex items-center gap-2 px-2 py-1 text-sm text-white hover:bg-gray-700 rounded transition-colors duration-150"
+                    >
+                      <span className="w-4 h-4 flex items-center justify-center">{link.icon}</span>
+                      <span>{link.label}</span>
+                    </a>
+                  );
+                }
+                return child;
+              })}
+            </div>
+          </motion.div>
+        )}
+      </div>
     )
   }
 
-  // Helper function to get user management items based on role
-  const getUserManagementItems = () => {
-    if (userRole === 'SUPER_ADMIN') {
-      return MENU_STRUCTURE.userManagement.superAdminItems
-    } else if (userRole === 'ADMIN') {
-      return MENU_STRUCTURE.userManagement.adminItems
-    } else if (userRole === 'MODERATOR') {
-      return MENU_STRUCTURE.userManagement.moderatorItems.filter(item => isAllowed(item.href))
-    }
-    return []
-  }
-
   return (
-    <div
-      className={`bg-gray-800 text-white w-64 space-y-6 py-7 px-2 fixed inset-y-0 left-0 transform ${
-        isOpen ? "translate-x-0" : "-translate-x-full"
-      } md:relative md:translate-x-0 transition duration-500 ease-in-out z-50 overflow-y-auto border-r border-gray-700`}
-    >
-      <Link href="/dashboard" className="text-white flex items-center space-x-2 px-4">
-        <Bell className="w-8 h-8 text-yellow-400" />
-        <span className="text-2xl font-extrabold">Smart Notice Board</span>
-      </Link>
-      <nav className="space-y-2">
-        {/* Top-level items */}
-        {isAllowed(MENU_STRUCTURE.home.href) && (
-          <MenuItem href={MENU_STRUCTURE.home.href} icon={MENU_STRUCTURE.home.icon}>
-            {MENU_STRUCTURE.home.label}
-          </MenuItem>
-        )}
-        
-        {isAllowed(MENU_STRUCTURE.dashboard.href) && (
-          <MenuItem href={MENU_STRUCTURE.dashboard.href} icon={MENU_STRUCTURE.dashboard.icon}>
-            {MENU_STRUCTURE.dashboard.label}
-          </MenuItem>
-        )}
-        
-        {isAllowed(MENU_STRUCTURE.publicNotices.href) && (
-          <MenuItem href={MENU_STRUCTURE.publicNotices.href} icon={MENU_STRUCTURE.publicNotices.icon}>
-            {MENU_STRUCTURE.publicNotices.label}
-          </MenuItem>
-        )}
-
-        {/* Role-based content */}
+    <UISidebar open={isOpen} setOpen={setOpen}>
+      <SidebarBody className={`gap-2 ${roboto.className} bg-black text-white`}>
+        <div className="flex flex-col gap-2">
+          {links.top.map((link, idx) => (
+            <SidebarLink key={`top-${idx}`} link={link} className="text-white" />
+          ))}
+        </div>
         {userRole !== 'USER' && (
-          <>
-            {/* Individual dashboard items */}
-            {isAllowed(MENU_STRUCTURE.noticeBoardSettings.href) && (
-              <MenuItem href={MENU_STRUCTURE.noticeBoardSettings.href} icon={MENU_STRUCTURE.noticeBoardSettings.icon}>
-                {MENU_STRUCTURE.noticeBoardSettings.label}
-              </MenuItem>
-            )}
-            
-            {isAllowed(MENU_STRUCTURE.noticeCategories.href) && (
-              <MenuItem href={MENU_STRUCTURE.noticeCategories.href} icon={MENU_STRUCTURE.noticeCategories.icon}>
-                {MENU_STRUCTURE.noticeCategories.label}
-              </MenuItem>
-            )}
-
-            {/* Manage Notices Dropdown */}
-            {(() => {
-              const allowedItems = MENU_STRUCTURE.manageNotices.items.filter(item => isAllowed(item.href))
-              return allowedItems.length > 0 ? (
-                <DropdownMenu title={MENU_STRUCTURE.manageNotices.title} items={allowedItems} />
-              ) : null
-            })()}
-
-            {/* Interface Management Dropdown */}
-            {(() => {
-              const allowedItems = MENU_STRUCTURE.interfaceManagement.items.filter(item => isAllowed(item.href))
-              return allowedItems.length > 0 ? (
-                <DropdownMenu title={MENU_STRUCTURE.interfaceManagement.title} items={allowedItems} />
-              ) : null
-            })()}
-
-            {/* User Management Dropdown */}
-            {(() => {
-              const userManagementItems = getUserManagementItems()
-              return userManagementItems.length > 0 ? (
-                <DropdownMenu title={MENU_STRUCTURE.userManagement.title} items={userManagementItems} />
-              ) : null
-            })()}
-          </>
+          <div className="flex flex-col gap-2">
+            {links.singles.map((link, idx) => (
+              <SidebarLink key={`single-${idx}`} link={link} className="text-white" />
+            ))}
+            <DropdownSection title={MENU_STRUCTURE.manageNotices.title} icon={<List className="h-5 w-5" />}>
+              {links.manageNotices.map((link, idx) => (
+                <SidebarLink key={`mn-${idx}`} link={link} className="text-white" />
+              ))}
+            </DropdownSection>
+            <DropdownSection title={MENU_STRUCTURE.interfaceManagement.title} icon={<Grid3X3 className="h-5 w-5" />}>
+              {links.interfaceMgmt.map((link, idx) => (
+                <SidebarLink key={`im-${idx}`} link={link} className="text-white" />
+              ))}
+            </DropdownSection>
+            <DropdownSection title={MENU_STRUCTURE.userManagement.title} icon={<Shield className="h-5 w-5" />}>
+              {userManagementItems.map((link, idx) => (
+                <SidebarLink key={`um-${idx}`} link={link} className="text-white" />
+              ))}
+            </DropdownSection>
+          </div>
         )}
-
-        {/* User role specific content */}
         {userRole === 'USER' && (
-          <MenuItem href="/dashboard/showNotices" icon={List}>
-            View Notices
-          </MenuItem>
+          <SidebarLink link={{ href: '/dashboard/showNotices', icon: <List className="h-5 w-5" />, label: 'View Notices' }} className="text-white" />
         )}
-      </nav>
-    </div>
+      </SidebarBody>
+    </UISidebar>
   )
 }
 

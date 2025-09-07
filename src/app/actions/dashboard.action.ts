@@ -179,6 +179,25 @@ export const deleteDashboard = async(id: string) => {
     }
 }
 
+// Delete all dashboards
+export const deleteAllDashboards = async() => {
+    try{
+        const result = await prisma.dashboard.deleteMany({});
+        
+        return {
+            success: true,
+            result: result
+        }
+    }
+    catch(err){
+        console.error("Error in deleteAllDashboards:", err);
+        return {
+            success: false,
+            result: err
+        }
+    }
+}
+
 // Get specific dashboard by index
 export const getDashboardByIndex = async(index: number) => {
     try{
@@ -265,6 +284,187 @@ export const getDashboardByIndex = async(index: number) => {
         return {
             success: false,
             result: err
+        }
+    }
+}
+
+// TempDashboard Actions
+export const createTempDashboard = async(values: any) => {
+    try{
+        // Check if tempDashboard model is available in Prisma client
+        if (!(prisma as any).tempDashboard) {
+            console.warn("Prisma client has no tempDashboard model. Did you run prisma generate?")
+            return { success: false, result: "TempDashboard model not available" }
+        }
+        
+        const result = await (prisma as any).tempDashboard.create({
+            data: values
+        })
+        if(result.id){
+            return {success: true, result}
+        }
+        else {
+            return { success: false, result: "Something went wrong"}
+        }
+    }
+    catch(error){
+        return {success: false, result: error}
+    }
+}
+
+export const updateTempDashboard = async(id: string, values: any) => {
+    try{
+        // Check if tempDashboard model is available in Prisma client
+        if (!(prisma as any).tempDashboard) {
+            console.warn("Prisma client has no tempDashboard model. Did you run prisma generate?")
+            return { success: false, result: "TempDashboard model not available" }
+        }
+        
+        const result = await (prisma as any).tempDashboard.update({
+            where: { id },
+            data: values
+        })
+        if(result.id){
+            return {success: true, result}
+        }
+        else {
+            return { success: false, result: "Something went wrong"}
+        }
+    }
+    catch(error){
+        return {success: false, result: error}
+    }
+}
+
+export const deleteTempDashboard = async(id: string) => {
+    try{
+        // Check if tempDashboard model is available in Prisma client
+        if (!(prisma as any).tempDashboard) {
+            console.warn("Prisma client has no tempDashboard model. Did you run prisma generate?")
+            return { success: false, result: "TempDashboard model not available" }
+        }
+        
+        const result = await (prisma as any).tempDashboard.delete({
+            where: { id }
+        });
+        
+        return {
+            success: true,
+            result: result
+        }
+    }
+    catch(err){
+        console.error("Error in deleteTempDashboard:", err);
+        return {
+            success: false,
+            result: err
+        }
+    }
+}
+
+export const deleteAllTempDashboards = async() => {
+    try{
+        // In some environments the Prisma client might be outdated and not include TempDashboard yet.
+        // Gracefully handle that by short-circuiting when the model is missing.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tempModel = (prisma as any).tempDashboard
+        if (!tempModel) {
+            console.warn("Prisma client has no tempDashboard model. Skipping deleteAllTempDashboards(). Did you run prisma generate?")
+            return {
+                success: true,
+                result: { count: 0 }
+            }
+        }
+        const result = await tempModel.deleteMany({});
+        
+        return {
+            success: true,
+            result: result
+        }
+    }
+    catch(err){
+        console.error("Error in deleteAllTempDashboards:", err);
+        return {
+            success: false,
+            result: err
+        }
+    }
+}
+
+export const getAllTempDashboards = async() => {
+    try{
+        // Check if tempDashboard model is available in Prisma client
+        if (!(prisma as any).tempDashboard) {
+            console.warn("Prisma client has no tempDashboard model. Did you run prisma generate?")
+            return { success: false, result: "TempDashboard model not available" }
+        }
+        
+        const result = await (prisma as any).tempDashboard.findMany({
+            orderBy: [
+                { createdAt: 'desc' },
+                { screenIndex: 'asc' }
+            ]
+        });
+
+        return {
+            success: true,
+            result: result
+        }
+    }
+    catch(err){
+        console.error("Error in getAllTempDashboards:", err);
+        return {
+            success: false,
+            result: err
+        }
+    }
+}
+
+export const getTempDashboardScreens = async(id: string) => {
+    try {
+        // Check if tempDashboard model is available in Prisma client
+        if (!(prisma as any).tempDashboard) {
+            console.warn("Prisma client has no tempDashboard model. Did you run prisma generate?")
+            return { success: false, error: "TempDashboard model not available" }
+        }
+        
+        // First, get the temp dashboard with the provided ID to get its creation time
+        const originalTempDashboard = await (prisma as any).tempDashboard.findUnique({
+            where: { id }
+        })
+
+        if (!originalTempDashboard) {
+            return {
+                success: false,
+                error: "TempDashboard not found"
+            }
+        }
+
+        // Get all temp dashboards created within 1 second of the original temp dashboard
+        const oneSecondLater = new Date(originalTempDashboard.createdAt!.getTime() + 1000)
+        const oneSecondEarlier = new Date(originalTempDashboard.createdAt!.getTime() - 1000)
+
+        const allScreens = await (prisma as any).tempDashboard.findMany({
+            where: {
+                createdAt: {
+                    gte: oneSecondEarlier,
+                    lte: oneSecondLater
+                }
+            },
+            orderBy: {
+                screenIndex: 'asc'
+            }
+        })
+
+        return {
+            success: true,
+            result: allScreens
+        }
+    } catch (error) {
+        console.error("Error getting temp dashboard screens:", error)
+        return {
+            success: false,
+            error: "Failed to get temp dashboard screens"
         }
     }
 }

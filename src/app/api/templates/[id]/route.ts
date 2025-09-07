@@ -3,11 +3,12 @@ import { getTemplateById, updateTemplate, deleteTemplate, applyTemplateToSetting
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log("Fetching template with ID:", params.id)
-    const template = await getTemplateById(params.id)
+    const { id } = await params
+    console.log("Fetching template with ID:", id)
+    const template = await getTemplateById(id)
     
     if (template) {
       console.log("Template found:", template.id)
@@ -30,14 +31,15 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json()
-    console.log("Updating template with ID:", params.id)
+    const { id } = await params
+    console.log("Updating template with ID:", id)
     console.log("Update data:", body)
     
-    const template = await updateTemplate(params.id, body)
+    const template = await updateTemplate(id, body)
     
     if (template) {
       console.log("Template updated successfully:", template.id)
@@ -60,11 +62,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log("Deleting template with ID:", params.id)
-    const success = await deleteTemplate(params.id)
+    const { id } = await params
+    console.log("Deleting template with ID:", id)
+    const success = await deleteTemplate(id)
     
     if (success) {
       console.log("Template deleted successfully")
@@ -87,14 +90,15 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json()
-    console.log("Applying template with ID:", params.id)
+    const { id } = await params
+    console.log("Applying template with ID:", id)
     
     if (body.action === 'apply') {
-      const success = await applyTemplateToSettings(params.id)
+      const success = await applyTemplateToSettings(id)
       
       if (success) {
         console.log("Template applied successfully")

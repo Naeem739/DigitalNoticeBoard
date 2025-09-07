@@ -3,10 +3,10 @@ import { prisma } from "@/db/prisma";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const dashboardId = params.id;
+    const { id: dashboardId } = await params;
 
     const dashboard = await prisma.dashboard.findUnique({
       where: {

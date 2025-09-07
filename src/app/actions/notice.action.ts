@@ -62,3 +62,45 @@ export const createNotice = async(value: Omit<TNotice, "id">)=>{
     }
    
 }
+
+// Delete all notices
+export const deleteAllNotices = async() => {
+    try{
+        const result = await prisma.notice.deleteMany({});
+        
+        return {
+            success: true,
+            result: result
+        }
+    }
+    catch(err){
+        console.error("Error in deleteAllNotices:", err);
+        return {
+            success: false,
+            result: err
+        }
+    }
+}
+
+// Delete notices by category
+export const deleteNoticesByCategory = async(categoryName: string) => {
+    try{
+        const result = await prisma.notice.deleteMany({
+            where: {
+                category: categoryName
+            }
+        });
+        
+        return {
+            success: true,
+            result: result
+        }
+    }
+    catch(err){
+        console.error("Error in deleteNoticesByCategory:", err);
+        return {
+            success: false,
+            result: err
+        }
+    }
+}

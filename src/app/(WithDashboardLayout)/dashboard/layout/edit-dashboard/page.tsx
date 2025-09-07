@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
+import { createPortal } from "react-dom"
 import GridLayout, { type Layout } from "react-grid-layout"
 import {
   Plus,
@@ -26,9 +27,9 @@ import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import "./edit-dashboard.css"
 import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } from "@/types/template-types"
-import { getCategoriesWithNotices, getCategories } from "@/app/actions/category.action"
+import { getCategoriesWithNotices, getCategories, getDashboardCategory, getDashboardPdfCategory, getTextCategoriesWithNotices } from "@/app/actions/category.action"
 import { getAllTemplates, createTemplate, getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
-import { createDashboard, getAllDashboards } from "@/app/actions/dashboard.action"
+import { createDashboard, getAllDashboards, createTempDashboard, updateTempDashboard, deleteAllTempDashboards } from "@/app/actions/dashboard.action"
 import { createNotice } from "@/app/actions/notice.action"
 import { createCategory } from "@/app/actions/category.action"
 // import { createImage } from "@/app/actions/image.action"
@@ -38,6 +39,7 @@ import { Button } from "@/components/ui/button"
 import { SpinningBellLoader, WaveLoader } from "@/components/ui/loader"
 import { localStorageUtils } from "@/lib/utils"
 import { useSession } from "next-auth/react"
+import * as pdfjsLib from "pdfjs-dist"
 
 // Client-only wrapper for GridLayout to prevent hydration issues
 const ClientOnlyGridLayout = ({ children, ...props }: any) => {
@@ -84,6 +86,7 @@ type TCategoriesWithNotices = {
   id: string
   name: string
   notices: TNotice[]
+  categoryType?: 'TEXT' | 'IMAGE' | 'PDF'
 }
 
 type TResult = {
@@ -148,10 +151,10 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
 }
 
 const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
-  "4:3": { width: 800, height: 600 },
-  "16:9": { width: 960, height: 540 },
-  "16:10": { width: 960, height: 600 },
-}
+  "4:3":   { width: 1200, height: 900 },
+  "16:9":  { width: 1440, height: 810 },
+  "16:10": { width: 1440, height: 900 },
+};
 
 // Helper function to convert hex color to rgba
 const hexToRgba = (hex: string, opacity: number) => {
@@ -181,7 +184,7 @@ const reconstructImageUrl = (notice: any) => {
 type SettingsTab = "style" | "typography" | "content" | "category" | "image"
 
 // Add widget type enum
-type WidgetType = "notice" | "image"
+type WidgetType = "notice" | "image" | "pdf"
 
 // Extend Widget type to include widget type and images
 interface ExtendedWidget extends Widget {
@@ -190,14 +193,740 @@ interface ExtendedWidget extends Widget {
     id: string
     url: string
     title: string
-    file: File
+    file?: File
     dbId?: string
     width?: number
     height?: number
     size?: number
     type?: string
+    isPlaceholder?: boolean
+  }>
+  pdfs?: Array<{
+    id: string
+    title: string
+    pdfData: string
+    fileName: string
+    dbId?: string
   }>
 
+}
+
+// Inline PDF widget component with upload + render + auto-scroll + TemporaryDashboard storage
+function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfStored: (pdfId: string, pdfData: string, fileName: string) => void }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [currentPdfData, setCurrentPdfData] = useState<string | null>(null)
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false)
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false)
+  const [existingPdfs, setExistingPdfs] = useState<Array<any>>([])
+  const [animateOpen, setAnimateOpen] = useState(false)
+
+  // Configure worker once on mount (client-side only)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/build/pdf.worker.min.mjs",
+        import.meta.url
+      ).toString()
+    }
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
+
+  // Load existing PDF data from TemporaryDashboard on mount and set up real-time updates
+  useEffect(() => {
+    const loadExistingPdf = async () => {
+      try {
+        const response = await fetch('/api/temp-dashboard/get-all')
+        const result = await response.json()
+        
+        if (result.success && result.result.length > 0) {
+          // Find the temp dashboard that contains this widget
+          for (const tempDashboard of result.result) {
+            if (tempDashboard.containers) {
+              const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+              const widgetContainer = containers.find((container: any) => container.id === widgetId)
+              
+              if (widgetContainer && widgetContainer.pdfData) {
+                console.log("Found PDF data in temp dashboard for widget:", widgetId)
+                setCurrentPdfData(widgetContainer.pdfData)
+                try {
+                  await renderPdfFromData(widgetContainer.pdfData)
+                } catch (renderError) {
+                  console.error('Error rendering PDF from temp dashboard:', renderError)
+                  toast.error('Failed to load PDF from saved data. The file may be corrupted.')
+                }
+                break
+              }
+            }
+          }
+        }
+        
+        // If no PDF data found in temp dashboard, try to recover from localStorage backup
+        if (!currentPdfData) {
+          try {
+            const backupKey = `pdf-backup-${widgetId}`
+            const backupData = localStorage.getItem(backupKey)
+            if (backupData) {
+              const parsed = JSON.parse(backupData)
+              // Check if backup is recent (within last hour)
+              if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
+                setCurrentPdfData(parsed.pdfData)
+                try {
+                  await renderPdfFromData(parsed.pdfData)
+                  console.log("Recovered PDF data from localStorage backup")
+                  
+                  // Try to save to temp dashboard again
+                  setTimeout(() => {
+                    saveToTempDashboard(parsed.pdfData, parsed.fileName)
+                  }, 1000)
+                } catch (renderError) {
+                  console.error('Error rendering PDF from localStorage backup:', renderError)
+                  toast.error('Failed to load PDF from backup. The file may be corrupted.')
+                }
+              } else {
+                // Remove old backup
+                localStorage.removeItem(backupKey)
+              }
+            }
+          } catch (backupError) {
+            console.error("Error recovering PDF data from backup:", backupError)
+          }
+        }
+      } catch (error) {
+        console.error("Error loading existing PDF from temp dashboard:", error)
+        
+        // Try to recover from localStorage backup as fallback
+        try {
+          const backupKey = `pdf-backup-${widgetId}`
+          const backupData = localStorage.getItem(backupKey)
+          if (backupData) {
+            const parsed = JSON.parse(backupData)
+            if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
+              setCurrentPdfData(parsed.pdfData)
+              try {
+                await renderPdfFromData(parsed.pdfData)
+                console.log("Recovered PDF data from localStorage backup after API error")
+              } catch (renderError) {
+                console.error('Error rendering PDF from localStorage backup after API error:', renderError)
+                toast.error('Failed to load PDF from backup. The file may be corrupted.')
+              }
+            }
+          }
+        } catch (backupError) {
+          console.error("Error recovering PDF data from backup after API error:", backupError)
+        }
+      }
+    }
+
+    // Load on mount
+    loadExistingPdf()
+    
+    // Set up real-time polling to check for updates every 2 seconds
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch('/api/temp-dashboard/get-all')
+        const result = await response.json()
+        
+        if (result.success && result.result.length > 0) {
+          for (const tempDashboard of result.result) {
+            if (tempDashboard.containers) {
+              const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+              const widgetContainer = containers.find((container: any) => container.id === widgetId)
+              
+              if (widgetContainer && widgetContainer.pdfData && widgetContainer.pdfData !== currentPdfData) {
+                console.log("PDF data updated in temp dashboard for widget:", widgetId)
+                setCurrentPdfData(widgetContainer.pdfData)
+                try {
+                  await renderPdfFromData(widgetContainer.pdfData)
+                } catch (renderError) {
+                  console.error('Error rendering updated PDF from temp dashboard:', renderError)
+                  toast.error('Failed to load updated PDF. The file may be corrupted.')
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error polling temp dashboard for updates:", error)
+      }
+    }, 2000) // Check every 2 seconds
+    
+    return () => clearInterval(intervalId)
+  }, [widgetId, currentPdfData])
+
+  // Auto-save to TemporaryDashboard whenever PDF data changes
+  useEffect(() => {
+    if (currentPdfData) {
+      const autoSaveTimer = setTimeout(() => {
+        saveToTempDashboard(currentPdfData, 'auto-saved.pdf')
+      }, 1000) // Save after 1 second of no changes
+      
+      return () => clearTimeout(autoSaveTimer)
+    }
+  }, [currentPdfData])
+
+  // Auto-save entire dashboard state to TemporaryDashboard
+  const autoSaveDashboardToTemp = async () => {
+    try {
+      // Get current temp dashboard data
+      const response = await fetch('/api/temp-dashboard/get-all')
+      const result = await response.json()
+      
+      if (result.success && result.result.length > 0) {
+        // Update the first temp dashboard with current state
+        const tempDashboard = result.result[0]
+        const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+        
+        // Update the widget container with current PDF data
+        const updatedContainers = containers.map((container: any) => {
+          if (container.id === widgetId && currentPdfData) {
+            return {
+              ...container,
+              pdfData: currentPdfData,
+              pdfFileName: 'auto-saved.pdf',
+              type: "pdf"
+            }
+          }
+          return container
+        })
+
+        // Update the temp dashboard
+        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            containers: updatedContainers
+          })
+        })
+
+        const updateResult = await updateResponse.json()
+        if (updateResult.success) {
+          console.log("Dashboard state auto-saved to temp dashboard")
+        }
+      }
+    } catch (error) {
+      console.error("Error auto-saving dashboard to temp:", error)
+    }
+  }
+
+  // Auto-save dashboard state when component unmounts
+  useEffect(() => {
+    return () => {
+      if (currentPdfData) {
+        autoSaveDashboardToTemp()
+      }
+    }
+  }, [currentPdfData])
+
+  const startAutoScroll = () => {
+    const container = containerRef.current
+    if (!container) return
+    // Reset to the top before starting
+    container.scrollTop = 0
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    const step = () => {
+      container.scrollBy(0, 0.5)
+      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1
+      if (atBottom) {
+        container.scrollTop = 0
+      }
+      rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+  }
+
+  const renderPdfFromData = async (pdfData: string) => {
+    const container = containerRef.current
+    if (!container) return
+    
+    try {
+      // Clear container and show loading state
+      container.innerHTML = ""
+      
+      // Validate PDF data
+      if (!pdfData || pdfData.trim() === '') {
+        throw new Error('No PDF data provided')
+      }
+      
+      // Check if PDF data is valid base64
+      const base64Regex = /^data:application\/pdf;base64,/
+      if (!base64Regex.test(pdfData) && !pdfData.startsWith('data:application/pdf')) {
+        // Try to add the data URL prefix if missing
+        if (!pdfData.startsWith('data:')) {
+          pdfData = `data:application/pdf;base64,${pdfData}`
+        }
+      }
+
+      // Show loading indicator
+      const loadingDiv = document.createElement('div')
+      loadingDiv.className = 'flex items-center justify-center h-32 text-gray-500'
+      loadingDiv.innerHTML = `
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600 mx-auto mb-2"></div>
+          <p class="text-sm">Loading PDF...</p>
+        </div>
+      `
+      container.appendChild(loadingDiv)
+
+      // Load PDF document
+      const pdf = await pdfjsLib.getDocument(pdfData).promise
+      
+      // Clear loading indicator
+      container.innerHTML = ""
+
+      // Render each page
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        try {
+          const page = await pdf.getPage(pageNum)
+          // Fit page width to container to avoid horizontal scroll
+          const containerWidth = container.clientWidth || 600
+          const baseViewport = page.getViewport({ scale: 1 })
+          const fitScale = containerWidth / baseViewport.width
+          const viewport = page.getViewport({ scale: fitScale })
+          
+          // Render at higher pixel density for crisp text
+          const outputScale = typeof window !== "undefined" ? Math.max(2, window.devicePixelRatio || 1) : 2
+          const canvas = document.createElement("canvas")
+          const context = canvas.getContext("2d")
+          
+          if (!context) {
+            throw new Error('Failed to get canvas context')
+          }
+          
+          // Set canvas size for high DPI rendering
+          canvas.width = Math.floor(viewport.width * outputScale)
+          canvas.height = Math.floor(viewport.height * outputScale)
+          
+          // Set CSS size to display size (no blur) - this ensures it fits the widget
+          canvas.style.width = "100%"
+          canvas.style.height = "auto"
+          
+          // Scale context for high DPI rendering
+          context.scale(outputScale, outputScale)
+          
+          await page.render({ 
+            canvasContext: context, 
+            viewport,
+            canvas
+          }).promise
+          container.appendChild(canvas)
+        } catch (pageError) {
+          console.error(`Error rendering PDF page ${pageNum}:`, pageError)
+          // Continue with other pages even if one fails
+        }
+      }
+
+      // Ensure we begin from the first page
+      container.scrollTop = 0
+      startAutoScroll()
+      
+    } catch (error) {
+      console.error('Error rendering PDF:', error)
+      
+      // Clear container and show error message
+      container.innerHTML = ""
+      
+      const errorDiv = document.createElement('div')
+      errorDiv.className = 'flex items-center justify-center h-32 text-red-500'
+      errorDiv.innerHTML = `
+        <div class="text-center">
+          <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          </div>
+          <p class="text-sm font-medium">Failed to load PDF</p>
+          <p class="text-xs text-gray-400 mt-1">The PDF file may be corrupted or invalid</p>
+        </div>
+      `
+      container.appendChild(errorDiv)
+      
+      // Show toast error
+      toast.error('Failed to load PDF. The file may be corrupted or invalid.')
+    }
+  }
+
+  // Function to refresh dashboard state from TemporaryDashboard
+  const refreshFromTempDashboard = async () => {
+    try {
+      console.log("Refreshing dashboard from TemporaryDashboard")
+      const response = await fetch('/api/temp-dashboard/get-all')
+      const result = await response.json()
+      
+      if (result.success && result.result.length > 0) {
+        const tempDashboard = result.result[0]
+        if (tempDashboard.containers && tempDashboard.containers.length > 0) {
+          const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+          const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
+          
+          if (pdfContainers.length > 0) {
+            console.log("Refreshing PDF data for", pdfContainers.length, "widgets")
+            const pdfContainer = pdfContainers.find((container: any) => container.id === widgetId)
+            if (pdfContainer) {
+              const genId = `pdf-${Date.now()}`
+              onPdfStored(genId, pdfContainer.pdfData, pdfContainer.pdfFileName || 'uploaded.pdf')
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing from temp dashboard:', error)
+    }
+  }
+
+  const saveToTempDashboard = async (pdfData: string, fileName: string) => {
+    try {
+      // Get current temp dashboard data
+      const response = await fetch('/api/temp-dashboard/get-all')
+      const result = await response.json()
+      
+      if (result.success && result.result.length > 0) {
+        // Update the first temp dashboard with the new PDF data
+        const tempDashboard = result.result[0]
+        const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+        
+        // Find and update the widget container
+        const updatedContainers = containers.map((container: any) => {
+          if (container.id === widgetId) {
+            return {
+              ...container,
+              pdfData: pdfData,
+              pdfFileName: fileName,
+              type: "pdf"
+            }
+          }
+          return container
+        })
+
+        // Update the temp dashboard
+        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            containers: updatedContainers
+          })
+        })
+
+        const updateResult = await updateResponse.json()
+        if (updateResult.success) {
+          console.log("PDF data saved to temp dashboard successfully")
+          // Trigger immediate refresh to display the updated PDF
+          setTimeout(() => {
+            refreshFromTempDashboard()
+          }, 500)
+        } else {
+          console.error("Failed to save PDF data to temp dashboard:", updateResult)
+        }
+              } else {
+          // No temp dashboard exists yet, create one with current widget data
+          console.log("No temp dashboard found, creating one with PDF data")
+          try {
+            const createResponse = await fetch('/api/temp-dashboard/create', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                aspectRatio: '16:9', // Default aspect ratio
+                containers: [{
+                  id: widgetId,
+                  type: 'pdf',
+                  pdfData: pdfData,
+                  pdfFileName: fileName
+                }],
+                screenName: 'Screen 1',
+                screenIndex: 0,
+                totalScreens: 1
+              })
+            })
+
+            const createResult = await createResponse.json()
+            if (createResult.success) {
+              console.log("Created new temp dashboard with PDF data")
+              // Trigger immediate refresh to display the PDF
+              setTimeout(() => {
+                refreshFromTempDashboard()
+              }, 500)
+            } else {
+              console.warn("Failed to create temp dashboard:", createResult.error)
+            }
+          } catch (error) {
+            console.error("Error creating temp dashboard:", error)
+            // Fallback: store PDF data in localStorage as backup
+            try {
+              const backupData = {
+                widgetId,
+                pdfData,
+                fileName,
+                timestamp: Date.now()
+              }
+              localStorage.setItem(`pdf-backup-${widgetId}`, JSON.stringify(backupData))
+              console.log("PDF data backed up to localStorage")
+            } catch (localStorageError) {
+              console.error("Failed to backup PDF data to localStorage:", localStorageError)
+            }
+          }
+        }
+    } catch (error) {
+      console.error("Error saving PDF to temp dashboard:", error)
+    }
+  }
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || file.type !== "application/pdf") {
+      toast.error("Please select a valid PDF file")
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast.error("PDF file size must be less than 10MB")
+      return
+    }
+
+    try {
+      setIsUploading(true)
+      const loadingToast = toast.loading('Uploading PDF...')
+
+      // Convert file to base64
+      const reader = new FileReader()
+      reader.onload = async (event) => {
+        try {
+          const pdfData = event.target?.result as string
+          setCurrentPdfData(pdfData)
+          
+          // Render the uploaded PDF
+          await renderPdfFromData(pdfData)
+          
+          // Save to TemporaryDashboard immediately
+          await saveToTempDashboard(pdfData, file.name)
+          
+          // Generate a unique ID for the PDF
+          const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          
+          // Notify parent component about the stored PDF with data
+          onPdfStored(pdfId, pdfData, file.name)
+          
+          toast.dismiss(loadingToast)
+          toast.success('PDF uploaded and stored successfully!')
+        } catch (error) {
+          console.error("Error processing PDF:", error)
+          toast.dismiss(loadingToast)
+          toast.error("Failed to process PDF")
+        }
+      }
+      
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error("Error uploading PDF:", error)
+      toast.error("Failed to upload PDF")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="pb-2 flex items-center gap-2">
+        <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm cursor-pointer bg-white hover:bg-gray-50 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          <Upload size={16} />
+          <span>{isUploading ? 'Uploading...' : 'Upload PDF'}</span>
+          <input 
+            className="hidden" 
+            type="file" 
+            accept="application/pdf" 
+            onChange={handleUpload}
+            disabled={isUploading}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              setIsSelectModalOpen(true)
+              // start animation immediately
+              requestAnimationFrame(() => setAnimateOpen(true))
+              setIsLoadingExisting(true)
+              const resp = await fetch('/api/notice/get-all')
+              const data = await resp.json()
+              // Filter notices that have pdfData
+              const pdfNotices = (data?.result || []).filter((n: any) => n?.pdfData)
+              console.log('Found PDF notices:', pdfNotices.length, pdfNotices.map((n: any) => ({ 
+                title: n.title, 
+                fileName: n.pdfFileName, 
+                hasPdfData: !!n.pdfData,
+                pdfDataLength: n.pdfData?.length || 0,
+                pdfDataPrefix: n.pdfData?.substring(0, 50) || 'none'
+              })))
+              
+              // Ensure PDF data has proper format for rendering
+              const processedPdfNotices = pdfNotices.map((n: any) => {
+                let pdfData = n.pdfData || ''
+                
+                // Ensure PDF data has data URL prefix for proper rendering
+                if (pdfData && !pdfData.startsWith('data:')) {
+                  pdfData = `data:application/pdf;base64,${pdfData}`
+                  console.log('Added data URL prefix to PDF:', n.pdfFileName)
+                }
+                
+                return {
+                  ...n,
+                  pdfData: pdfData
+                }
+              })
+              
+              // Deduplicate strictly by file name
+              const seen = new Set<string>()
+              const unique = [] as any[]
+              for (const n of processedPdfNotices) {
+                const key = (n?.pdfFileName ?? '').toString().trim().toLowerCase()
+                if (!key) continue
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(n)
+                }
+              }
+              setExistingPdfs(unique)
+            } catch (e) {
+              console.error('Failed to load existing PDFs', e)
+              toast.error('Failed to load existing PDFs. Please try again.')
+              setExistingPdfs([])
+            } finally {
+              setIsLoadingExisting(false)
+            }
+          }}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm bg-white hover:bg-gray-50"
+        >
+          <Upload size={16} />
+          <span>From Existing</span>
+        </button>
+      </div>
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden border rounded-md"
+        style={{ background: "#fff" }}
+      />
+
+      {isSelectModalOpen && createPortal(
+        <div className="fixed inset-0 z-[1000]">
+          <div
+            className={`absolute inset-0 bg-black/50 transition-opacity duration-150 ${animateOpen ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => {
+              setAnimateOpen(false)
+              setTimeout(() => setIsSelectModalOpen(false), 200)
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div
+              className={`relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-[92vw] max-w-5xl max-h-[85vh] overflow-hidden transition-all duration-150 transform ${animateOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-95'}`}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center gap-3 text-base font-semibold text-gray-800">
+                  <div className="p-2 rounded-lg bg-white border border-gray-200"><Upload size={18} className="text-indigo-600" /></div>
+                  Choose Existing PDF
+                </div>
+                <button
+                  onClick={() => {
+                    setAnimateOpen(false)
+                    setTimeout(() => setIsSelectModalOpen(false), 200)
+                  }}
+                  className="h-8 w-8 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-gray-700 grid place-items-center"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="px-6 py-4 border-b border-gray-100 bg-white">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Search by title or file name..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      const q = e.target.value.trim().toLowerCase()
+                      setExistingPdfs((prev: any[]) => prev.map(p => ({ ...p, __hidden: q ? !((p.title||'').toLowerCase().includes(q) || (p.pdfFileName||'').toLowerCase().includes(q)) : false })))
+                    }}
+                  />
+                  <div className="text-xs text-gray-500">{existingPdfs.filter((p: any) => !p.__hidden).length} item{existingPdfs.filter((p: any) => !p.__hidden).length !== 1 ? 's' : ''}</div>
+                </div>
+              </div>
+              <div className="p-6 bg-white">
+                {isLoadingExisting ? (
+                  <div className="flex items-center justify-center py-16 text-sm text-gray-500">Loading PDFs...</div>
+                ) : existingPdfs.length === 0 ? (
+                  <div className="text-center py-16 text-sm text-gray-500">No existing PDF notices found.</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {existingPdfs.filter((p: any) => !p.__hidden).map((n: any) => (
+                      <button
+                        key={n.id}
+                        className="group text-left rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all bg-white p-4 flex items-start gap-3"
+                        onClick={async () => {
+                          try {
+                            console.log('Selecting PDF:', { 
+                              title: n.title, 
+                              fileName: n.pdfFileName, 
+                              hasPdfData: !!n.pdfData,
+                              pdfDataLength: n.pdfData?.length || 0,
+                              pdfDataPrefix: n.pdfData?.substring(0, 50) || 'none'
+                            })
+                            
+                            if (!n.pdfData) {
+                              toast.error('No PDF data found for this file')
+                              return
+                            }
+                            
+                            // Validate PDF data before processing
+                            if (typeof n.pdfData !== 'string' || n.pdfData.trim() === '') {
+                              toast.error('Invalid PDF data format')
+                              return
+                            }
+                            
+                            setCurrentPdfData(n.pdfData)
+                            
+                            // Try to render the PDF first to validate it
+                            try {
+                              await renderPdfFromData(n.pdfData)
+                            } catch (renderError) {
+                              console.error('Error rendering selected PDF:', renderError)
+                              toast.error('Failed to load PDF. The file may be corrupted.')
+                              return
+                            }
+                            
+                            await saveToTempDashboard(n.pdfData, n.pdfFileName || 'uploaded.pdf')
+                            const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+                            onPdfStored(pdfId, n.pdfData, n.pdfFileName || 'uploaded.pdf')
+                            setIsSelectModalOpen(false)
+                            toast.success('PDF selected successfully')
+                          } catch (err) {
+                            console.error('Error selecting existing PDF:', err)
+                            toast.error('Failed to select PDF. Please try again.')
+                          }
+                        }}
+                        title={n.pdfFileName || 'PDF'}
+                      >
+                        <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-blue-50 text-blue-600 grid place-items-center border border-blue-100">PDF</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 truncate">{n.pdfFileName || 'PDF'}</div>
+                          <div className="text-xs text-gray-400 truncate">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>, document.body)
+      }
+    </div>
+  )
 }
 
 // Add this before the EditDashboardDemo component
@@ -214,6 +943,9 @@ const getTabsForWidgetType = (widgetType: WidgetType | undefined) => {
   if (widgetType === "image") {
     // Image widgets: show style, typography, category, and image tabs
     return SETTINGS_TABS.filter(tab => tab.id !== "content");
+  } else if (widgetType === "pdf") {
+    // PDF widgets: show style and category tabs (no content/image specific)
+    return SETTINGS_TABS.filter(tab => tab.id !== "content" && tab.id !== "image");
   } else {
     // Notice widgets: show style, typography, content, and category tabs
     return SETTINGS_TABS.filter(tab => tab.id !== "image");
@@ -286,7 +1018,7 @@ function EditDashboardDemo() {
     })
   }
   
-  const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>(null)
+  const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>('16:9')
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false)
   const [categories, setCategories] = useState<TCategoriesWithNotices[]>([])
   const [activeSettingsWidget, setActiveSettingsWidget] = useState<string | null>(null)
@@ -312,9 +1044,7 @@ function EditDashboardDemo() {
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
   
-  // Add state for confirmation dialog
-  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false)
-  const [pendingSavedState, setPendingSavedState] = useState<any>(null)
+
   
   // Add state for loading existing dashboard
   const [isLoadingExistingDashboard, setIsLoadingExistingDashboard] = useState(false)
@@ -332,16 +1062,27 @@ function EditDashboardDemo() {
   const [isRemovingWidget, setIsRemovingWidget] = useState(false)
   const [isAddingScreen, setIsAddingScreen] = useState(false)
   const [isRemovingScreen, setIsRemovingScreen] = useState(false)
+  const [isClearingScreens, setIsClearingScreens] = useState(false)
   const [isApplyingTemplate, setIsApplyingTemplate] = useState(false)
   const [isCreatingFromTemplate, setIsCreatingFromTemplate] = useState(false)
   const [isDeletingTemplate, setIsDeletingTemplate] = useState(false)
   const [isUpdatingTemplate, setIsUpdatingTemplate] = useState(false)
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState<string | null>(null) // widgetId for which image is being uploaded
+  const [isImageSelectOpen, setIsImageSelectOpen] = useState(false)
+  const [imageSelectWidgetId, setImageSelectWidgetId] = useState<string | null>(null)
+  const [isLoadingExistingImages, setIsLoadingExistingImages] = useState(false)
+  const [existingImages, setExistingImages] = useState<any[]>([])
+  const [animateImageOpen, setAnimateImageOpen] = useState(false)
+
 
   // Enhanced localStorage state management
   const [hasInitialized, setHasInitialized] = useState(false)
   const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 })
+
+  // TempDashboard state management
+  const [tempDashboardId, setTempDashboardId] = useState<string | null>(null)
+  const [isTempDashboardActive, setIsTempDashboardActive] = useState(false)
 
   // Template management state
   const [templates, setTemplates] = useState<DashboardTemplate[]>([])
@@ -410,13 +1151,23 @@ function EditDashboardDemo() {
           
           // Check if there was previous content (screens with widgets)
           if (savedScreens && savedScreens.length > 0 && savedScreens.some((screen: any) => screen.widgets.length > 0)) {
-            // Show confirmation dialog instead of clearing immediately
-            setPendingSavedState(savedState)
-            setShowConfirmationDialog(true)
+            // Automatically restore the saved state
+            restoreStateFromSaved(savedState)
+            localStorageUtils.removeItem('dashboardState')
+            
+            // Save to TemporaryDashboard after restoring state
+            setTimeout(() => {
+              autoSaveToTempDashboard()
+            }, 100)
           } else {
             // No previous content, just load the ratio and screens structure
             restoreStateFromSaved(savedState)
             localStorageUtils.removeItem('dashboardState')
+            
+            // Save to TemporaryDashboard after restoring state
+            setTimeout(() => {
+              autoSaveToTempDashboard()
+            }, 100)
           }
         }
       } catch (error) {
@@ -459,6 +1210,159 @@ function EditDashboardDemo() {
     if (savedState.templateDescription !== undefined) setTemplateDescription(savedState.templateDescription)
     if (savedState.newTemplateName !== undefined) setNewTemplateName(savedState.newTemplateName)
     if (savedState.newTemplateDescription !== undefined) setNewTemplateDescription(savedState.newTemplateDescription)
+  }
+
+  // Ensure default Dashboard categories (IMAGE and PDF) exist
+  useEffect(() => {
+    const ensureDashboardCategories = async () => {
+      try {
+        // Ensure Dashboard (IMAGE)
+        try {
+          const imgCat: any = await getDashboardCategory()
+          if (!imgCat?.success || !imgCat.result) {
+            await createCategory({ name: 'Dashboard', categoryType: 'IMAGE' } as any)
+          }
+        } catch (e) {
+          console.warn('Could not ensure Dashboard IMAGE category:', e)
+        }
+
+        // Ensure Dashboard (PDF)
+        try {
+          const pdfCat: any = await getDashboardPdfCategory()
+          if (!pdfCat?.success || !pdfCat.result) {
+            await createCategory({ name: 'Dashboard', categoryType: 'PDF' } as any)
+          }
+        } catch (e) {
+          console.warn('Could not ensure Dashboard PDF category:', e)
+        }
+      } catch (e) {
+        console.warn('Error ensuring default Dashboard categories:', e)
+      }
+    }
+
+    ensureDashboardCategories()
+  }, [])
+
+  // Function to auto-save current dashboard state to TemporaryDashboard
+  const autoSaveToTempDashboard = async () => {
+    try {
+      // Get current temp dashboard data
+      const response = await fetch('/api/temp-dashboard/get-all')
+      const result = await response.json()
+      
+      if (result.success && result.result.length > 0) {
+        // Update the first temp dashboard with current state
+        const tempDashboard = result.result[0]
+        
+        // Prepare updated containers with current widget data
+        const updatedContainers = []
+        
+        for (let screenIndex = 0; screenIndex < screens.length; screenIndex++) {
+          const screen = screens[screenIndex]
+          
+          for (const widget of screen.widgets) {
+            const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
+            if (!specificLayout) continue
+
+            const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
+            const containerHeight = (RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0)
+
+            const colWidth = (containerWidth - 11 * 24) / 12
+            const rowHeight = 50
+
+            const leftPx = specificLayout.x * (colWidth + 24)
+            const topPx = specificLayout.y * (rowHeight + 24)
+
+            const leftPercent = (leftPx / containerWidth) * 100
+            const topPercent = (topPx / containerHeight) * 100
+
+            const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
+            const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
+
+            const settings = screen.widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
+
+            const container: any = {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title,
+              category: widget.category,
+              type: widget.type || "notice",
+              settings: settings
+            }
+
+            // Add PDF data if it's a PDF widget
+            if (widget.type === "pdf" && widget.pdfs && widget.pdfs.length > 0) {
+              container.pdfData = widget.pdfs[0].pdfData || ''
+              container.pdfFileName = widget.pdfs[0].fileName || 'uploaded.pdf'
+            }
+
+            updatedContainers.push(container)
+          }
+        }
+
+        // Update the temp dashboard
+        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            containers: updatedContainers,
+            aspectRatio: selectedRatio,
+            screenName: screens[currentScreenIndex]?.name || 'Screen 1',
+            screenIndex: currentScreenIndex,
+            totalScreens: screens.length
+          })
+        })
+
+        const updateResult = await updateResponse.json()
+        if (updateResult.success) {
+          console.log("Dashboard state auto-saved to temp dashboard")
+        } else {
+          console.warn("Failed to auto-save to temp dashboard:", updateResult.error)
+        }
+      } else if (result.success && result.result.length === 0) {
+        // No temp dashboard exists, create one
+        try {
+          const createResponse = await fetch('/api/temp-dashboard/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              aspectRatio: selectedRatio || '16:9',
+              containers: [],
+              screenName: screens[currentScreenIndex]?.name || 'Screen 1',
+              screenIndex: currentScreenIndex,
+              totalScreens: screens.length
+            })
+          })
+
+          const createResult = await createResponse.json()
+          if (createResult.success) {
+            console.log("Created new temp dashboard for auto-save")
+          } else {
+            console.warn("Failed to create temp dashboard for auto-save:", createResult.error)
+          }
+        } catch (createError) {
+          console.warn("Error creating temp dashboard for auto-save:", createError)
+        }
+      } else {
+        console.warn("Failed to get temp dashboards for auto-save:", result.error)
+      }
+    } catch (error) {
+      console.error("Error auto-saving dashboard to temp:", error)
+      // Don't show error to user, just log it for debugging
+    }
   }
 
   // Enhanced useEffect to save state whenever it changes
@@ -548,6 +1452,121 @@ function EditDashboardDemo() {
     }
   }, [hasInitialized])
 
+  // Auto-save dashboard state to TemporaryDashboard whenever changes are made
+  useEffect(() => {
+    if (!hasInitialized) return
+
+    const autoSaveTimer = setTimeout(async () => {
+      try {
+        // Only auto-save if there are widgets and we have a selected ratio
+        if (screens.some(screen => screen.widgets.length > 0) && selectedRatio) {
+          await autoSaveToTempDashboard()
+        }
+      } catch (error) {
+        console.error('Error auto-saving to temp dashboard:', error)
+      }
+    }, 2000) // Auto-save after 2 seconds of no changes
+
+    return () => clearTimeout(autoSaveTimer)
+  }, [screens, selectedRatio, hasInitialized])
+
+  // Load data from TemporaryDashboard on mount if available
+  useEffect(() => {
+    if (!hasInitialized) return
+
+    const loadFromTempDashboard = async () => {
+      try {
+        const response = await fetch('/api/temp-dashboard/get-all')
+        const result = await response.json()
+        
+        if (result.success && result.result.length > 0) {
+          const tempDashboard = result.result[0]
+          if (tempDashboard.containers && tempDashboard.containers.length > 0) {
+            console.log("Loading dashboard state from TemporaryDashboard")
+            // Set the temp dashboard ID to indicate it's active
+            setTempDashboardId(tempDashboard.id)
+            setIsTempDashboardActive(true)
+            
+            // Load PDF data from temp dashboard containers into widget state
+            const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+            const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
+            
+            if (pdfContainers.length > 0) {
+              console.log("Found PDF containers in temp dashboard:", pdfContainers.length)
+              setWidgets(prev => prev.map(widget => {
+                const pdfContainer = pdfContainers.find((container: any) => container.id === widget.id)
+                if (pdfContainer && widget.type === 'pdf') {
+                  console.log("Updating widget with PDF data:", widget.id, pdfContainer.pdfFileName)
+                  return {
+                    ...widget,
+                    pdfs: [{
+                      id: `pdf-${Date.now()}`,
+                      title: pdfContainer.pdfFileName || 'PDF',
+                      pdfData: pdfContainer.pdfData,
+                      fileName: pdfContainer.pdfFileName || 'uploaded.pdf',
+                      dbId: `pdf-${Date.now()}`
+                    }]
+                  }
+                }
+                return widget
+              }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading from temp dashboard:', error)
+      }
+    }
+
+    // Load on mount
+    loadFromTempDashboard()
+    
+    // Set up real-time polling to refresh dashboard state every 3 seconds
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch('/api/temp-dashboard/get-all')
+        const result = await response.json()
+        
+        if (result.success && result.result.length > 0) {
+          const tempDashboard = result.result[0]
+          if (tempDashboard.containers && tempDashboard.containers.length > 0) {
+            const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+            const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
+            
+            if (pdfContainers.length > 0) {
+              // Update widgets with latest PDF data
+              setWidgets(prev => prev.map(widget => {
+                const pdfContainer = pdfContainers.find((container: any) => container.id === widget.id)
+                if (pdfContainer && widget.type === 'pdf') {
+                  // Check if PDF data has changed
+                  const currentPdfData = widget.pdfs?.[0]?.pdfData
+                  if (pdfContainer.pdfData !== currentPdfData) {
+                    console.log("Refreshing PDF data for widget:", widget.id)
+                    return {
+                      ...widget,
+                      pdfs: [{
+                        id: `pdf-${Date.now()}`,
+                        title: pdfContainer.pdfFileName || 'PDF',
+                        pdfData: pdfContainer.pdfData,
+                        fileName: pdfContainer.pdfFileName || 'uploaded.pdf',
+                        dbId: `pdf-${Date.now()}`
+                      }]
+                    }
+                  }
+                }
+                return widget
+              }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error refreshing dashboard from temp dashboard:', error)
+      }
+    }, 3000) // Check every 3 seconds
+    
+    return () => clearInterval(intervalId)
+  }, [hasInitialized])
+
   // Save state before page unload
   useEffect(() => {
     // Only run on client side and after initialization
@@ -631,9 +1650,226 @@ function EditDashboardDemo() {
     })
   }, [screens, currentScreenIndex, widgets.length, layout.length, selectedRatio, activeSettingsTab, activeSettingsWidget, scrollPosition])
 
+  // Auto-save to TempDashboard whenever state changes
+  useEffect(() => {
+    // Only auto-save if we have a ratio selected and some content
+    if (selectedRatio && screens.length > 0 && screens.some(screen => screen.widgets.length > 0)) {
+      // Debounce the auto-save to avoid too many database calls
+      const timeoutId = setTimeout(() => {
+        saveToTempDashboard()
+      }, 2000) // Wait 2 seconds after last change
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [screens, selectedRatio]) // Only depend on screens and selectedRatio to avoid infinite loops
+
   // Add function to clear saved state
   const clearSavedState = () => {
     localStorageUtils.removeItem('dashboardState')
+    
+    // Save to TemporaryDashboard after clearing saved state
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+  }
+
+  // Function to save current state to TempDashboard
+  const saveToTempDashboard = async () => {
+    if (!selectedRatio) {
+      toast.error("Please select a display ratio first")
+      return
+    }
+
+    try {
+      // Calculate positions for all screens
+      const allScreenData = []
+      
+      for (let screenIndex = 0; screenIndex < screens.length; screenIndex++) {
+        const screen = screens[screenIndex]
+        
+        // Calculate positions for this screen
+        const positions = await Promise.all(screen.widgets.map(async (widget) => {
+          const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
+          if (!specificLayout) return null
+
+          const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
+          const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
+
+          const colWidth = (containerWidth - 11 * 24) / 12
+          const rowHeight = 50
+
+          const leftPx = specificLayout.x * (colWidth + 24)
+          const topPx = specificLayout.y * (rowHeight + 24)
+
+          const leftPercent = (leftPx / containerWidth) * 100
+          const topPercent = (topPx / containerHeight) * 100
+
+          const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
+          const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
+
+          const settings = screen.widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
+
+          // Handle different widget types
+          if (widget.type === "image" && widget.images && widget.images.length > 0) {
+            // For image displays, collect image IDs
+            const imageNoticeIds = widget.images.map(image => image.dbId).filter(Boolean)
+            
+            return {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title || "Image Display",
+              category: "Dashboard Images",
+              type: "image",
+              noticeIds: imageNoticeIds,
+              settings: {
+                backgroundColor: settings.backgroundColor,
+                backgroundOpacity: settings.backgroundOpacity,
+                cardOpacity: settings.cardOpacity,
+                borderColor: settings.borderColor,
+                borderWidth: settings.borderWidth,
+                fontColor: settings.fontColor,
+                noticeCount: settings.noticeCount,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                fontWeight: settings.fontWeight,
+                autoScroll: settings.autoScroll,
+                showFullContent: settings.showFullContent,
+                categoryFont: settings.categoryFont,
+                categoryFontSize: settings.categoryFontSize,
+                categoryFontWeight: settings.categoryFontWeight,
+                categoryFontColor: settings.categoryFontColor,
+                categoryBackgroundColor: settings.categoryBackgroundColor,
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
+                imageFit: settings.imageFit,
+                imageBorderRadius: settings.imageBorderRadius,
+                showImageTitle: settings.showImageTitle,
+                imageTitleColor: settings.imageTitleColor,
+                imageTitleFontSize: settings.imageTitleFontSize,
+                imageTitleFontWeight: settings.imageTitleFontWeight,
+                imageOverlay: settings.imageOverlay,
+                imageOverlayOpacity: settings.imageOverlayOpacity,
+                imageShadow: settings.imageShadow,
+                imageShadowColor: settings.imageShadowColor,
+                imageShadowBlur: settings.imageShadowBlur,
+                imageShadowOffset: settings.imageShadowOffset,
+                imageZoom: settings.imageZoom,
+                imageRotation: settings.imageRotation,
+                imageBrightness: settings.imageBrightness,
+                imageContrast: settings.imageContrast,
+                imageSaturation: settings.imageSaturation,
+                imageBlur: settings.imageBlur,
+                imageGrayscale: settings.imageGrayscale,
+                imageSepia: settings.imageSepia,
+                imageInvert: settings.imageInvert,
+              },
+            }
+          } else if (widget.type === "notice") {
+            // For notice widgets, use existing logic
+            const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
+
+            return {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title,
+              category: widget.category,
+              type: "notice",
+              noticeIds: noticeIds,
+              settings: {
+                backgroundColor: settings.backgroundColor,
+                backgroundOpacity: settings.backgroundOpacity,
+                cardOpacity: settings.cardOpacity,
+                borderColor: settings.borderColor,
+                borderWidth: settings.borderWidth,
+                fontColor: settings.fontColor,
+                noticeCount: settings.noticeCount,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                fontWeight: settings.fontWeight,
+                autoScroll: settings.autoScroll,
+                showFullContent: settings.showFullContent,
+                categoryFont: settings.categoryFont,
+                categoryFontSize: settings.categoryFontSize,
+                categoryFontWeight: settings.categoryFontWeight,
+                categoryFontColor: settings.categoryFontColor,
+                categoryBackgroundColor: settings.categoryBackgroundColor,
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
+              },
+            }
+          }
+        }))
+
+        // Filter out null positions
+        const validPositions = positions.filter(Boolean)
+
+        // Create temp dashboard data for this screen
+        const tempDashboardData = {
+          aspectRatio: selectedRatio,
+          containers: validPositions,
+          screenName: screen.name,
+          screenIndex: screenIndex,
+          totalScreens: screens.length
+        }
+
+        allScreenData.push(tempDashboardData)
+      }
+
+      // Delete existing temp dashboards if any
+      if (tempDashboardId) {
+        try {
+          await deleteAllTempDashboards()
+        } catch (error) {
+          console.warn("Error deleting existing temp dashboards:", error)
+        }
+      }
+
+      // Create new temp dashboard records
+      const tempDashboardResults = []
+      for (const screenData of allScreenData) {
+        const result = await createTempDashboard(screenData)
+        tempDashboardResults.push(result)
+        
+        if (!result.success) {
+          console.error("Failed to save temp dashboard screen:", result.result)
+          return
+        }
+      }
+
+      // Set the temp dashboard ID from the first result
+      if (tempDashboardResults.length > 0 && tempDashboardResults[0].success) {
+        const newTempDashboardId = tempDashboardResults[0].result.id
+        setTempDashboardId(newTempDashboardId)
+        setIsTempDashboardActive(true)
+        console.log("TempDashboard saved successfully:", tempDashboardResults)
+      }
+
+    } catch (error) {
+      console.error("Error saving to temp dashboard:", error)
+      toast.error(`Error saving to temp dashboard: ${error}`)
+    }
   }
 
   // Screen management functions
@@ -651,6 +1887,11 @@ function EditDashboardDemo() {
     }
     setScreens([...screens, newScreen])
     setCurrentScreenIndex(screens.length) // Switch to the new screen
+    
+    // Save to TemporaryDashboard after adding screen
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
     } catch (error) {
       console.error("Error adding screen:", error)
       toast.error("Failed to add screen")
@@ -675,6 +1916,11 @@ function EditDashboardDemo() {
     if (currentScreenIndex >= screenIndex) {
       setCurrentScreenIndex(Math.max(0, currentScreenIndex - 1))
       }
+      
+      // Save to TemporaryDashboard after removing screen
+      setTimeout(() => {
+        autoSaveToTempDashboard()
+      }, 100)
     } catch (error) {
       console.error("Error removing screen:", error)
       toast.error("Failed to remove screen")
@@ -690,46 +1936,60 @@ function EditDashboardDemo() {
       name: newName
     }
     setScreens(newScreens)
+    
+    // Save to TemporaryDashboard after renaming screen
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
   }
 
-  // Handle confirmation dialog actions
-  const handleConfirmClear = () => {
-    if (pendingSavedState) {
-      // Load only the ratio, clear everything else
-      setSelectedRatio(pendingSavedState.selectedRatio)
-    }
-    localStorageUtils.removeItem('dashboardState')
-    setShowConfirmationDialog(false)
-    setPendingSavedState(null)
-  }
-
-  const handleCancelClear = () => {
-    if (pendingSavedState) {
-      // Use the enhanced restore function to restore all state
-      restoreStateFromSaved(pendingSavedState)
-      
-      // Check if there are image widgets that need to be re-uploaded
-      const hasImageWidgets = pendingSavedState.screens?.some((screen: any) => 
-        screen.widgets?.some((widget: any) => 
-          widget.type === 'notice' && widget.images?.length > 0
-        )
-      )
-      
-      if (hasImageWidgets) {
-        toast.info("Dashboard restored! Note: Image displays need to be re-uploaded due to storage limitations.")
-      } else {
-        toast.success("Dashboard restored successfully!", { duration: 1500 })
+  const clearAllScreens = async () => {
+    try {
+      setIsClearingScreens(true)
+      // Reset to a single empty screen
+      const initialScreen = {
+        id: 'screen-1',
+        name: 'Screen 1',
+        widgets: [],
+        layout: [],
+        widgetSettings: {}
       }
+      setScreens([initialScreen])
+      setCurrentScreenIndex(0)
+
+      // Clear any temp dashboard data
+      try {
+        await deleteAllTempDashboards()
+        setTempDashboardId(null)
+        setIsTempDashboardActive(false)
+      } catch (error) {
+        console.warn('Error clearing temp dashboards while clearing screens:', error)
+      }
+
+      // Clear saved local state
+      clearSavedState()
+      
+      // Save to TemporaryDashboard after clearing screens
+      setTimeout(() => {
+        autoSaveToTempDashboard()
+      }, 100)
+      
+      toast.success('All screens cleared')
+    } catch (error) {
+      console.error('Error clearing all screens:', error)
+      toast.error('Failed to clear screens')
+    } finally {
+      setIsClearingScreens(false)
     }
-    setShowConfirmationDialog(false)
-    setPendingSavedState(null)
   }
+
+
 
   useEffect(() => {
     const getData = async () => {
       try {
         setIsLoadingCategories(true)
-      const categoriesWithNotices = (await getCategoriesWithNotices()) as TResult
+      const categoriesWithNotices = (await getTextCategoriesWithNotices()) as TResult
       if (categoriesWithNotices.success) {
         setCategories(categoriesWithNotices.result as TCategoriesWithNotices[])
         }
@@ -859,6 +2119,11 @@ function EditDashboardDemo() {
             setScreens(newScreens)
             setCurrentScreenIndex(0)
             
+            // Save to TemporaryDashboard after loading existing dashboard
+            setTimeout(() => {
+              autoSaveToTempDashboard()
+            }, 100)
+            
             toast.success(`Dashboard loaded successfully! ${newScreens.length} screen${newScreens.length > 1 ? 's' : ''} found.`, { duration: 1500 })
           } else {
             // Fallback to single dashboard loading for backward compatibility
@@ -959,6 +2224,11 @@ function EditDashboardDemo() {
               
               setScreens([singleScreen])
               setCurrentScreenIndex(0)
+              
+              // Save to TemporaryDashboard after loading existing dashboard
+              setTimeout(() => {
+                autoSaveToTempDashboard()
+              }, 100)
               
               toast.success('Existing dashboard loaded successfully!', { duration: 1500 })
             } else {
@@ -1161,12 +2431,14 @@ function EditDashboardDemo() {
 
     const newWidgetId = `widget-${Date.now()}-${Math.floor(Math.random() * 1000)}`
     const widgetTitle = type === "image" ? "Image Display" : 
+                       type === "pdf" ? "PDF Widget" :
                        `Notice Widget ${widgets.length + 1}`
     
     const newWidget: ExtendedWidget = {
       id: newWidgetId,
       title: widgetTitle,
       type: type,
+      ...(type === "pdf" ? { url: "/dashboard/test-pdf-scroll" } : {}),
     }
 
     const newLayout: Layout = {
@@ -1186,6 +2458,11 @@ function EditDashboardDemo() {
     console.log("Adding widget:", newWidget, "Layout:", newLayout, "Current widgets:", widgets.length)
     setWidgets(prev => [...prev, newWidget])
     setLayout(prev => [...prev, newLayout])
+
+    // Save to TemporaryDashboard after adding widget
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
 
     toast.success("Widget added successfully!", { duration: 1200 })
     } catch (error) {
@@ -1212,7 +2489,12 @@ function EditDashboardDemo() {
     })
     setActiveSettingsWidget(null)
 
-            toast.success("Widget removed", { duration: 1200 })
+    // Save to TemporaryDashboard after removing widget
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+
+    toast.success("Widget removed", { duration: 1200 })
     } catch (error) {
       console.error("Error removing widget:", error)
       toast.error("Failed to remove widget")
@@ -1251,6 +2533,11 @@ function EditDashboardDemo() {
         return prev
       }
     })
+
+    // Save to TemporaryDashboard after ratio change
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
   }
 
   const handleDragStart2 = (e: React.DragEvent, category: TCategoriesWithNotices) => {
@@ -1328,6 +2615,19 @@ function EditDashboardDemo() {
       return
     }
 
+    // Validate that TEXT type categories can only be dropped on notice widgets
+    if (widgetId) {
+      const targetWidget = widgets.find(widget => widget.id === widgetId)
+      if (targetWidget && targetWidget.type === "image" && category.categoryType === "TEXT") {
+        toast.error("Text categories cannot be dropped on image widgets. Only image categories are allowed.")
+        return
+      }
+      if (targetWidget && targetWidget.type === "pdf" && category.categoryType === "TEXT") {
+        toast.error("Text categories cannot be dropped on PDF widgets. Only PDF categories are allowed.")
+        return
+      }
+    }
+
     // If widgetId is provided, update existing widget
     if (widgetId) {
       console.log("Updating existing widget:", widgetId, "with category:", category.name)
@@ -1363,6 +2663,11 @@ function EditDashboardDemo() {
       }
 
               toast.success(`Added ${categoryName} to widget`, { duration: 1200 })
+              
+              // Save to TemporaryDashboard after updating widget
+              setTimeout(() => {
+                autoSaveToTempDashboard()
+              }, 100)
     } else {
       console.log("Creating new widget with category:", category.name)
       // Create new widget at drop location
@@ -1373,6 +2678,16 @@ function EditDashboardDemo() {
   const createWidgetFromCategory = (category: TCategoriesWithNotices, e: React.DragEvent) => {
     if (!selectedRatio) {
       toast.error("Please select a display ratio first")
+      return
+    }
+
+    // Ensure TEXT type categories only create notice widgets
+    if (category.categoryType === "TEXT") {
+      // TEXT categories can only create notice widgets (which is the default)
+      console.log("Creating notice widget from TEXT category:", category.name)
+    } else {
+      // For non-TEXT categories, show error (they should not be in the TEXT categories list)
+      toast.error(`Category type ${category.categoryType} is not allowed for notice widgets. Only TEXT categories are allowed.`)
       return
     }
 
@@ -1424,6 +2739,11 @@ function EditDashboardDemo() {
     console.log("Creating widget from category:", newWidget, "Layout:", newLayout, "Current widgets:", widgets.length)
     setWidgets(prev => [...prev, newWidget])
     setLayout(prev => [...prev, newLayout])
+
+    // Save to TemporaryDashboard after creating widget
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
 
     toast.success(`Created new widget with ${category.name} category!`, { duration: 1200 })
   }
@@ -1506,46 +2826,47 @@ function EditDashboardDemo() {
             // For image displays, create notices for each image and collect their IDs
             const imageNoticeIds = []
             
-            // Use a default category for image displays (first available category or create a generic one)
+            // Use the Dashboard category with type IMAGE for dashboard images
             let imageCategoryId = ""
             try {
-              const categories = await getCategories()
-              if (categories.result && categories.result.length > 0) {
-                // Use the first available category
-                imageCategoryId = categories.result[0].id
+              const dashboardCategory: any = await getDashboardCategory()
+              if (dashboardCategory.success && dashboardCategory.result) {
+                // Use the Dashboard category with type IMAGE
+                imageCategoryId = (dashboardCategory.result as any).id
               } else {
-                // Create a default category if none exist
-                const createCategoryResult = await createCategory({ name: "General" })
-                if (createCategoryResult.success) {
-                  const newCategories = await getCategories()
-                  if (newCategories.result && newCategories.result.length > 0) {
-                    imageCategoryId = newCategories.result[0].id
-                  }
+                // Fallback: try to find any IMAGE category if Dashboard category doesn't exist
+                const categoriesResp: any = await getCategories()
+                const imageCategory = categoriesResp.result?.find((cat: any) => cat.categoryType === 'IMAGE')
+                if (imageCategory) {
+                  imageCategoryId = (imageCategory as any).id
+                } else {
+                  console.error("No Dashboard category with type IMAGE found")
                 }
               }
             } catch (error) {
-              console.error("Error handling image display category:", error)
+              console.error("Error handling Dashboard category:", error)
             }
             
             for (const image of widget.images) {
               try {
-                // Create a notice for this image
+                // Create a notice for this image following the same pattern as create-notice page
                 const noticeData = {
-                  title: image.title || "Image Notice",
-                  content: `Image: ${image.title}`,
-                  category: "Image", // Use generic category name
+                  title: image.title || "Dashboard Image",
+                  content: `Dashboard Image: ${image.title}`,
+                  category: "Dashboard", // Use Dashboard category name
                   categoryId: imageCategoryId,
-                  imageUrl: image.url, // Store the full data URL for display
+                  imageUrl: image.url, // Store the full data URL for display (same as imagePreview in create-notice)
                   imageFileName: image.title,
-                  imageData: image.url.split(',')[1], // Store only the base64 data without the prefix
+                  imageData: image.url.split(',')[1], // Store only the base64 data without the prefix (same as convertImageToBase64)
                 }
                 
                 // Create the notice using the server action directly
                 const noticeResult = await createNotice(noticeData)
                 
-                if (noticeResult.success) {
-                  imageNoticeIds.push(noticeResult.message.id)
-                  console.log(`Created notice for image: ${image.title} with ID: ${noticeResult.message.id}`)
+                const created: any = noticeResult as any
+                if (created.success && created.message && typeof created.message !== 'string' && created.message.id) {
+                  imageNoticeIds.push(created.message.id as string)
+                  console.log(`Created notice for image: ${image.title} with ID: ${created.message.id}`)
                 } else {
                   console.error(`Failed to create notice for image: ${image.title}`, noticeResult)
                 }
@@ -1566,8 +2887,8 @@ function EditDashboardDemo() {
               topPercent: `${topPercent.toFixed(2)}%`,
               width: `${widgetWidth.toFixed(2)}%`,
               height: `${widgetHeight.toFixed(2)}%`,
-              title: widget.content || widget.title || "Image Display",
-              category: "Image", // Use generic category name
+              title: widget.content || widget.title || "Dashboard Image Display",
+              category: "Dashboard", // Use Dashboard category name
               type: "image",
               noticeIds: imageNoticeIds, // Use the created notice IDs
               settings: {
@@ -1614,6 +2935,127 @@ function EditDashboardDemo() {
                 imageGrayscale: settings.imageGrayscale,
                 imageSepia: settings.imageSepia,
                 imageInvert: settings.imageInvert,
+              },
+            }
+          } else if (widget.type === "pdf" && widget.pdfs && widget.pdfs.length > 0) {
+            // For PDF widgets, save PDF data directly in the container
+            const pdf = widget.pdfs[0] // Take the first PDF for now
+            
+            // Get PDF data from TemporaryDashboard if not in widget
+            let pdfData = pdf.pdfData
+            if (!pdfData) {
+              try {
+                const tempResponse = await fetch('/api/temp-dashboard/get-all')
+                const tempResult = await tempResponse.json()
+                
+                if (tempResult.success && tempResult.result.length > 0) {
+                  for (const tempDashboard of tempResult.result) {
+                    if (tempDashboard.containers) {
+                      const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+                      const widgetContainer = containers.find((container: any) => container.id === widget.id)
+                      
+                      if (widgetContainer && widgetContainer.pdfData) {
+                        pdfData = widgetContainer.pdfData
+                        break
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error("Error fetching PDF data from temp dashboard:", error)
+              }
+            }
+
+            // Persist PDF as a Notice under the Dashboard (PDF) category
+            try {
+              // Store the full PDF data with data URL prefix for proper retrieval
+              const fullPdfData = pdfData || ''
+              
+              // Ensure we have the data URL prefix for proper PDF rendering
+              const pdfDataWithPrefix = fullPdfData.startsWith('data:') 
+                ? fullPdfData 
+                : `data:application/pdf;base64,${fullPdfData}`
+
+              if (pdfDataWithPrefix) {
+                // Find or create the Dashboard PDF category
+                let dashboardPdfCategoryId: string | null = null
+                try {
+                  const dashPdfCat: any = await getDashboardPdfCategory()
+                  if (dashPdfCat?.success && dashPdfCat.result) {
+                    dashboardPdfCategoryId = (dashPdfCat.result as any).id
+                  } else {
+                    const created = await createCategory({ name: 'Dashboard', categoryType: 'PDF' } as any)
+                    if ((created as any)?.success) {
+                      const refreshed: any = await getDashboardPdfCategory()
+                      if (refreshed?.success && refreshed.result) {
+                        dashboardPdfCategoryId = (refreshed.result as any).id
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.warn('Error ensuring Dashboard PDF category:', e)
+                }
+
+                if (dashboardPdfCategoryId) {
+                  try {
+                    await createNotice({
+                      title: pdf.fileName || pdf.title || 'Dashboard PDF',
+                      content: '',
+                      category: 'Dashboard',
+                      categoryId: dashboardPdfCategoryId,
+                      pdfData: pdfDataWithPrefix, // Store with data URL prefix
+                      pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
+                      createdAt: new Date() as any,
+                    } as any)
+                    console.log('PDF notice created successfully for dashboard widget')
+                  } catch (e) {
+                    console.warn('Failed to create PDF notice for dashboard widget:', e)
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Error while persisting PDF widget to notice:', e)
+            }
+            
+            return {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title || "Dashboard PDF Widget",
+              category: "Dashboard",
+              type: "pdf",
+              pdfData: pdfData || '',
+              pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
+              settings: {
+                backgroundColor: settings.backgroundColor,
+                backgroundOpacity: settings.backgroundOpacity,
+                cardOpacity: settings.cardOpacity,
+                borderColor: settings.borderColor,
+                borderWidth: settings.borderWidth,
+                fontColor: settings.fontColor,
+                noticeCount: settings.noticeCount,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                fontWeight: settings.fontWeight,
+                autoScroll: settings.autoScroll,
+                showFullContent: settings.showFullContent,
+                categoryFont: settings.categoryFont,
+                categoryFontSize: settings.categoryFontSize,
+                categoryFontWeight: settings.categoryFontWeight,
+                categoryFontColor: settings.categoryFontColor,
+                categoryBackgroundColor: settings.categoryBackgroundColor,
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
               },
             }
           } else {
@@ -1692,6 +3134,16 @@ function EditDashboardDemo() {
       const allSuccessful = dashboardResults.every(result => result.success)
       
       if (allSuccessful) {
+        // Clear TempDashboard after successful save
+        try {
+          await deleteAllTempDashboards()
+          setTempDashboardId(null)
+          setIsTempDashboardActive(false)
+          console.log("TempDashboard cleared after successful save")
+        } catch (error) {
+          console.warn("Error clearing TempDashboard:", error)
+        }
+        
         clearSavedState() // Clear saved state after successful save
         toast.success(`Dashboard saved successfully! ${screens.length} screen${screens.length > 1 ? 's' : ''} created.`, { duration: 2000 })
         console.log("All screens saved successfully:", dashboardResults)
@@ -1745,6 +3197,11 @@ function EditDashboardDemo() {
         return prev
       })
     }
+
+    // Save to TemporaryDashboard after widget setting change
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
   }
 
   const getPresetColors = () => [
@@ -1935,6 +3392,11 @@ function EditDashboardDemo() {
           : widget
       ))
 
+        // Save to TemporaryDashboard after image upload
+        setTimeout(() => {
+          autoSaveToTempDashboard()
+        }, 100)
+
         toast.dismiss(loadingToast)
         toast.success(`Image uploaded successfully! (${img.width}×${img.height})`, {
           description: `${(file.size / 1024 / 1024).toFixed(1)}MB`
@@ -1958,6 +3420,8 @@ function EditDashboardDemo() {
       setIsUploadingImage(null)
     }
   }
+
+  // PDF widget support removed
 
 
 
@@ -2016,79 +3480,151 @@ function EditDashboardDemo() {
     return Math.max(80, widgetHeight - reservedSpace) // Ensure minimum height of 80px
   }
 
+  // Helper function to determine widget type based on content
+  const getWidgetType = (widget: ExtendedWidget): "notice" | "image" | "pdf" => {
+    // If widget has explicit type, use it
+    if (widget.type) {
+      console.log(`Widget ${widget.id} has explicit type: ${widget.type}`);
+      return widget.type as "notice" | "image" | "pdf";
+    }
+    
+    // If widget has PDFs, treat as pdf widget
+    if ((widget as any).pdfs && (widget as any).pdfs.length > 0) {
+      console.log(`Widget ${widget.id} determined as pdf type due to pdfs array`);
+      return "pdf";
+    }
+    
+    // If widget has images array with content, it's an image widget
+    if (widget.images && widget.images.length > 0) {
+      console.log(`Widget ${widget.id} determined as image type due to images array`);
+      return "image";
+    }
+    
+    // If widget has notices or content, it's a notice widget
+    if (widget.notices || widget.content || widget.category) {
+      console.log(`Widget ${widget.id} determined as notice type due to notices/content/category`);
+      return "notice";
+    }
+    
+    // Default to notice if no clear indication
+    console.log(`Widget ${widget.id} defaulting to notice type`);
+    return "notice";
+  };
+
+  // Helper function to get widget types as a string for display
+  const getWidgetTypesString = (widgets: ExtendedWidget[]): string => {
+    const sortedWidgets = [...widgets].sort((a, b) => {
+      const layoutA = layout.find(l => l.i === a.id);
+      const layoutB = layout.find(l => l.i === b.id);
+      if (!layoutA || !layoutB) return 0;
+      return layoutA.y === layoutB.y ? layoutA.x - layoutB.x : layoutA.y - layoutB.y;
+    });
+    
+    return sortedWidgets.map(widget => getWidgetType(widget)).join(', ');
+  };
+
+  // Helper function to check if two widget arrays have matching types
+  const hasMatchingWidgetTypes = (currentWidgets: ExtendedWidget[], templateWidgets: Widget[]): boolean => {
+    if (currentWidgets.length !== templateWidgets.length) {
+      return false;
+    }
+    
+    // Sort current widgets by position (x, y coordinates) to ensure proper matching
+    const sortedCurrent = [...currentWidgets].sort((a, b) => {
+      const layoutA = layout.find(l => l.i === a.id);
+      const layoutB = layout.find(l => l.i === b.id);
+      if (!layoutA || !layoutB) return 0;
+      return layoutA.y === layoutB.y ? layoutA.x - layoutB.x : layoutA.y - layoutB.y;
+    });
+    
+    // Sort template widgets by their index (assuming they're in the order they should be applied)
+    const sortedTemplate = [...templateWidgets];
+    
+    // Check if each position has matching widget types
+    for (let i = 0; i < sortedCurrent.length; i++) {
+      const currentType = getWidgetType(sortedCurrent[i]);
+      const templateType = getWidgetType(sortedTemplate[i] as ExtendedWidget);
+      
+      if (currentType !== templateType) {
+        console.log(`Widget type mismatch at position ${i}: current=${currentType}, template=${templateType}`);
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   // Add this function inside the EditDashboardDemo component
   const applyTemplate = async (template: DashboardTemplate) => {
     try {
       setIsApplyingTemplate(true)
       
-    // Store all existing widget data (categories, notices, content) by position
-    const existingWidgetData = widgets.map((widget) => ({
-      notices: widget.notices || [],
-      topNotices: widget.topNotices || [],
-      category: widget.category,
-      categoryId: widget.categoryId,
-      content: widget.content,
-      customCategoryName: widgetSettings[widget.id]?.customCategoryName || ''
+      // Debug logging for current widgets
+      console.log('Current widgets before applying template:', widgets);
+      console.log('Template widgets:', template.widgets);
+      
+    // Determine positional order of current widgets by their layout (top-left to bottom-right)
+    const currentLayout = [...layout]
+    const currentWidgetsSorted = [...widgets].sort((a, b) => {
+      const la = currentLayout.find(l => l.i === a.id)
+      const lb = currentLayout.find(l => l.i === b.id)
+      if (!la || !lb) return 0
+      return la.y === lb.y ? la.x - lb.x : la.y - lb.y
+    })
+
+    // Build mapping from index -> current widget id and type
+    const indexToCurrent = currentWidgetsSorted.map(w => ({ id: w.id, type: getWidgetType(w as ExtendedWidget) }))
+
+    // Remap template layout positions onto current widget ids in the same index order
+    const templateLayoutSorted = [...template.layout].sort((a, b) => a.y === b.y ? a.x - b.x : a.y - b.y)
+    const remappedLayout = templateLayoutSorted.map((tplItem, idx) => ({
+      ...tplItem,
+      i: indexToCurrent[idx]?.id || tplItem.i
     }))
 
-    // Apply template completely but preserve existing categories and notices for corresponding positions
-    const newWidgets = template.widgets.map((templateWidget, index) => {
-      const existingData = existingWidgetData[index]
-      
-      return {
-        ...templateWidget,
-        // Always preserve existing notices if they exist
-        notices: existingData?.notices || [],
-        topNotices: existingData?.topNotices || [],
-        // Preserve existing category COMPLETELY - don't fall back to template
-        category: existingData?.category || templateWidget.title,
-        categoryId: existingData?.categoryId || '',
-        // Preserve existing content if it exists
-        content: existingData?.content || templateWidget.title
-      }
-    })
+    // Rebuild widgetSettings:
+    // - For Notice widgets: take template settings from matching index and assign to current widget id
+    // - For Image/PDF widgets: keep existing settings
+    const newWidgetSettings: Record<string, any> = { ...widgetSettings }
+    const templateWidgetSettings = template.widgetSettings || {}
 
-    // Update widget settings to apply template colors while preserving only specific user settings
-    const newWidgetSettings = { ...template.widgetSettings }
-    
-    // For each new widget, preserve only specific settings (not colors/styling)
-    newWidgets.forEach((newWidget, index) => {
-      const oldWidget = widgets[index]
-      if (oldWidget && widgetSettings[oldWidget.id]) {
-        const oldSettings = widgetSettings[oldWidget.id]
-        const existingData = existingWidgetData[index]
-        
-        // Check if this widget has an existing category or content
-        const hasExistingCategory = !!(existingData?.category || existingData?.content)
-        
-        // Apply template settings first, then selectively preserve only non-visual settings
-        newWidgetSettings[newWidget.id] = {
-          ...newWidgetSettings[newWidget.id], // Template settings (including colors)
-          // Preserve only content-related settings, not visual/color settings
-          noticeCount: oldSettings.noticeCount || newWidgetSettings[newWidget.id]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount,
-          autoScroll: oldSettings.autoScroll !== undefined ? oldSettings.autoScroll : newWidgetSettings[newWidget.id]?.autoScroll,
-          showFullContent: oldSettings.showFullContent !== undefined ? oldSettings.showFullContent : newWidgetSettings[newWidget.id]?.showFullContent,
-          // Preserve customCategoryName ONLY if the widget has an existing category or content
-          // If there's an existing category, preserve the customCategoryName exactly as it was
-          // If there's no existing category, use the template's customCategoryName
-          customCategoryName: hasExistingCategory 
-            ? oldSettings.customCategoryName ?? '' // Preserve existing customCategoryName exactly as it was (use nullish coalescing)
-            : (newWidgetSettings[newWidget.id]?.customCategoryName || '')
+    // Sort template widgets by their positional order (mirror of templateLayoutSorted order)
+    const templateWidgetsSorted = [...template.widgets]
+
+    remappedLayout.forEach((mappedItem, idx) => {
+      const currentId = mappedItem.i
+      const currentType = indexToCurrent[idx]?.type
+      const templateWidget = templateWidgetsSorted[idx] as ExtendedWidget | undefined
+      const templateWidgetId = templateWidget?.id
+      if (!currentId) return
+
+      if (currentType && currentType !== 'image' && currentType !== 'pdf') {
+        // Notice-like widget: fully affected by template settings
+        if (templateWidgetId && templateWidgetSettings[templateWidgetId]) {
+          newWidgetSettings[currentId] = { ...templateWidgetSettings[templateWidgetId] }
         }
+      } else {
+        // Image/PDF: keep existing settings untouched
+        newWidgetSettings[currentId] = { ...widgetSettings[currentId] }
       }
     })
 
-    // Update the current screen with the new template data
+    // Update the current screen: keep widgets unchanged, only update positions and settings
     const newScreens = [...screens]
     newScreens[currentScreenIndex] = {
       ...newScreens[currentScreenIndex],
-      widgets: newWidgets,
-      layout: template.layout,
+      widgets: [...widgets],
+      layout: remappedLayout,
       widgetSettings: newWidgetSettings
     }
     setScreens(newScreens)
     
-    toast.success(`Applied "${template.name}" template to current screen while preserving all categories and content!`, { duration: 1500 })
+    // Save to TemporaryDashboard after applying template
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+    
+    toast.success(`Applied "${template.name}" template. Notice widgets updated, PDF/Image positions adjusted.`, { duration: 1500 })
     } catch (error) {
       console.error("Error applying template:", error)
       toast.error("Failed to apply template")
@@ -2115,6 +3651,11 @@ function EditDashboardDemo() {
       widgetSettings: template.widgetSettings
     }
     setScreens(newScreens)
+
+    // Save to TemporaryDashboard after creating from template
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
 
     // Wait a moment for the state to update
     setTimeout(async () => {
@@ -2155,46 +3696,47 @@ function EditDashboardDemo() {
               // For image displays, create notices for each image and collect their IDs
               const imageNoticeIds = []
               
-              // Use a default category for image displays (first available category or create a generic one)
+              // Use the Dashboard category with type IMAGE for dashboard images
               let imageCategoryId = ""
               try {
-                const categories = await getCategories()
-                if (categories.result && categories.result.length > 0) {
-                  // Use the first available category
-                  imageCategoryId = categories.result[0].id
+                const dashboardCategory: any = await getDashboardCategory()
+                if (dashboardCategory.success && dashboardCategory.result) {
+                  // Use the Dashboard category with type IMAGE
+                  imageCategoryId = (dashboardCategory.result as any).id
                 } else {
-                  // Create a default category if none exist
-                  const createCategoryResult = await createCategory({ name: "General" })
-                  if (createCategoryResult.success) {
-                    const newCategories = await getCategories()
-                    if (newCategories.result && newCategories.result.length > 0) {
-                      imageCategoryId = newCategories.result[0].id
-                    }
+                  // Fallback: try to find any IMAGE category if Dashboard category doesn't exist
+                  const categoriesResp: any = await getCategories()
+                  const imageCategory = categoriesResp.result?.find((cat: any) => cat.categoryType === 'IMAGE')
+                  if (imageCategory) {
+                    imageCategoryId = (imageCategory as any).id
+                  } else {
+                    console.error("No Dashboard category with type IMAGE found")
                   }
                 }
               } catch (error) {
-                console.error("Error handling image display category:", error)
+                console.error("Error handling Dashboard category:", error)
               }
               
               for (const image of widget.images) {
                 try {
-                                  // Create a notice for this image
-                const noticeData = {
-                  title: image.title || "Image Title",
-                  content: `Image: ${image.title}`,
-                  category: "Image", // Use generic category name
-                  categoryId: imageCategoryId,
-                  imageUrl: image.url, // Store the full data URL for display
-                  imageFileName: image.title,
-                  imageData: image.url.split(',')[1], // Store only the base64 data without the prefix
-                }
+                  // Create a notice for this image following the same pattern as create-notice page
+                  const noticeData = {
+                    title: image.title || "Dashboard Image",
+                    content: `Dashboard Image: ${image.title}`,
+                    category: "Dashboard", // Use Dashboard category name
+                    categoryId: imageCategoryId,
+                    imageUrl: image.url, // Store the full data URL for display (same as imagePreview in create-notice)
+                    imageFileName: image.title,
+                    imageData: image.url.split(',')[1], // Store only the base64 data without the prefix (same as convertImageToBase64)
+                  }
                   
                   // Create the notice using the server action directly
                   const noticeResult = await createNotice(noticeData)
                   
-                  if (noticeResult.success) {
-                    imageNoticeIds.push(noticeResult.message.id)
-                    console.log(`Created notice for image: ${image.title} with ID: ${noticeResult.message.id}`)
+                  const created: any = noticeResult as any
+                  if (created.success && created.message && typeof created.message !== 'string' && created.message.id) {
+                    imageNoticeIds.push(created.message.id as string)
+                    console.log(`Created notice for image: ${image.title} with ID: ${created.message.id}`)
                   } else {
                     console.error(`Failed to create notice for image: ${image.title}`, noticeResult)
                   }
@@ -2215,8 +3757,8 @@ function EditDashboardDemo() {
                 topPercent: `${topPercent.toFixed(2)}%`,
                 width: `${widgetWidth.toFixed(2)}%`,
                 height: `${widgetHeight.toFixed(2)}%`,
-                title: widget.content || widget.title || "Image Display",
-                category: "Image", // Use generic category name
+                title: widget.content || widget.title || "Dashboard Image Display",
+                category: "Dashboard", // Use Dashboard category name
                 type: "image",
                 noticeIds: imageNoticeIds, // Use the created notice IDs
                 settings: {
@@ -2396,45 +3938,7 @@ function EditDashboardDemo() {
       )}
 
 
-      {/* Minimal Confirmation Dialog */}
-      {showConfirmationDialog && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full border border-gray-100">
-            <div className="p-6">
-              {/* Header */}
-              <div className="text-center mb-4">
-                <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                  Unsaved Changes
-                </h3>
-                <p className="text-sm text-gray-500">
-                  You have a previous dashboard. What would you like to do?
-                </p>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                <button
-                  onClick={handleConfirmClear}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                >
-                  Start Fresh
-                </button>
-                <button
-                  onClick={handleCancelClear}
-                  className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                >
-                  Restore Previous
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
 
 
@@ -2498,7 +4002,7 @@ function EditDashboardDemo() {
             ) : (
               <>
                 <Plus size={20} className="font-bold" />
-                <span>Create Notice Widget</span>
+                                    <span>Notice</span>
               </>
             )}
             {/* Shimmer Effect */}
@@ -2507,6 +4011,37 @@ function EditDashboardDemo() {
             )}
           </button>
           
+          <button
+            onClick={() => addWidget("pdf")}
+            disabled={!selectedRatio || isAddingWidget}
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
+              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:from-indigo-600 hover:to-indigo-700 border border-indigo-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-600 cursor-not-allowed border border-indigo-300 shadow-md"
+            } ${isAddingWidget ? 'animate-pulse' : ''}`}
+          >
+            {isAddingWidget ? (
+              <>
+                <div className="relative">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-indigo-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                </div>
+                <span className="font-medium">Creating PDF Widget...</span>
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Upload size={20} className="font-bold" />
+                                    <span>PDF Notice</span>
+              </>
+            )}
+            {isAddingWidget && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+            )}
+          </button>
+
           <button
             onClick={() => addWidget("image")}
             disabled={!selectedRatio || isAddingWidget}
@@ -2532,7 +4067,7 @@ function EditDashboardDemo() {
             ) : (
               <>
                 <ImageIcon size={20} className="font-bold" />
-                <span>Create Image Display</span>
+                                    <span>Image Notice</span>
               </>
             )}
             {/* Shimmer Effect */}
@@ -2549,6 +4084,8 @@ function EditDashboardDemo() {
         
 
         
+
+
 
 
 
@@ -2591,6 +4128,8 @@ function EditDashboardDemo() {
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
           )}
         </button>
+
+
       </div>
 
       {/* Improved Screen Management Section - Left Side */}
@@ -2612,12 +4151,34 @@ function EditDashboardDemo() {
               <Plus size={16} className="text-white" />
             )}
           </button>
+
+          {/* Clear All Screens Button */}
+          <button
+            onClick={clearAllScreens}
+            disabled={isClearingScreens}
+            className={`group relative bg-gradient-to-r from-rose-500 to-rose-600 text-white p-2 rounded-lg hover:from-rose-600 hover:to-rose-700 transition-all duration-200 shadow-sm hover:shadow-md border-0 transform hover:scale-105 active:scale-95 ${
+              isClearingScreens ? 'opacity-75 cursor-not-allowed' : ''
+            }`}
+            title="Clear All Screens"
+          >
+            {isClearingScreens ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Trash2 size={16} className="text-white" />
+            )}
+          </button>
           
           {/* Navigation Arrows */}
           {screens.length > 1 && (
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setCurrentScreenIndex(currentScreenIndex > 0 ? currentScreenIndex - 1 : screens.length - 1)}
+                onClick={() => {
+                  setCurrentScreenIndex(currentScreenIndex > 0 ? currentScreenIndex - 1 : screens.length - 1)
+                  // Save to TemporaryDashboard after screen change
+                  setTimeout(() => {
+                    autoSaveToTempDashboard()
+                  }, 100)
+                }}
                 className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
                 title="Previous Screen"
               >
@@ -2626,7 +4187,13 @@ function EditDashboardDemo() {
                 </svg>
               </button>
               <button
-                onClick={() => setCurrentScreenIndex(currentScreenIndex < screens.length - 1 ? currentScreenIndex + 1 : 0)}
+                onClick={() => {
+                  setCurrentScreenIndex(currentScreenIndex < screens.length - 1 ? currentScreenIndex + 1 : 0)
+                  // Save to TemporaryDashboard after screen change
+                  setTimeout(() => {
+                    autoSaveToTempDashboard()
+                  }, 100)
+                }}
                 className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
                 title="Next Screen"
               >
@@ -2647,7 +4214,13 @@ function EditDashboardDemo() {
                     ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'
                 }`}
-                onClick={() => setCurrentScreenIndex(index)}
+                onClick={() => {
+                  setCurrentScreenIndex(index)
+                  // Save to TemporaryDashboard after screen change
+                  setTimeout(() => {
+                    autoSaveToTempDashboard()
+                  }, 100)
+                }}
               >
                 {/* Screen Number */}
                 <span className="text-sm font-medium">{index + 1}</span>
@@ -2719,6 +4292,7 @@ function EditDashboardDemo() {
                   key={category.id}
                   draggable
                   onDragStart={(e) => handleDragStart2(e, category)}
+                  title={`${category.name} - Text Category (Drag to create notice widget only)`}
                 className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-md cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
               >
                 <div className="flex items-center gap-2">
@@ -2759,13 +4333,13 @@ function EditDashboardDemo() {
       {selectedRatio && (
         <div className="dashboard-screen-container">
           <div
-            className={`border-4 border-dashed rounded-lg overflow-hidden bg-white p-4 relative transition-all duration-200 ${
+            className={`border-4 border-dashed rounded-lg overflow-hidden bg-white p-4  relative transition-all duration-200 ${
               isDragOverDashboard 
-                ? 'border-blue-400 bg-blue-50 shadow-lg' 
-                : 'border-gray-300'
+                ? 'border-amber-500 bg-amber-50 shadow-lg' 
+                : 'border-amber-400'
             }`}
             style={{
-              width: RATIO_DIMENSIONS[selectedRatio].width * 1.3, // Increased screen size by 30% for better visibility
+              width: RATIO_DIMENSIONS[selectedRatio].width * 1.0, // Increased screen size by 30% for better visibility
               height: RATIO_DIMENSIONS[selectedRatio].height * 1.0, // Fixed: Use 100% height to maintain aspect ratio without exceeding 100%
             }}
             onDrop={(e) => handleDrop(e)}
@@ -2789,8 +4363,14 @@ function EditDashboardDemo() {
             layout={layout}
             cols={12}
             rowHeight={50}
-            width={(RATIO_DIMENSIONS[selectedRatio].width * 1.3) - 32}
-            onLayoutChange={(newLayout: Layout[]) => setLayout(newLayout)}
+            width={(RATIO_DIMENSIONS[selectedRatio].width * 1.0) -136}
+                                    onLayoutChange={(newLayout: Layout[]) => {
+                          setLayout(newLayout)
+                          // Save to TemporaryDashboard after layout change
+                          setTimeout(() => {
+                            autoSaveToTempDashboard()
+                          }, 100)
+                        }}
             margin={[12, 12]}
             draggableHandle=".widget-drag-handle"
           >
@@ -3087,6 +4667,39 @@ function EditDashboardDemo() {
                                                     />
                                                   </label>
                                     <button
+                                      onClick={async () => {
+                                        try {
+                                          setImageSelectWidgetId(widget.id)
+                                          setIsImageSelectOpen(true)
+                                          requestAnimationFrame(() => setAnimateImageOpen(true))
+                                          setIsLoadingExistingImages(true)
+                                          const resp = await fetch('/api/notice/get-all')
+                                          const data = await resp.json()
+                                          const imageNotices = (data?.result || []).filter((n: any) => n?.imageUrl || n?.imageData)
+                                          const seen = new Set<string>()
+                                          const unique: any[] = []
+                                          for (const n of imageNotices) {
+                                            const key = (n?.imageFileName ?? '').toString().trim().toLowerCase()
+                                            if (!key) continue
+                                            if (!seen.has(key)) {
+                                              seen.add(key)
+                                              unique.push(n)
+                                            }
+                                          }
+                                          setExistingImages(unique)
+                                        } catch (e) {
+                                          console.error('Failed to load existing images', e)
+                                          setExistingImages([])
+                                        } finally {
+                                          setIsLoadingExistingImages(false)
+                                        }
+                                      }}
+                                      className="flex items-center gap-2 px-3 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium border"
+                                    >
+                                      <ImageIcon size={16} />
+                                      From Existing
+                                    </button>
+                                    <button
                                       onClick={() => toggleWidgetSettings(widget.id)}
                                       className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
                                     >
@@ -3128,11 +4741,84 @@ function EditDashboardDemo() {
                                   disabled={isUploadingImage === widget.id}
                             />
                               </label>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    setImageSelectWidgetId(widget.id)
+                                    setIsImageSelectOpen(true)
+                                    requestAnimationFrame(() => setAnimateImageOpen(true))
+                                    setIsLoadingExistingImages(true)
+                                    const resp = await fetch('/api/notice/get-all')
+                                    const data = await resp.json()
+                                    const imageNotices = (data?.result || []).filter((n: any) => n?.imageUrl || n?.imageData)
+                                    const seen = new Set<string>()
+                                    const unique: any[] = []
+                                    for (const n of imageNotices) {
+                                      const key = (n?.imageFileName ?? '').toString().trim().toLowerCase()
+                                      if (!key) continue
+                                      if (!seen.has(key)) {
+                                        seen.add(key)
+                                        unique.push(n)
+                                      }
+                                    }
+                                    setExistingImages(unique)
+                                  } catch (e) {
+                                    console.error('Failed to load existing images', e)
+                                    setExistingImages([])
+                                  } finally {
+                                    setIsLoadingExistingImages(false)
+                                  }
+                                }}
+                                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 text-xs font-medium"
+                              >
+                                <ImageIcon size={12} /> From Existing
+                              </button>
                             </div>
                           </div>
                         )}
                       </div>
                     )}
+
+                    {/* PDF widget content: inline upload + render + auto-scroll */}
+                    {widget.type === "pdf" && (
+                      <InlinePdfWidget 
+                        widgetId={widget.id}
+                        onPdfStored={(pdfId: string, pdfData: string, fileName: string) => {
+                          // Store PDF reference in widget with proper PDF data
+                          setWidgets(prev => prev.map(w => 
+                            w.id === widget.id 
+                              ? { 
+                                  ...w, 
+                                  pdfs: [{ 
+                                    id: pdfId, 
+                                    title: fileName || 'PDF', 
+                                    pdfData: pdfData, 
+                                    fileName: fileName || 'uploaded.pdf', 
+                                    dbId: pdfId 
+                                  }] 
+                                }
+                              : w
+                          ))
+                          
+                          // Immediately save to TemporaryDashboard
+                          setTimeout(() => {
+                            autoSaveToTempDashboard()
+                          }, 100)
+                          
+                          // Also save the current widget state to ensure PDF data is included
+                          const currentWidget = widgets.find(w => w.id === widget.id)
+                          if (currentWidget && currentWidget.type === 'pdf' && currentWidget.pdfs && currentWidget.pdfs.length > 0) {
+                            // Force save the current state to include the new PDF data
+                            setTimeout(() => {
+                              autoSaveToTempDashboard()
+                            }, 500)
+                          }
+                        }}
+                      />
+                    )}
+
+                    {/* PDF widget rendering removed */}
 
 
                   </div>
@@ -3212,7 +4898,7 @@ function EditDashboardDemo() {
                     </svg>
                   </div>
                   <p className="text-sm">No templates available for {widgets.length} widget{widgets.length !== 1 ? 's' : ''}</p>
-                  <p className="text-xs text-gray-400 mt-1">Create a template with {widgets.length} widget{widgets.length !== 1 ? 's' : ''} or add more widgets</p>
+                  <p className="text-xs text-gray-400 mt-1">Create a template with {widgets.length} widget{widgets.length !== 1 ? 's' : ''}, or adjust your current widgets</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -3224,7 +4910,6 @@ function EditDashboardDemo() {
                       
                       // Filter by widget count to match current screen
                       const matchesWidgetCount = template.widgets.length === widgets.length;
-                      
                       return matchesSearch && matchesWidgetCount;
                     })
                     .map((template) => (
@@ -4796,6 +6481,101 @@ function EditDashboardDemo() {
           </div>
         </div>
       )}
+
+      {/* Image Select Modal */}
+      {isImageSelectOpen && createPortal(
+        <div className="fixed inset-0 z-[1000]">
+          <div
+            className={`absolute inset-0 bg-black/50 transition-opacity duration-150 ${animateImageOpen ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => {
+              setAnimateImageOpen(false)
+              setTimeout(() => {
+                setIsImageSelectOpen(false)
+                setImageSelectWidgetId(null)
+              }, 150)
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div
+              className={`relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-[92vw] max-w-5xl max-h-[85vh] overflow-hidden transition-all duration-150 transform ${animateImageOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-95'}`}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                <div className="flex items-center gap-3 text-base font-semibold text-gray-800">
+                  <div className="p-2 rounded-lg bg-white border border-gray-200"><ImageIcon size={18} className="text-emerald-600" /></div>
+                  Choose Existing Image
+                </div>
+                <button
+                  onClick={() => {
+                    setAnimateImageOpen(false)
+                    setTimeout(() => {
+                      setIsImageSelectOpen(false)
+                      setImageSelectWidgetId(null)
+                    }, 150)
+                  }}
+                  className="h-8 w-8 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-gray-700 grid place-items-center"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-6 bg-white">
+                {isLoadingExistingImages ? (
+                  <div className="flex items-center justify-center py-16 text-sm text-gray-500">Loading images...</div>
+                ) : existingImages.length === 0 ? (
+                  <div className="text-center py-16 text-sm text-gray-500">No existing image notices found.</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {existingImages.map((n: any) => {
+                      const url = reconstructImageUrl(n)
+                      return (
+                        <button
+                          key={n.id}
+                          className="text-left rounded-xl border border-gray-200 hover:border-emerald-300 hover:shadow-md transition-all bg-white p-3 flex flex-col gap-3"
+                          onClick={async () => {
+                            try {
+                              if (!imageSelectWidgetId || !url) return
+                              setWidgets(prev => prev.map(w => w.id === imageSelectWidgetId ? {
+                                ...w,
+                                images: [{
+                                  id: `img-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                                  url,
+                                  title: n.imageFileName || n.title || 'Image',
+                                  dbId: n.id
+                                }]
+                              } : w))
+                              setTimeout(() => { autoSaveToTempDashboard() }, 100)
+                              setAnimateImageOpen(false)
+                              setTimeout(() => {
+                                setIsImageSelectOpen(false)
+                                setImageSelectWidgetId(null)
+                              }, 150)
+                              toast.success('Image selected successfully')
+                            } catch (err) {
+                              console.error('Error selecting existing image:', err)
+                              toast.error('Failed to select image')
+                            }
+                          }}
+                          title={n.imageFileName || n.title || 'Image'}
+                        >
+                          <div className="w-full h-28 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
+                            {url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={url} alt={n.title || 'Image'} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="text-xs text-gray-400">No preview</div>
+                            )}
+                          </div>
+                          <div className="text-sm font-medium text-gray-900 truncate">{n.imageFileName || n.title || 'Image'}</div>
+                          <div className="text-xs text-gray-400 truncate">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>, document.body)
+      }
 
       {/* View Template Modal */}
       {showViewModal && selectedTemplate && (

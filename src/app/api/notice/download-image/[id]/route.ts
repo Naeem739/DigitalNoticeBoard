@@ -3,10 +3,10 @@ import { prisma } from '@/db/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const noticeId = params.id
+    const { id: noticeId } = await params
 
     // Try to find the image data from the Notice model instead of Image
     const notice = await prisma.notice.findFirst({

@@ -43,6 +43,7 @@ export default function NoticeEditor() {
   const [content, setContent] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [fontSize, setFontSize] = useState("14");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -82,6 +83,28 @@ export default function NoticeEditor() {
     { name: "Pink", value: "#EC4899" },
   ];
 
+  // Function to filter categories based on content mode
+  const filterCategoriesByMode = (mode: 'text' | 'pdf' | 'image') => {
+    const categoryTypeMap = {
+      'text': 'TEXT',
+      'pdf': 'PDF',
+      'image': 'IMAGE'
+    };
+    
+    const targetType = categoryTypeMap[mode];
+    // Filter by category type AND exclude the "Dashboard" category
+    const filtered = categories.filter(category => 
+      category.categoryType === targetType && 
+      category.name.toLowerCase() !== 'dashboard'
+    );
+    setFilteredCategories(filtered);
+    
+    // Reset selected category if it's not in the filtered list
+    if (selectedCategory && !filtered.find(cat => cat.name === selectedCategory)) {
+      setSelectedCategory("");
+    }
+  };
+
   useEffect(() => {
     const getData = async () => {
       try {
@@ -113,6 +136,13 @@ export default function NoticeEditor() {
       document.removeEventListener("selectionchange", checkFormatting);
     };
   }, []);
+
+  // Filter categories when content mode changes
+  useEffect(() => {
+    if (categories.length > 0) {
+      filterCategoriesByMode(contentMode);
+    }
+  }, [contentMode, categories]);
   
   // Function to check current formatting state
   const checkFormatting = () => {
@@ -261,10 +291,10 @@ export default function NoticeEditor() {
 
     setIsSaving(true);
 
-    console.log("Available categories:", categories.map(c => ({ id: c.id, name: c.name })));
+    console.log("Available categories:", filteredCategories.map(c => ({ id: c.id, name: c.name })));
     console.log("Selected category:", selectedCategory);
     
-    const specificCategory = categories.filter(category => 
+    const specificCategory = filteredCategories.filter(category => 
       category.name.toLowerCase() === selectedCategory.toLowerCase()
     );
     
@@ -408,17 +438,15 @@ export default function NoticeEditor() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information Card */}
           <Card className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <PenLine className="w-5 h-5" />
-                Notice Information
-              </h2>
-      </div>
-      
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Category 
+                    <span className="text-xs text-gray-500 ml-2">
+                      ({contentMode === 'text' ? 'Text' : contentMode === 'pdf' ? 'PDF' : 'Image'} categories only)
+                    </span>
+                  </label>
             <Select
               onValueChange={(value: string) => setSelectedCategory(value)}
               value={selectedCategory}
@@ -428,11 +456,17 @@ export default function NoticeEditor() {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.name}>
-                      {category.name}
+                  {filteredCategories.length > 0 ? (
+                    filteredCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-categories" disabled>
+                      No {contentMode === 'text' ? 'Text' : contentMode === 'pdf' ? 'PDF' : 'Image'} categories available
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -457,7 +491,10 @@ export default function NoticeEditor() {
                 <div className="flex bg-gray-100 rounded-lg p-1">
                   <button
                     type="button"
-                    onClick={() => setContentMode('text')}
+                    onClick={() => {
+                      setContentMode('text');
+                      setSelectedCategory(""); // Reset category when mode changes
+                    }}
                     className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
                       contentMode === 'text'
                         ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-md'
@@ -469,7 +506,10 @@ export default function NoticeEditor() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setContentMode('pdf')}
+                    onClick={() => {
+                      setContentMode('pdf');
+                      setSelectedCategory(""); // Reset category when mode changes
+                    }}
                     className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
                       contentMode === 'pdf'
                         ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
@@ -481,7 +521,10 @@ export default function NoticeEditor() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setContentMode('image')}
+                    onClick={() => {
+                      setContentMode('image');
+                      setSelectedCategory(""); // Reset category when mode changes
+                    }}
                     className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
                       contentMode === 'image'
                         ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md'
@@ -835,10 +878,33 @@ export default function NoticeEditor() {
                   (contentMode === 'text' && (!content.trim() || content === '<br>' || content === '<div><br></div>')) || 
                   (contentMode === 'pdf' && !pdfFile) ||
                   (contentMode === 'image' && !imageFile)}
-                className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3 px-8 rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-300 disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                className={`bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3 px-8 rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-300 disabled:opacity-50 flex items-center gap-2 shadow-lg relative overflow-hidden ${isSaving ? 'animate-pulse' : ''}`}
           >
-            <Save size={18} />
-                {isSaving ? "Publishing Notice..." : "Publish Notice"}
+            {isSaving ? (
+              <>
+                {/* Professional Loading Animation */}
+                <div className="relative">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-yellow-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                </div>
+                <span className="font-medium">Publishing Notice...</span>
+                {/* Progress Dots */}
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                <span>Publish Notice</span>
+              </>
+            )}
+            {/* Shimmer Effect */}
+            {isSaving && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+            )}
           </Button>
             </div>
         </div>

@@ -3,10 +3,10 @@ import { prisma } from '@/db/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const noticeId = params.id
+    const { id: noticeId } = await params
 
     // Fetch the notice from database
     const notice = await prisma.notice.findUnique({

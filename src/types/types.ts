@@ -24,6 +24,7 @@ export type Category = {
   id: string;
   icon?: string;
   editedName?: string;
+  categoryType?: 'TEXT' | 'IMAGE' | 'PDF';
 };
 
 export type TNotice = {
@@ -39,11 +40,13 @@ export type TNotice = {
   imageFileName?: string;
   imageData?: string;
   categoryName?: string;
+  categoryType?: 'TEXT' | 'IMAGE' | 'PDF';
   createdAt?: Date;
   categoryRelation?: {
     id: string;
     name: string;
     editedName?: string;
+    categoryType?: 'TEXT' | 'IMAGE' | 'PDF';
   };
 };
 
@@ -141,6 +144,7 @@ export type PublicNoticeSettings = {
   headerBackgroundColor: string;
   footerBackgroundColor: string;
   accentColor: string;
+  fontColor: string;
   createdAt: Date;
   updatedAt: Date;
 };

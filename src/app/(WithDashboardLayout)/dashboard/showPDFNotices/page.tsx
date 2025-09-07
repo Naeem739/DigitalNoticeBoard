@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, FileText, Download, Eye } from 'lucide-react'
+import { Trash2, FileText, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 
@@ -15,6 +15,7 @@ type TPDF = {
   createdAt?: Date
   category?: string
   categoryName?: string
+  source?: 'notice' | 'pdf'
 }
 
 export default function ShowPDFNotices() {
@@ -28,20 +29,56 @@ export default function ShowPDFNotices() {
     fetchPDFs()
   }, [])
 
+  const stripDataUrlPrefix = (data: string) => {
+    return data.replace(/^data:application\/pdf;base64,/, '')
+  }
+
   const fetchPDFs = async () => {
     try {
       setLoading(true)
-      // Fetch from Notice model instead of a separate PDF model
-      const response = await fetch('/api/notice/get-all')
-      const data = await response.json()
-      
-      if (data.success) {
-        // Filter notices that have pdfData
-        const noticesWithPDFs = data.result.filter((notice: any) => notice.pdfData)
-        setPdfs(noticesWithPDFs || [])
-      } else {
-        toast.error('Failed to fetch PDFs')
+      // Fetch PDFs from Notice model first
+      const noticeRes = await fetch('/api/notice/get-all')
+      const noticeJson = await noticeRes.json()
+
+      const aggregated: TPDF[] = []
+
+      if (noticeJson.success && Array.isArray(noticeJson.result)) {
+        const noticesWithPDFs = noticeJson.result
+          .filter((notice: any) => !!notice.pdfData)
+          .map((notice: any) => ({
+            id: notice.id,
+            title: notice.title,
+            pdfData: stripDataUrlPrefix(notice.pdfData),
+            pdfFileName: notice.pdfFileName,
+            createdAt: notice.createdAt,
+            category: notice.category,
+            categoryName: notice.categoryName,
+            source: 'notice' as const
+          }))
+        aggregated.push(...noticesWithPDFs)
       }
+
+      // Also fetch from legacy/separate PDF model to ensure nothing is missed
+      const pdfRes = await fetch('/api/pdf/get-all')
+      const pdfJson = await pdfRes.json()
+      if (pdfJson.success && Array.isArray(pdfJson.result)) {
+        const pdfsFromTable = pdfJson.result.map((p: any) => ({
+          id: p.id,
+          title: p.title || p.fileName || 'PDF',
+          pdfData: stripDataUrlPrefix(p.pdfData),
+          pdfFileName: p.fileName,
+          createdAt: p.createdAt,
+          source: 'pdf' as const
+        }))
+        aggregated.push(...pdfsFromTable)
+      }
+
+      // Remove duplicates by id if any
+      const byId = new Map<string, TPDF>()
+      for (const item of aggregated) {
+        if (!byId.has(item.id)) byId.set(item.id, item)
+      }
+      setPdfs(Array.from(byId.values()))
     } catch (error) {
       console.error('Error fetching PDFs:', error)
       toast.error('Error fetching PDFs')
@@ -57,8 +94,10 @@ export default function ShowPDFNotices() {
 
     try {
       setDeletingId(pdfId)
-      // Delete from notice instead of a separate PDF model
-      const response = await fetch(`/api/notice/delete?id=${pdfId}`, {
+      // Decide delete endpoint by source
+      const pdfItem = pdfs.find(p => p.id === pdfId)
+      const endpoint = pdfItem?.source === 'pdf' ? '/api/pdf/delete' : '/api/notice/delete'
+      const response = await fetch(`${endpoint}?id=${pdfId}`, {
         method: 'DELETE'
       })
       const result = await response.json()
@@ -80,7 +119,8 @@ export default function ShowPDFNotices() {
   const handleDownloadPDF = (pdf: TPDF) => {
     try {
       // Create a blob from the base64 data
-      const byteCharacters = atob(pdf.pdfData)
+      const base64 = stripDataUrlPrefix(pdf.pdfData)
+      const byteCharacters = atob(base64)
       const byteNumbers = new Array(byteCharacters.length)
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i)
@@ -110,6 +150,7 @@ export default function ShowPDFNotices() {
       // Create a new window with the PDF
       const newWindow = window.open('', '_blank')
       if (newWindow) {
+        const base64 = stripDataUrlPrefix(pdf.pdfData)
         newWindow.document.write(`
           <!DOCTYPE html>
           <html>
@@ -131,13 +172,13 @@ export default function ShowPDFNotices() {
                   padding: 20px;
                   border-radius: 8px;
                   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                  max-width: 90vw;
-                  max-height: 90vh;
+                  width: 95vw;
+                  height: 95vh;
                   overflow: auto;
                 }
                 embed {
                   width: 100%;
-                  height: 80vh;
+                  height: 90vh;
                   border-radius: 4px;
                 }
                 .pdf-info {
@@ -159,13 +200,8 @@ export default function ShowPDFNotices() {
             </head>
             <body>
               <div class="pdf-container">
-                <embed src="data:application/pdf;base64,${pdf.pdfData}" type="application/pdf" />
+                <embed src="data:application/pdf;base64,${base64}" type="application/pdf" />
                 <div class="pdf-info">
-                  <div class="pdf-title">${pdf.title}</div>
-                  <div class="pdf-details">
-                    Category: ${pdf.categoryName || pdf.category || 'N/A'} | ID: ${pdf.id}
-                    ${pdf.createdAt ? ` | Created: ${new Date(pdf.createdAt).toLocaleDateString()}` : ''}
-                  </div>
                 </div>
               </div>
             </body>
@@ -207,10 +243,7 @@ export default function ShowPDFNotices() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">PDF Notices</h1>
-          <p className="text-gray-600 mt-2">Manage all notices with PDFs</p>
-        </div>
+       
         <div className="flex items-center gap-2">
           <FileText className="w-6 h-6 text-red-600" />
           <span className="text-lg font-semibold">{pdfs.length} PDFs</span>
@@ -228,64 +261,88 @@ export default function ShowPDFNotices() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
           {pdfs.map((pdf) => (
-            <Card key={pdf.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium truncate" title={pdf.title}>
-                    {pdf.pdfFileName || pdf.title}
-                  </CardTitle>
-                  <div className="flex items-center gap-1">
+            <Card key={pdf.id} className="group relative overflow-hidden bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 cursor-pointer" onClick={() => handleViewFullSize(pdf)}>
+              {/* Professional gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              
+              {/* Header with better spacing */}
+              <CardHeader className="pb-2 pt-3 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-xs font-semibold text-gray-800 truncate leading-tight" title={pdf.title}>
+                      {pdf.pdfFileName || pdf.title}
+                    </CardTitle>
+                    <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+                      {pdf.categoryName || pdf.category || 'Uncategorized'}
+                    </p>
+                  </div>
+                  
+                  {/* Action buttons with better styling */}
+                  <div className="flex items-center gap-1.5 ml-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDownloadPDF(pdf)}
-                      className="h-8 w-8 p-0"
-                      title="Download"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadPDF(pdf);
+                      }}
+                      className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                      title="Download PDF"
                     >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewFullSize(pdf)}
-                      className="h-8 w-8 p-0"
-                      title="View Full Size"
-                    >
-                      <Eye className="w-4 h-4" />
+                      <Download className="w-3 h-3" />
                     </Button>
                     {userRole !== 'USER' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeletePDF(pdf.id)}
-                        disabled={deletingId === pdf.id}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Delete"
-                      >
+                                              <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePDF(pdf.id);
+                          }}
+                          disabled={deletingId === pdf.id}
+                          className="h-6 w-6 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete PDF"
+                        >
                         {deletingId === pdf.id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600"></div>
                         ) : (
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3 h-3" />
                         )}
                       </Button>
                     )}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0">
-                <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden mb-3 flex items-center justify-center">
-                  <div className="text-center">
-                    <FileText className="w-16 h-16 text-red-500 mx-auto mb-2" />
-                    <p className="text-xs text-gray-600">PDF Document</p>
+              
+              {/* PDF preview area */}
+              <CardContent className="pt-0 pb-3 relative z-10">
+                <div className="relative aspect-[4/3] bg-white rounded-xl overflow-hidden mb-2 flex items-center justify-center border border-gray-200 group-hover:border-blue-200 transition-colors duration-300">
+                  <div className="flex flex-col items-center select-none">
+                    {/* Windows-like PDF icon */}
+                    <div className="relative w-14 h-16 bg-white shadow-sm border border-gray-200 rounded-sm">
+                      {/* folded corner */}
+                      <div className="absolute right-0 top-0 w-0 h-0 border-t-[16px] border-t-gray-200 border-l-[16px] border-l-transparent"></div>
+                      {/* red PDF ribbon */}
+                      <div className="absolute left-0 right-0 top-6 mx-auto h-5 bg-red-600 flex items-center justify-center">
+                        <span className="text-[11px] font-bold tracking-wider text-white">PDF</span>
+                      </div>
+                    </div>
+                    {/* filename text under icon */}
+                    <p className="mt-1 max-w-[90%] text-[11px] font-medium text-gray-700 truncate" title={(pdf.pdfFileName || pdf.title) ?? ''}>
+                      {pdf.pdfFileName || pdf.title}
+                    </p>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Category: {pdf.categoryName || pdf.category || 'N/A'}</span>
-                    <span>{formatDate(pdf.createdAt)}</span>
+                
+                {/* Footer info */}
+                <div className="flex items-center justify-between text-[10px]">
+                  <div className="flex items-center gap-1 text-gray-500">
+                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                    <span>PDF</span>
                   </div>
+                  <span className="text-gray-400 font-medium">{formatDate(pdf.createdAt)}</span>
                 </div>
               </CardContent>
             </Card>

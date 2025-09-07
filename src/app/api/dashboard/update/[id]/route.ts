@@ -3,10 +3,10 @@ import { prisma } from "@/db/prisma";
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const dashboardId = params.id;
+    const { id: dashboardId } = await params;
     const body = await request.json();
 
     const { aspectRatio, containers } = body;

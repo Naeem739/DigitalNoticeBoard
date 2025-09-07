@@ -25,6 +25,7 @@ import { useInView } from 'framer-motion';
 import { useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { TypewriterEffectSmooth } from '@/components/ui/typewriter-effect';
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 60 },
@@ -47,6 +48,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('monthly');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const displayName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User';
   
   const pricingPlans = [
     {
@@ -281,17 +283,21 @@ export default function Home() {
 
       <main className="container mx-auto px-6 py-16 grid md:grid-cols-2 gap-12 items-center">
         <div>
-          <h1 className="text-5xl font-bold mb-6">
-            {session ? (
-              <>
-                Welcome back, <span className="text-yellow-500">{session.user?.name || 'User'}!</span>
-              </>
-            ) : (
-              <>
+          {status === 'loading' ? null : session ? (
+            <TypewriterEffectSmooth
+              words={[
+                { text: 'Welcome back,', className: 'text-white' },
+                { text: ` ${displayName}!`, className: 'text-yellow-500' },
+              ]}
+              className="mb-6"
+            />
+          ) : (
+            <h1 className="text-5xl font-bold mb-6">
+              <> 
                 Revolutionize Your <span className="text-yellow-500">Team Communication</span>
               </>
-            )}
-          </h1>
+            </h1>
+          )}
           <p className="text-xl text-gray-400 mb-8">
             {session ? (
               'Ready to manage your notices? Access your dashboard to create, organize, and share important information with your team.'

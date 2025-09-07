@@ -14,6 +14,9 @@ import {
   Pause
 } from 'lucide-react'
 import { NoticeQRCode } from '@/components/ui/qr-code'
+import LazyPdfWidget from './components/LazyPdfWidget'
+import ClientOnly from './components/ClientOnly'
+import PDFPerformanceMonitor from './components/PDFPerformanceMonitor'
 
 type TDashboard = {
   id: string
@@ -65,11 +68,13 @@ export default function PublicNoticePage() {
   const [currentDashboard, setCurrentDashboard] = useState<TDashboard | null>(null)
   const [notices, setNotices] = useState<TNotice[]>([])
   const [images, setImages] = useState<TImage[]>([])
+  const [pdfs, setPdfs] = useState<any[]>([])
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [pagination, setPagination] = useState<TPagination | null>(null)
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
   const [countdown, setCountdown] = useState(300) // 5 minutes = 300 seconds
   const [viewportWidth, setViewportWidth] = useState(0)
+  const isMobile = viewportWidth > 0 && viewportWidth <= 480
 
   // Initialize component
   useEffect(() => {
@@ -117,7 +122,10 @@ export default function PublicNoticePage() {
   const getResponsiveTitleFontSize = () => {
     const w = viewportWidth
     if (!w) return 14 // default until measured
-    if (w < 640) return 14 // Mobile
+    if (w < 360) return 12 // Very small phones
+    if (w < 400) return 13 // 6.1"-6.3"
+    if (w < 480) return 14 // ~6.4"-6.7" narrow
+    if (w < 640) return 15 // Larger mobiles / small tablets
     if (w < 1700) return 20 // Typical laptops (13–15.6")
     if (w < 3400) return 24 // Medium monitors (32–44")
     return 30 // Large displays (60"+)
@@ -127,10 +135,33 @@ export default function PublicNoticePage() {
   const getResponsiveNoticeHeight = () => {
     const w = viewportWidth
     if (!w) return '8.125em' // 130px equivalent at 16px base
-    if (w <= 640) return '8.125em' // Mobile: 130px equivalent
-    if (w <= 1366) return '9.0625em' // Laptops: 145px equivalent
-    if (w <= 2560) return '9.0625em' // Medium monitors: 145px equivalent
-    return '9.0625em' // Large monitors: 145px equivalent
+    if (w < 360) return '7.25em' // ~116px
+    if (w < 400) return '7.5em' // ~120px
+    if (w < 480) return '7.75em' // ~124px
+    if (w <= 640) return '8.125em' // 130px equivalent
+    if (w <= 1366) return '9.0625em' // 145px equivalent
+    if (w <= 2560) return '9.0625em' // 145px equivalent
+    return '9.0625em' // 145px equivalent
+  }
+
+  // Limit number of notices per widget based on viewport for readability
+  const getMaxNoticesPerWidget = () => {
+    const w = viewportWidth
+    if (!w) return 5
+    if (w < 360) return 3
+    if (w < 400) return 3
+    if (w < 480) return 4
+    if (w <= 640) return 4
+    return 5
+  }
+
+  // Ensure QR code fits comfortably on mobile by raising min height
+  const getMobileNoticeMinHeight = () => {
+    const w = viewportWidth
+    if (!w) return '9.5em'
+    if (w <= 360) return '9.5em'   // ~152px
+    if (w <= 400) return '10em'    // ~160px
+    return '10.5em'                // ~168px up to 480px
   }
 
   // Auto-pagination every 5 minutes
@@ -278,26 +309,52 @@ export default function PublicNoticePage() {
         }
       })
       
-      // Fetch notices if any
-      if (noticeIds.length > 0) {
-        try {
-          const noticesResponse = await fetch('/api/notice/get-all')
-          const noticesData = await noticesResponse.json()
-          if (noticesData.success) {
-            const filteredNotices = noticesData.result.filter((notice: TNotice) => 
-              noticeIds.includes(notice.id)
-            )
-            setNotices(filteredNotices)
-          }
-        } catch (error) {
-          console.error('Error fetching notices:', error)
+      // Fetch all notices
+      try {
+        const noticesResponse = await fetch('/api/notice/get-all')
+        const noticesData = await noticesResponse.json()
+        if (noticesData.success) {
+          let allNotices = noticesData.result || []
+          
+          // Filter notices from dashboard containers
+          const dashboardNotices = noticeIds.length > 0 ? 
+            allNotices.filter((notice: TNotice) => noticeIds.includes(notice.id)) : []
+          
+          // Get Dashboard Images category notices
+          const dashboardImageNotices = allNotices.filter((notice: TNotice) => 
+            notice.categoryName === 'Dashboard Images' && 
+            (notice.imageData || notice.imageFileName || notice.imageUrl)
+          )
+          
+          // Combine dashboard notices and dashboard image notices
+          const combinedNotices = [...dashboardNotices, ...dashboardImageNotices]
+          
+          // Remove duplicates based on notice ID
+          const uniqueNotices = combinedNotices.filter((notice, index, self) => 
+            index === self.findIndex(n => n.id === notice.id)
+          )
+          
+          setNotices(uniqueNotices)
         }
-      } else {
+      } catch (error) {
+        console.error('Error fetching notices:', error)
         setNotices([])
       }
       
       // Clear images array since images are now stored as notices
       setImages([])
+
+      // Fetch all PDFs
+      try {
+        const pdfsResponse = await fetch('/api/pdf/get-all')
+        const pdfsData = await pdfsResponse.json()
+        if (pdfsData.success) {
+          setPdfs(pdfsData.result || [])
+        }
+      } catch (error) {
+        console.error('Error fetching PDFs:', error)
+        setPdfs([])
+      }
     } catch (error) {
       console.error('Error fetching dashboard content:', error)
     }
@@ -309,6 +366,10 @@ export default function PublicNoticePage() {
 
   const getImageById = (imageId: string) => {
     return images.find(image => image.id === imageId)
+  }
+
+  const getPdfById = (pdfId: string) => {
+    return pdfs.find(pdf => pdf.id === pdfId)
   }
 
   // Helper function to reconstruct image URL from notice data
@@ -455,7 +516,8 @@ export default function PublicNoticePage() {
         className="bg-opacity-95 backdrop-blur-sm shadow-lg border-b border-blue-500/30 flex-shrink-0"
         style={{ 
           backgroundColor: settings?.headerBackgroundColor || '#1e293b',
-          borderBottomColor: settings?.accentColor || '#3b82f6'
+          borderBottomColor: settings?.accentColor || '#3b82f6',
+          color: settings?.fontColor || '#ffffff'
         }}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -482,7 +544,7 @@ export default function PublicNoticePage() {
               )}
               <div className="min-w-0 flex-1">
                 <motion.h1 
-                  className="text-sm sm:text-lg font-bold text-white truncate"
+                  className="text-sm sm:text-lg font-bold truncate"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
@@ -490,7 +552,7 @@ export default function PublicNoticePage() {
                   {settings?.title || "Smart Notice Board"}
                 </motion.h1>
                 <motion.p 
-                  className="text-xs text-gray-300 truncate"
+                  className="text-xs opacity-90 truncate"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 }}
@@ -502,7 +564,7 @@ export default function PublicNoticePage() {
 
             {/* Center - Emergency Contact Info, Current Screen, and Pagination */}
             <motion.div 
-              className="flex flex-col sm:flex-row items-center justify-center sm:justify-start space-y-1 sm:space-y-0 sm:space-x-2 lg:space-x-4 text-white text-xs sm:text-xs"
+              className="flex flex-col sm:flex-row items-center justify-center sm:justify-start space-y-1 sm:space-y-0 sm:space-x-2 lg:space-x-4 text-xs sm:text-xs"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
@@ -539,7 +601,7 @@ export default function PublicNoticePage() {
                   <button
                     onClick={goToPrevDashboard}
                     disabled={currentDashboardIndex === 0}
-                    className="p-0.5 sm:p-1 rounded-full bg-white/10 backdrop-blur-sm text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-all"
+                    className="p-0.5 sm:p-1 rounded-full bg-white/10 backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-all"
                   >
                     <ChevronLeft className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                   </button>
@@ -561,7 +623,7 @@ export default function PublicNoticePage() {
                   <button
                     onClick={goToNextDashboard}
                     disabled={currentDashboardIndex === dashboards.length - 1}
-                    className="p-0.5 sm:p-1 rounded-full bg-white/10 backdrop-blur-sm text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-all"
+                    className="p-0.5 sm:p-1 rounded-full bg-white/10 backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-all"
                   >
                     <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                   </button>
@@ -570,7 +632,7 @@ export default function PublicNoticePage() {
             </motion.div>
 
             {/* Right side - Time and Date */}
-            <div className="text-center sm:text-right text-white">
+            <div className="text-center sm:text-right">
               <motion.div 
                 className="text-sm sm:text-lg font-bold font-mono"
                 initial={{ opacity: 0, x: 20 }}
@@ -581,7 +643,7 @@ export default function PublicNoticePage() {
                 {formatTime(currentTime)}
               </motion.div>
               <motion.div 
-                className="text-xs text-gray-300"
+                className="text-xs opacity-90"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.4 }}
@@ -597,7 +659,7 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-0 p-1 sm:p-2 md:p-3 overflow-hidden">
+      <main className="flex-1 min-h-0 p-0 overflow-y-auto">
         <div className="w-full h-full">
           {/* Dashboard Content */}
           {dashboardLoading ? (
@@ -620,13 +682,13 @@ export default function PublicNoticePage() {
               transition={{ delay: 0.8 }}
             >
               <div 
-                className="relative w-full h-full overflow-y-auto rounded-lg shadow-lg"
+                className="relative w-full h-full overflow-visible rounded-lg shadow-lg"
                 style={{
                   minHeight: '250px'
                 }}
               >
                 {/* Grid Layout for Widgets */}
-                <div className="grid gap-1 sm:gap-2 md:gap-4 p-1 sm:p-2 md:p-4 notice-grid-container" style={{ gridTemplateColumns: 'repeat(12, 1fr)' }}>
+                <div className="grid gap-1 sm:gap-2 md:gap-4 p-1 sm:p-2 md:p-4 notice-grid-container" style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)' }}>
                   {currentDashboard.containers.map((container, index) => {
                     const settings = container.settings || {}
                     const bgColor = settings.backgroundColor || '#ffffff'
@@ -646,24 +708,27 @@ export default function PublicNoticePage() {
                         id={container.id}
                         className="relative rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
                         style={{
-                          gridColumn: `${gridX + 1} / span ${gridW}`,
-                          gridRow: `${gridY + 1} / span ${gridH}`,
-                          backgroundColor: `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
-                          border: `${borderWidth}px solid ${borderColor}`,
+                          gridColumn: isMobile ? '1 / -1' : `${gridX + 1} / span ${gridW}`,
+                          gridRow: isMobile ? 'auto' : `${gridY + 1} / span ${gridH}`,
+                          backgroundColor: (container.type === 'pdf' || container.type === 'image') ? '#ffffff' : `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
+                          border: (container.type === 'pdf' || container.type === 'image') ? '2px solid #e5e7eb' : `${borderWidth}px solid ${borderColor}`,
                           position: 'relative',
-                          minHeight: '150px',
-                          maxHeight: '100%',
-                          boxShadow: `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`
+                          minHeight: isMobile ? 'auto' : (container.type === 'pdf' || container.type === 'image') ? '200px' : '150px',
+                          maxHeight: isMobile ? 'none' : '100%',
+                          boxShadow: (container.type === 'pdf' || container.type === 'image') ? '0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -2px rgba(0,0,0,0.05)' : `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`
                         }}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.4, delay: index * 0.1 }}
                         whileHover={{ 
-                          scale: 1.02,
-                          boxShadow: `0 10px 25px -3px ${borderColor}30, 0 4px 6px -2px ${borderColor}20`
+                          scale: container.type === 'image' ? 1.01 : 1.02,
+                          boxShadow: container.type === 'image' 
+                            ? '0 12px 30px -8px rgba(0,0,0,0.15), 0 6px 15px -3px rgba(0,0,0,0.1)' 
+                            : `0 10px 25px -3px ${borderColor}30, 0 4px 6px -2px ${borderColor}20`
                         }}
                       >
-                        {/* Widget Header */}
+                        {/* Widget Header - Hidden for PDF and Image widgets */}
+                        {container.type !== 'pdf' && container.type !== 'image' && (
                         <div 
                           className="px-1 sm:px-2 md:px-4 py-1 sm:py-2 md:py-3 border-b relative overflow-hidden flex-shrink-0"
                           style={{
@@ -682,9 +747,9 @@ export default function PublicNoticePage() {
                             }}
                           />
                           
-                          <div className="relative flex items-center justify-center">
+                        <div className="relative flex items-center justify-start">
                             <h3 
-                              className="text-xs sm:text-sm md:text-lg font-bold text-center truncate px-1 sm:px-2 md:px-4 py-0.5 sm:py-1 md:py-2 rounded-xl relative overflow-hidden"
+                              className="text-xs sm:text-sm md:text-lg font-bold text-left truncate px-1 sm:px-2 md:px-4 py-0.5 sm:py-1 md:py-2 rounded-xl relative overflow-hidden"
                             style={{
                               color: settings.categoryFontColor || '#1e293b',
                               fontFamily: settings.categoryFont || 'Inter',
@@ -732,18 +797,20 @@ export default function PublicNoticePage() {
                             }}
                           />
                         </div>
+                        )}
 
                         {/* Widget Content */}
                         <div 
-                          className="p-1 sm:p-2 md:p-4 flex-1 flex flex-col justify-center overflow-hidden" 
+                          className="flex-1 flex flex-col justify-center overflow-hidden" 
                           style={{ 
-                            minHeight: '120px'
+                            minHeight: isMobile ? 'auto' : '120px',
+                            padding: (container.type === 'pdf' || container.type === 'image') ? '0' : (isMobile ? '0.75rem' : '1rem')
                           }}
                         >
                           {container.type === 'notice' && container.noticeIds && (
                             <div className="h-full flex flex-col justify-between gap-2">
-                              <div className="notices-container flex flex-col gap-2 overflow-auto scrollbar-hide flex-1">
-                                {container.noticeIds.slice(0, 5).map((noticeId: string, noticeIndex: number) => {
+                              <div className={`notices-container flex flex-col gap-2 overflow-auto scrollbar-hide flex-1`}>
+                                {(isMobile ? container.noticeIds.slice(0, getMaxNoticesPerWidget()) : container.noticeIds.slice(0, 5)).map((noticeId: string, noticeIndex: number) => {
                                 const notice = getNoticeById(noticeId)
                                 if (!notice) return null
                                 
@@ -756,9 +823,9 @@ export default function PublicNoticePage() {
                                       borderLeft: `3px solid ${borderColor}`,
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
-                                      height: getResponsiveNoticeHeight(),
-                                      minHeight: getResponsiveNoticeHeight(),
-                                      maxHeight: getResponsiveNoticeHeight(),
+                                      height: isMobile ? getMobileNoticeMinHeight() : getResponsiveNoticeHeight(),
+                                      minHeight: isMobile ? getMobileNoticeMinHeight() : getResponsiveNoticeHeight(),
+                                      maxHeight: isMobile ? 'none' : getResponsiveNoticeHeight(),
                                       width: '100%',
                                       overflow: 'hidden'
                                     }}
@@ -776,7 +843,7 @@ export default function PublicNoticePage() {
                                          notice={notice}
                                          imageData={notice.imageData}
                                          imageTitle={notice.imageFileName || notice.title}
-                                         size={viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80}
+                                         size={viewportWidth <= 360 ? 48 : viewportWidth <= 400 ? 54 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80}
                                          className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
                                        />
                                      </div>
@@ -929,71 +996,295 @@ export default function PublicNoticePage() {
                           )}
 
                           {container.type === 'image' && container.noticeIds && (
-                            <div className="h-full flex items-center justify-center p-2 md:p-4">
+                            <div className="h-full flex items-center justify-center" style={{ padding: '0' }}>
                               {container.noticeIds.slice(0, 1).map((noticeId: string) => {
                                 const notice = getNoticeById(noticeId)
-                                if (!notice || !notice.imageUrl) return null
+                                // Render if there is an image URL or base64 data; reconstruct if needed
+                                if (!notice || (!notice.imageUrl && !notice.imageData)) return null
                                 
                                 return (
                                   <motion.div 
                                     key={noticeId} 
-                                    className="w-full h-full relative group overflow-hidden rounded-lg shadow-md"
+                                    className="w-full h-full relative group rounded-lg shadow-md"
                                     style={{
-                                      borderRadius: `${settings.imageBorderRadius || 12}px`
+                                      height: '100%',
+                                      width: '100%',
+                                      margin: '0',
+                                      borderRadius: `${settings.imageBorderRadius || 12}px`,
+                                      boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
+                                      border: '1px solid rgba(229, 231, 235, 0.8)'
                                     }}
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ duration: 0.4 }}
-                                    whileHover={{ scale: 1.02 }}
                                   >
                                     <img
                                       src={reconstructImageUrl(notice)}
                                       alt={notice.title}
-                                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                      className="w-full h-full transition-transform duration-300"
                                       style={{
-                                        objectFit: settings.imageFit || 'cover',
-                                        borderRadius: `${settings.imageBorderRadius || 12}px`
+                                        objectFit: settings.imageFit || 'contain',
+                                        borderRadius: `${settings.imageBorderRadius || 12}px`,
+                                        width: '100%',
+                                        height: '100%'
                                       }}
                                     />
                                     
-                                    {/* Image Overlay */}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                    
-                                    {settings.showImageTitle && (
-                                      <div className="absolute bottom-0 left-0 right-0 p-2 md:p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-lg">
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex-1">
-                                        <p
-                                          className="text-xs md:text-sm font-semibold text-white truncate"
+                                                                        {/* Category Name - Bottom Left */}
+                                    <div className="absolute bottom-3 left-3">
+                                      <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold relative overflow-hidden"
+                                        style={{
+                                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                                          color: '#0f172a',
+                                          fontSize: '13px',
+                                          fontWeight: '600',
+                                          border: '1px solid rgba(229, 231, 235, 0.9)',
+                                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                          backdropFilter: 'blur(8px)',
+                                          transition: 'all 0.3s ease'
+                                        }}
+                                      >
+                                        {/* Gradient background */}
+                                        <div 
+                                          className="absolute inset-0 rounded-full opacity-20"
                                           style={{
-                                            color: settings.imageTitleColor || '#ffffff',
-                                            fontSize: `${getResponsiveTitleFontSize()}px`,
-                                                fontWeight: settings.imageTitleFontWeight || 'semibold',
-                                                fontFamily: settings.fontFamily || 'Inter',
-                                                textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.1))'
                                           }}
-                                        >
-                                          {notice.title}
-                                        </p>
-                                          </div>
-                                          <div className="flex-shrink-0 ml-2">
-                                            <div className="w-2 h-2 bg-white rounded-full opacity-60"></div>
-                                          </div>
-                                        </div>
+                                        />
+                                        <span className="relative z-10 font-semibold tracking-wide">
+                                          {container.settings?.customCategoryName || notice.categoryName || 'Image'}
+                                        </span>
+                                        {/* Subtle glow effect */}
+                                        <div 
+                                          className="absolute inset-0 rounded-full opacity-0 hover:opacity-10 transition-opacity duration-300"
+                                          style={{
+                                            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3), transparent)'
+                                          }}
+                                        />
                                       </div>
-                                    )}
+                                    </div>
                                     
-                                    {/* Corner Badge */}
-                                    <div className="absolute top-2 right-2">
-                                      <div className="w-3 h-3 bg-white/20 backdrop-blur-sm rounded-full border border-white/30"></div>
-                                  </div>
+                                    {/* QR Code - Bottom Right */}
+                                    <div className="absolute bottom-3 right-3">
+                                      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2"
+                                        style={{
+                                          width: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80,
+                                          height: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80
+                                        }}
+                                      >
+                                        <NoticeQRCode 
+                                          notice={notice}
+                                          imageData={notice.imageData}
+                                          imageTitle={notice.imageFileName || notice.title}
+                                          size={viewportWidth <= 360 ? 46 : viewportWidth <= 400 ? 50 : viewportWidth <= 640 ? 50 : viewportWidth <= 1366 ? 60 : 70}
+                                          className="w-full h-full"
+                                        />
+                                      </div>
+                                    </div>
                                   </motion.div>
                                 )
                               })}
                             </div>
                           )}
 
-                          {(!container.noticeIds || container.noticeIds.length === 0) && (
+                          {container.type === 'pdf' && (container.pdfIds || container.pdfData) && (
+                            <div className="h-full flex flex-col" style={{ padding: '0' }}>
+                                                            {/* Handle PDF widgets with pdfIds (from PDF table) */}
+                              {container.pdfIds && container.pdfIds.slice(0, 1).map((pdfId: string) => {
+                                const pdf = getPdfById(pdfId)
+                                if (!pdf) return null
+                                
+                                return (
+                                  <motion.div
+                                    key={pdfId}
+                                    className="relative w-full h-full flex flex-col rounded-lg overflow-hidden shadow-lg"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                    style={{
+                                      height: '100%',
+                                      width: '100%',
+                                      margin: '0',
+                                      borderRadius: '12px',
+                                      boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
+                                      border: '1px solid rgba(229, 231, 235, 0.8)'
+                                    }}
+                                  >
+                                    <ClientOnly fallback={
+                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+                                        <div className="text-center">
+                                          <div className="animate-pulse">
+                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
+                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
+                                          </div>
+                                          <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
+                                        </div>
+                                      </div>
+                                    }>
+                                      <LazyPdfWidget
+                                      pdfData={pdf.pdfData}
+                                      autoScroll={container.settings?.autoScroll || true}
+                                      className="h-full w-full"
+                                      showTitle={false}
+                                        containerId={container.id}
+                                    />
+                                    </ClientOnly>
+                                    
+                                                                         {/* Category Name - Bottom Left */}
+                                     <div className="absolute bottom-3 left-3">
+                                       <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold relative overflow-hidden"
+                                         style={{
+                                           backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                                           color: '#0f172a',
+                                           fontSize: '13px',
+                                           fontWeight: '600',
+                                           border: '1px solid rgba(229, 231, 235, 0.9)',
+                                           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                           backdropFilter: 'blur(8px)',
+                                           transition: 'all 0.3s ease'
+                                         }}
+                                       >
+                                         {/* Gradient background */}
+                                         <div 
+                                           className="absolute inset-0 rounded-full opacity-20"
+                                           style={{
+                                             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.1))'
+                                           }}
+                                         />
+                                                                                   <span className="relative z-10 font-semibold tracking-wide">
+                                            {container.settings?.customCategoryName || pdf.title || 'PDF Document'}
+                                          </span>
+                                         {/* Subtle glow effect */}
+                                         <div 
+                                           className="absolute inset-0 rounded-full opacity-0 hover:opacity-10 transition-opacity duration-300"
+                                           style={{
+                                             background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3), transparent)'
+                                           }}
+                                         />
+                                       </div>
+                                     </div>
+                                     
+                                     {/* QR Code - Bottom Right */}
+                                     <div className="absolute bottom-3 right-3">
+                                       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2"
+                                         style={{
+                                           width: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80,
+                                           height: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80
+                                         }}
+                                       >
+                                         <NoticeQRCode 
+                                           notice={{
+                                             id: pdf.id,
+                                             title: container.settings?.customCategoryName || pdf.title || 'PDF Document',
+                                             pdfData: pdf.pdfData,
+                                             pdfFileName: pdf.fileName || pdf.title
+                                           }}
+                                           size={viewportWidth <= 360 ? 46 : viewportWidth <= 400 ? 50 : viewportWidth <= 640 ? 50 : viewportWidth <= 1366 ? 60 : 70}
+                                           className="w-full h-full"
+                                         />
+                                       </div>
+                                     </div>
+                                  </motion.div>
+                                )
+                              })}
+                              
+                                                            {/* Handle PDF widgets with pdfData directly in container */}
+                              {container.pdfData && !container.pdfIds && (
+                                <motion.div
+                                  key={`pdf-${container.id}`}
+                                  className="relative w-full h-full flex flex-col rounded-lg overflow-hidden shadow-lg"
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ duration: 0.3 }}
+                                  style={{
+                                    height: '100%',
+                                    width: '100%',
+                                    margin: '0',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
+                                    border: '1px solid rgba(229, 231, 235, 0.8)'
+                                  }}
+                                >
+                                                                      <ClientOnly fallback={
+                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+                                        <div className="text-center">
+                                          <div className="animate-pulse">
+                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
+                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
+                                          </div>
+                                          <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
+                                        </div>
+                                      </div>
+                                    }>
+                                      <LazyPdfWidget
+                                      pdfData={container.pdfData}
+                                      autoScroll={container.settings?.autoScroll || true}
+                                      className="h-full w-full"
+                                      showTitle={false}
+                                        containerId={container.id}
+                                    />
+                                    </ClientOnly>
+                                    
+                                                                         {/* Category Name - Bottom Left */}
+                                     <div className="absolute bottom-3 left-3">
+                                       <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold relative overflow-hidden"
+                                         style={{
+                                           backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                                           color: '#0f172a',
+                                           fontSize: '13px',
+                                           fontWeight: '600',
+                                           border: '1px solid rgba(229, 231, 235, 0.9)',
+                                           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                           backdropFilter: 'blur(8px)',
+                                           transition: 'all 0.3s ease'
+                                         }}
+                                       >
+                                         {/* Gradient background */}
+                                         <div 
+                                           className="absolute inset-0 rounded-full opacity-20"
+                                           style={{
+                                             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.1))'
+                                           }}
+                                         />
+                                                                                   <span className="relative z-10 font-semibold tracking-wide">
+                                            {container.settings?.customCategoryName || 'PDF Document'}
+                                          </span>
+                                         {/* Subtle glow effect */}
+                                         <div 
+                                           className="absolute inset-0 rounded-full opacity-0 hover:opacity-10 transition-opacity duration-300"
+                                           style={{
+                                             background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3), transparent)'
+                                           }}
+                                         />
+                                       </div>
+                                     </div>
+                                     
+                                     {/* QR Code - Bottom Right */}
+                                     <div className="absolute bottom-3 right-3">
+                                       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2"
+                                         style={{
+                                           width: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80,
+                                           height: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80
+                                         }}
+                                       >
+                                         <NoticeQRCode 
+                                           notice={{
+                                             id: container.id,
+                                             title: container.settings?.customCategoryName || 'PDF Document',
+                                             pdfData: container.pdfData,
+                                             pdfFileName: container.pdfFileName
+                                           }}
+                                           size={viewportWidth <= 360 ? 46 : viewportWidth <= 400 ? 50 : viewportWidth <= 640 ? 50 : viewportWidth <= 1366 ? 60 : 70}
+                                           className="w-full h-full"
+                                         />
+                                       </div>
+                                     </div>
+                                </motion.div>
+                              )}
+                            </div>
+                          )}
+
+                          {(!container.noticeIds || container.noticeIds.length === 0) && (!container.pdfData) && (container.type !== 'image') && (
                             <div className="flex items-center justify-center h-full p-2 sm:p-4 md:p-6">
                               <div className="text-center">
                                 <div className="w-8 h-8 sm:w-12 sm:h-12 md:w-16 md:h-16 mx-auto mb-2 sm:mb-4 rounded-full flex items-center justify-center opacity-30"
@@ -1073,6 +1364,10 @@ export default function PublicNoticePage() {
           </div>
         </div>
       </motion.footer>
+      
+      {/* Performance Monitor - Only in development */}
+      <PDFPerformanceMonitor />
+      
     </div>
   )
 }
