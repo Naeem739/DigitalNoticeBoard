@@ -20,7 +20,8 @@ export async function getPublicNoticeSettings(): Promise<PublicNoticeSettings | 
         gradientColors: ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b"],
         headerBackgroundColor: "#1e293b",
         footerBackgroundColor: "#1e293b",
-        accentColor: "#3b82f6"
+        accentColor: "#3b82f6",
+        fontColor: "#ffffff"
       })
     }
     
@@ -59,6 +60,7 @@ export async function createPublicNoticeSettings(data: Partial<PublicNoticeSetti
         headerBackgroundColor: data.headerBackgroundColor || "#1e293b",
         footerBackgroundColor: data.footerBackgroundColor || "#1e293b",
         accentColor: data.accentColor || "#3b82f6",
+        fontColor: data.fontColor || "#ffffff",
         logo: data.logo,
         logoFileName: data.logoFileName,
       }
@@ -118,6 +120,7 @@ export async function updatePublicNoticeSettings(data: Partial<PublicNoticeSetti
       if (data.headerBackgroundColor !== undefined) updateData.headerBackgroundColor = data.headerBackgroundColor
       if (data.footerBackgroundColor !== undefined) updateData.footerBackgroundColor = data.footerBackgroundColor
       if (data.accentColor !== undefined) updateData.accentColor = data.accentColor
+      if (data.fontColor !== undefined) updateData.fontColor = data.fontColor
       if (data.logo !== undefined) updateData.logo = data.logo
       if (data.logoFileName !== undefined) updateData.logoFileName = data.logoFileName
       

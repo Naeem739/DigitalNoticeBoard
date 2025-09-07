@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import SidebarOverlay from './components/SidebarOverlay';
 import { useSession } from "next-auth/react";
 import Loading from '@/app/loading';
 import { Plus_Jakarta_Sans } from 'next/font/google'
@@ -27,14 +26,13 @@ export default function DashboardLayout({
 
   return (
     <div className={`${jakarta.className} antialiased flex h-screen bg-white overflow-hidden`}>
-      <Sidebar isOpen={isSidebarOpen} />
+      <Sidebar isOpen={isSidebarOpen} setOpen={setIsSidebarOpen} />
       <div className="flex flex-col flex-1">
         <Header toggleSidebar={toggleSidebar} />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-white">
           {children}
         </main>
       </div>
-      <SidebarOverlay isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
     </div>
   )
 }

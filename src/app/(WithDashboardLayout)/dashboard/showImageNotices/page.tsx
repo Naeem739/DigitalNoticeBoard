@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, Image as ImageIcon, Download, Eye } from 'lucide-react'
+import { Trash2, Image as ImageIcon, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
@@ -119,56 +119,33 @@ export default function ShowImageNotices() {
               <style>
                 body {
                   margin: 0;
-                  padding: 20px;
-                  background: #f5f5f5;
+                  padding: 0;
+                  background: #000;
                   font-family: Arial, sans-serif;
                   display: flex;
-                  flex-direction: column;
                   align-items: center;
+                  justify-content: center;
                   min-height: 100vh;
+                  overflow: hidden;
                 }
                 .image-container {
-                  background: white;
-                  padding: 20px;
-                  border-radius: 8px;
-                  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                  max-width: 90vw;
-                  max-height: 90vh;
-                  overflow: auto;
+                  max-width: 100vw;
+                  max-height: 100vh;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
                 }
                 img {
-                  max-width: 100%;
-                  max-height: 80vh;
+                  max-width: 100vw;
+                  max-height: 100vh;
                   object-fit: contain;
-                  border-radius: 4px;
-                }
-                .image-info {
-                  margin-top: 15px;
-                  text-align: center;
-                  color: #666;
-                }
-                .image-title {
-                  font-size: 18px;
-                  font-weight: bold;
-                  margin-bottom: 5px;
-                  color: #333;
-                }
-                .image-details {
-                  font-size: 14px;
-                  color: #888;
+                  display: block;
                 }
               </style>
             </head>
             <body>
               <div class="image-container">
                 <img src="data:image/jpeg;base64,${image.imageData}" alt="${image.title}" />
-                <div class="image-info">
-                  <div class="image-title">${image.title}</div>
-                  <div class="image-details">
-                    Category: ${image.categoryName || image.category || 'N/A'} | ID: ${image.id}
-                    ${image.createdAt ? ` | Created: ${new Date(image.createdAt).toLocaleDateString()}` : ''}
-                  </div>
-                </div>
               </div>
             </body>
           </html>
@@ -209,10 +186,7 @@ export default function ShowImageNotices() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Image Notices</h1>
-          <p className="text-gray-600 mt-2">Manage all notices with images</p>
-        </div>
+       
         <div className="flex items-center gap-2">
           <ImageIcon className="w-6 h-6 text-blue-600" />
           <span className="text-lg font-semibold">{images.length} Images</span>
@@ -221,76 +195,73 @@ export default function ShowImageNotices() {
 
       {images.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
+          <div className="flex flex-col items-center justify-center py-12">
             <ImageIcon className="w-16 h-16 text-gray-400 mb-4" />
             <h3 className="text-xl font-semibold text-gray-600 mb-2">No Images Found</h3>
             <p className="text-gray-500 text-center">
               No notices with images have been created yet. Images will appear here once notices with images are added.
             </p>
-          </CardContent>
+          </div>
         </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8">
           {images.map((image) => (
-            <Card key={image.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2">
+            <Card key={image.id} className="group relative overflow-hidden bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 cursor-pointer" onClick={() => handleViewFullSize(image)}>
+              {/* Image preview area - 99% of card height */}
+              <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                <img
+                  src={`data:image/jpeg;base64,${image.imageData}`}
+                  alt={image.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+              
+              {/* Footer - 1% of card height with filename and buttons */}
+              <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 px-2 py-1.5">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium truncate" title={image.title}>
-                    {image.imageFileName || image.title}
-                  </CardTitle>
-                  <div className="flex items-center gap-1">
+                  {/* Filename on left */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-medium text-gray-700 truncate" title={image.imageFileName || image.title}>
+                      {image.imageFileName || image.title}
+                    </p>
+                  </div>
+                  
+                  {/* Action buttons on right */}
+                  <div className="flex items-center gap-1 ml-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDownloadImage(image)}
-                      className="h-8 w-8 p-0"
-                      title="Download"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadImage(image);
+                      }}
+                      className="h-5 w-5 p-0 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                      title="Download Image"
                     >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewFullSize(image)}
-                      className="h-8 w-8 p-0"
-                      title="View Full Size"
-                    >
-                      <Eye className="w-4 h-4" />
+                      <Download className="w-2.5 h-2.5" />
                     </Button>
                     {userRole !== 'USER' && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteImage(image.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteImage(image.id);
+                        }}
                         disabled={deletingId === image.id}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Delete"
+                        className="h-5 w-5 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Delete Image"
                       >
                         {deletingId === image.id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                          <div className="animate-spin rounded-full h-2.5 w-2.5 border-b-2 border-red-600"></div>
                         ) : (
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-2.5 h-2.5" />
                         )}
                       </Button>
                     )}
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden mb-3">
-                  <img
-                    src={`data:image/jpeg;base64,${image.imageData}`}
-                    alt={image.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Category: {image.categoryName || image.category || 'N/A'}</span>
-                    <span>{formatDate(image.createdAt)}</span>
-                  </div>
-                </div>
-              </CardContent>
+              </div>
             </Card>
           ))}
         </div>

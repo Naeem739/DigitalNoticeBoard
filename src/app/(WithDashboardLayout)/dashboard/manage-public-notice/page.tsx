@@ -26,10 +26,8 @@ import {
   Palette as PaletteIcon,
   Image,
   Download,
-  RotateCcw,
   CheckCircle,
   AlertCircle,
-  Clock,
   Zap,
   Bookmark,
   Edit,
@@ -95,7 +93,8 @@ export default function ManagePublicNoticePage() {
     gradientColors: ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b"],
     headerBackgroundColor: "#1e293b",
     footerBackgroundColor: "#1e293b",
-    accentColor: "#3b82f6"
+    accentColor: "#3b82f6",
+    fontColor: "#ffffff"
   })
   const [loading, setLoading] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -371,27 +370,6 @@ export default function ManagePublicNoticePage() {
                 <Eye className="w-4 h-4" />
                 {previewMode ? "Hide Preview" : "Live Preview"}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => window.open('/notice', '_blank')}
-                className="flex items-center gap-2"
-              >
-                <Globe className="w-4 h-4" />
-                View Public Page
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleInitializeSettings}
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                {loading ? (
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <RotateCcw className="w-4 h-4" />
-                )}
-                Initialize Settings
-              </Button>
               <motion.div
                 initial={{ scale: 1 }}
                 animate={{ 
@@ -452,69 +430,8 @@ export default function ManagePublicNoticePage() {
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Status Cards */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
-        >
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">Status</div>
-                  <div className="text-xs text-gray-600">Configured</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Monitor className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">Preview</div>
-                  <div className="text-xs text-gray-600">{previewMode ? "Active" : "Inactive"}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <PaletteIcon className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">Background</div>
-                  <div className="text-xs text-gray-600 capitalize">{settings.backgroundType}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Clock className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">Last Updated</div>
-                  <div className="text-xs text-gray-600">Just now</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+      <div className="max-w-7xl mx-auto w-full px-6 py-6">
+        {/* Removed the status summary tiles section */}
 
         {/* Live Preview Panel */}
         {previewMode && (
@@ -536,13 +453,13 @@ export default function ManagePublicNoticePage() {
               </CardHeader>
               <CardContent>
                 <div
-                  className="w-full h-[500px] rounded-lg overflow-hidden relative shadow-lg mx-auto max-w-4xl"
+                  className="w-full h-[60vh] rounded-lg overflow-hidden relative shadow-lg mx-auto max-w-4xl"
                   style={getBackgroundStyle()}
                 >
                   {/* Header Preview */}
                   <div
                     className="p-6 border-b border-white/20"
-                    style={{ backgroundColor: settings.headerBackgroundColor || "#1e293b" }}
+                    style={{ backgroundColor: settings.headerBackgroundColor || "#1e293b", color: settings.fontColor || '#ffffff' }}
                   >
                     <div className="flex items-center justify-between text-white">
                       <div className="flex items-center space-x-4">
@@ -557,12 +474,12 @@ export default function ManagePublicNoticePage() {
                         )}
                         <div>
                           <h1 className="text-3xl font-bold">{settings.title || "Smart Notice Board"}</h1>
-                          <p className="text-lg text-gray-300">{settings.subtitle || "Information Technology Department"}</p>
+                          <p className="text-lg opacity-90">{settings.subtitle || "Information Technology Department"}</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-3xl font-bold font-mono">{getCurrentTime().time}</div>
-                        <div className="text-sm text-gray-300">{getCurrentTime().date}</div>
+                        <div className="text-sm opacity-90">{getCurrentTime().date}</div>
                       </div>
                     </div>
                   </div>
@@ -644,9 +561,9 @@ export default function ManagePublicNoticePage() {
                   {/* Footer Preview */}
                   <div
                     className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/20"
-                    style={{ backgroundColor: settings.footerBackgroundColor || "#1e293b" }}
+                    style={{ backgroundColor: settings.footerBackgroundColor || "#1e293b", color: settings.fontColor || '#ffffff' }}
                   >
-                    <div className="flex items-center justify-between text-white">
+                    <div className="flex items-center justify-between">
                       <div className="text-sm">© 2024 Smart Notice Board. All rights reserved.</div>
                       <div className="font-medium">{settings.departmentName || "Information Technology Department"}</div>
                       <div className="flex items-center space-x-2">
@@ -662,7 +579,7 @@ export default function ManagePublicNoticePage() {
         )}
 
         {/* Main Content Area - Two Column Layout */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
           {/* Settings Panel - Left Side (2/3 width) */}
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
@@ -940,21 +857,22 @@ export default function ManagePublicNoticePage() {
                         />
                       </div>
                     </div>
+                    {/* Accent color option removed as requested */}
                     <div>
-                      <Label htmlFor="accentColor" className="text-sm font-medium">Accent Color</Label>
+                      <Label htmlFor="fontColor" className="text-sm font-medium">Font Color</Label>
                       <div className="mt-1 flex items-center gap-2">
                         <Input
-                          id="accentColor"
+                          id="fontColor"
                           type="color"
-                          value={settings.accentColor || "#3b82f6"}
-                          onChange={(e) => setSettings(prev => ({ ...prev, accentColor: e.target.value }))}
+                          value={settings.fontColor || "#ffffff"}
+                          onChange={(e) => setSettings(prev => ({ ...prev, fontColor: e.target.value }))}
                           className="h-12 w-20 rounded-lg border-2"
                         />
                         <Input
-                          value={settings.accentColor || "#3b82f6"}
-                          onChange={(e) => setSettings(prev => ({ ...prev, accentColor: e.target.value }))}
+                          value={settings.fontColor || "#ffffff"}
+                          onChange={(e) => setSettings(prev => ({ ...prev, fontColor: e.target.value }))}
                           className="flex-1"
-                          placeholder="#3b82f6"
+                          placeholder="#ffffff"
                         />
                       </div>
                     </div>
@@ -968,7 +886,7 @@ export default function ManagePublicNoticePage() {
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="space-y-6 xl:sticky xl:top-32"
+            className="space-y-6 xl:col-span-1"
           >
             <TemplateManager 
               currentSettings={settings}

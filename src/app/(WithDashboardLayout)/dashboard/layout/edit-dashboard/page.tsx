@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
+import { createPortal } from "react-dom"
 import GridLayout, { type Layout } from "react-grid-layout"
 import {
   Plus,
@@ -26,9 +27,9 @@ import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import "./edit-dashboard.css"
 import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } from "@/types/template-types"
-import { getCategoriesWithNotices, getCategories } from "@/app/actions/category.action"
+import { getCategoriesWithNotices, getCategories, getDashboardCategory, getDashboardPdfCategory, getTextCategoriesWithNotices } from "@/app/actions/category.action"
 import { getAllTemplates, createTemplate, getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
-import { createDashboard, getAllDashboards } from "@/app/actions/dashboard.action"
+import { createDashboard, getAllDashboards, createTempDashboard, updateTempDashboard, deleteAllTempDashboards } from "@/app/actions/dashboard.action"
 import { createNotice } from "@/app/actions/notice.action"
 import { createCategory } from "@/app/actions/category.action"
 // import { createImage } from "@/app/actions/image.action"
@@ -38,6 +39,7 @@ import { Button } from "@/components/ui/button"
 import { SpinningBellLoader, WaveLoader } from "@/components/ui/loader"
 import { localStorageUtils } from "@/lib/utils"
 import { useSession } from "next-auth/react"
+import * as pdfjsLib from "pdfjs-dist"
 
 // Client-only wrapper for GridLayout to prevent hydration issues
 const ClientOnlyGridLayout = ({ children, ...props }: any) => {
@@ -58,10 +60,33 @@ const ClientOnlyGridLayout = ({ children, ...props }: any) => {
   return <GridLayout {...props}>{children}</GridLayout>;
 };
 
+// Client-only wrapper for the entire dashboard to prevent hydration issues
+const ClientOnlyDashboard = () => {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen w-full bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard editor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <EditDashboardDemo />;
+};
+
 type TCategoriesWithNotices = {
   id: string
   name: string
   notices: TNotice[]
+  categoryType?: 'TEXT' | 'IMAGE' | 'PDF'
 }
 
 type TResult = {
@@ -126,10 +151,10 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
 }
 
 const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
-  "4:3": { width: 800, height: 600 },
-  "16:9": { width: 960, height: 540 },
-  "16:10": { width: 960, height: 600 },
-}
+  "4:3":   { width: 1200, height: 900 },
+  "16:9":  { width: 1440, height: 810 },
+  "16:10": { width: 1440, height: 900 },
+};
 
 // Helper function to convert hex color to rgba
 const hexToRgba = (hex: string, opacity: number) => {
@@ -159,7 +184,7 @@ const reconstructImageUrl = (notice: any) => {
 type SettingsTab = "style" | "typography" | "content" | "category" | "image"
 
 // Add widget type enum
-type WidgetType = "notice" | "image"
+type WidgetType = "notice" | "image" | "pdf"
 
 // Extend Widget type to include widget type and images
 interface ExtendedWidget extends Widget {
@@ -168,14 +193,740 @@ interface ExtendedWidget extends Widget {
     id: string
     url: string
     title: string
-    file: File
+    file?: File
     dbId?: string
     width?: number
     height?: number
     size?: number
     type?: string
+    isPlaceholder?: boolean
+  }>
+  pdfs?: Array<{
+    id: string
+    title: string
+    pdfData: string
+    fileName: string
+    dbId?: string
   }>
 
+}
+
+// Inline PDF widget component with upload + render + auto-scroll + TemporaryDashboard storage
+function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfStored: (pdfId: string, pdfData: string, fileName: string) => void }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [currentPdfData, setCurrentPdfData] = useState<string | null>(null)
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false)
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false)
+  const [existingPdfs, setExistingPdfs] = useState<Array<any>>([])
+  const [animateOpen, setAnimateOpen] = useState(false)
+
+  // Configure worker once on mount (client-side only)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/build/pdf.worker.min.mjs",
+        import.meta.url
+      ).toString()
+    }
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
+
+  // Load existing PDF data from TemporaryDashboard on mount and set up real-time updates
+  useEffect(() => {
+    const loadExistingPdf = async () => {
+      try {
+        const response = await fetch('/api/temp-dashboard/get-all')
+        const result = await response.json()
+        
+        if (result.success && result.result.length > 0) {
+          // Find the temp dashboard that contains this widget
+          for (const tempDashboard of result.result) {
+            if (tempDashboard.containers) {
+              const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+              const widgetContainer = containers.find((container: any) => container.id === widgetId)
+              
+              if (widgetContainer && widgetContainer.pdfData) {
+                console.log("Found PDF data in temp dashboard for widget:", widgetId)
+                setCurrentPdfData(widgetContainer.pdfData)
+                try {
+                  await renderPdfFromData(widgetContainer.pdfData)
+                } catch (renderError) {
+                  console.error('Error rendering PDF from temp dashboard:', renderError)
+                  toast.error('Failed to load PDF from saved data. The file may be corrupted.')
+                }
+                break
+              }
+            }
+          }
+        }
+        
+        // If no PDF data found in temp dashboard, try to recover from localStorage backup
+        if (!currentPdfData) {
+          try {
+            const backupKey = `pdf-backup-${widgetId}`
+            const backupData = localStorage.getItem(backupKey)
+            if (backupData) {
+              const parsed = JSON.parse(backupData)
+              // Check if backup is recent (within last hour)
+              if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
+                setCurrentPdfData(parsed.pdfData)
+                try {
+                  await renderPdfFromData(parsed.pdfData)
+                  console.log("Recovered PDF data from localStorage backup")
+                  
+                  // Try to save to temp dashboard again
+                  setTimeout(() => {
+                    saveToTempDashboard(parsed.pdfData, parsed.fileName)
+                  }, 1000)
+                } catch (renderError) {
+                  console.error('Error rendering PDF from localStorage backup:', renderError)
+                  toast.error('Failed to load PDF from backup. The file may be corrupted.')
+                }
+              } else {
+                // Remove old backup
+                localStorage.removeItem(backupKey)
+              }
+            }
+          } catch (backupError) {
+            console.error("Error recovering PDF data from backup:", backupError)
+          }
+        }
+      } catch (error) {
+        console.error("Error loading existing PDF from temp dashboard:", error)
+        
+        // Try to recover from localStorage backup as fallback
+        try {
+          const backupKey = `pdf-backup-${widgetId}`
+          const backupData = localStorage.getItem(backupKey)
+          if (backupData) {
+            const parsed = JSON.parse(backupData)
+            if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
+              setCurrentPdfData(parsed.pdfData)
+              try {
+                await renderPdfFromData(parsed.pdfData)
+                console.log("Recovered PDF data from localStorage backup after API error")
+              } catch (renderError) {
+                console.error('Error rendering PDF from localStorage backup after API error:', renderError)
+                toast.error('Failed to load PDF from backup. The file may be corrupted.')
+              }
+            }
+          }
+        } catch (backupError) {
+          console.error("Error recovering PDF data from backup after API error:", backupError)
+        }
+      }
+    }
+
+    // Load on mount
+    loadExistingPdf()
+    
+    // Set up real-time polling to check for updates every 2 seconds
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch('/api/temp-dashboard/get-all')
+        const result = await response.json()
+        
+        if (result.success && result.result.length > 0) {
+          for (const tempDashboard of result.result) {
+            if (tempDashboard.containers) {
+              const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+              const widgetContainer = containers.find((container: any) => container.id === widgetId)
+              
+              if (widgetContainer && widgetContainer.pdfData && widgetContainer.pdfData !== currentPdfData) {
+                console.log("PDF data updated in temp dashboard for widget:", widgetId)
+                setCurrentPdfData(widgetContainer.pdfData)
+                try {
+                  await renderPdfFromData(widgetContainer.pdfData)
+                } catch (renderError) {
+                  console.error('Error rendering updated PDF from temp dashboard:', renderError)
+                  toast.error('Failed to load updated PDF. The file may be corrupted.')
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error polling temp dashboard for updates:", error)
+      }
+    }, 2000) // Check every 2 seconds
+    
+    return () => clearInterval(intervalId)
+  }, [widgetId, currentPdfData])
+
+  // Auto-save to TemporaryDashboard whenever PDF data changes
+  useEffect(() => {
+    if (currentPdfData) {
+      const autoSaveTimer = setTimeout(() => {
+        saveToTempDashboard(currentPdfData, 'auto-saved.pdf')
+      }, 1000) // Save after 1 second of no changes
+      
+      return () => clearTimeout(autoSaveTimer)
+    }
+  }, [currentPdfData])
+
+  // Auto-save entire dashboard state to TemporaryDashboard
+  const autoSaveDashboardToTemp = async () => {
+    try {
+      // Get current temp dashboard data
+      const response = await fetch('/api/temp-dashboard/get-all')
+      const result = await response.json()
+      
+      if (result.success && result.result.length > 0) {
+        // Update the first temp dashboard with current state
+        const tempDashboard = result.result[0]
+        const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+        
+        // Update the widget container with current PDF data
+        const updatedContainers = containers.map((container: any) => {
+          if (container.id === widgetId && currentPdfData) {
+            return {
+              ...container,
+              pdfData: currentPdfData,
+              pdfFileName: 'auto-saved.pdf',
+              type: "pdf"
+            }
+          }
+          return container
+        })
+
+        // Update the temp dashboard
+        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            containers: updatedContainers
+          })
+        })
+
+        const updateResult = await updateResponse.json()
+        if (updateResult.success) {
+          console.log("Dashboard state auto-saved to temp dashboard")
+        }
+      }
+    } catch (error) {
+      console.error("Error auto-saving dashboard to temp:", error)
+    }
+  }
+
+  // Auto-save dashboard state when component unmounts
+  useEffect(() => {
+    return () => {
+      if (currentPdfData) {
+        autoSaveDashboardToTemp()
+      }
+    }
+  }, [currentPdfData])
+
+  const startAutoScroll = () => {
+    const container = containerRef.current
+    if (!container) return
+    // Reset to the top before starting
+    container.scrollTop = 0
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    const step = () => {
+      container.scrollBy(0, 0.5)
+      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1
+      if (atBottom) {
+        container.scrollTop = 0
+      }
+      rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+  }
+
+  const renderPdfFromData = async (pdfData: string) => {
+    const container = containerRef.current
+    if (!container) return
+    
+    try {
+      // Clear container and show loading state
+      container.innerHTML = ""
+      
+      // Validate PDF data
+      if (!pdfData || pdfData.trim() === '') {
+        throw new Error('No PDF data provided')
+      }
+      
+      // Check if PDF data is valid base64
+      const base64Regex = /^data:application\/pdf;base64,/
+      if (!base64Regex.test(pdfData) && !pdfData.startsWith('data:application/pdf')) {
+        // Try to add the data URL prefix if missing
+        if (!pdfData.startsWith('data:')) {
+          pdfData = `data:application/pdf;base64,${pdfData}`
+        }
+      }
+
+      // Show loading indicator
+      const loadingDiv = document.createElement('div')
+      loadingDiv.className = 'flex items-center justify-center h-32 text-gray-500'
+      loadingDiv.innerHTML = `
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600 mx-auto mb-2"></div>
+          <p class="text-sm">Loading PDF...</p>
+        </div>
+      `
+      container.appendChild(loadingDiv)
+
+      // Load PDF document
+      const pdf = await pdfjsLib.getDocument(pdfData).promise
+      
+      // Clear loading indicator
+      container.innerHTML = ""
+
+      // Render each page
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        try {
+          const page = await pdf.getPage(pageNum)
+          // Fit page width to container to avoid horizontal scroll
+          const containerWidth = container.clientWidth || 600
+          const baseViewport = page.getViewport({ scale: 1 })
+          const fitScale = containerWidth / baseViewport.width
+          const viewport = page.getViewport({ scale: fitScale })
+          
+          // Render at higher pixel density for crisp text
+          const outputScale = typeof window !== "undefined" ? Math.max(2, window.devicePixelRatio || 1) : 2
+          const canvas = document.createElement("canvas")
+          const context = canvas.getContext("2d")
+          
+          if (!context) {
+            throw new Error('Failed to get canvas context')
+          }
+          
+          // Set canvas size for high DPI rendering
+          canvas.width = Math.floor(viewport.width * outputScale)
+          canvas.height = Math.floor(viewport.height * outputScale)
+          
+          // Set CSS size to display size (no blur) - this ensures it fits the widget
+          canvas.style.width = "100%"
+          canvas.style.height = "auto"
+          
+          // Scale context for high DPI rendering
+          context.scale(outputScale, outputScale)
+          
+          await page.render({ 
+            canvasContext: context, 
+            viewport,
+            canvas
+          }).promise
+          container.appendChild(canvas)
+        } catch (pageError) {
+          console.error(`Error rendering PDF page ${pageNum}:`, pageError)
+          // Continue with other pages even if one fails
+        }
+      }
+
+      // Ensure we begin from the first page
+      container.scrollTop = 0
+      startAutoScroll()
+      
+    } catch (error) {
+      console.error('Error rendering PDF:', error)
+      
+      // Clear container and show error message
+      container.innerHTML = ""
+      
+      const errorDiv = document.createElement('div')
+      errorDiv.className = 'flex items-center justify-center h-32 text-red-500'
+      errorDiv.innerHTML = `
+        <div class="text-center">
+          <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          </div>
+          <p class="text-sm font-medium">Failed to load PDF</p>
+          <p class="text-xs text-gray-400 mt-1">The PDF file may be corrupted or invalid</p>
+        </div>
+      `
+      container.appendChild(errorDiv)
+      
+      // Show toast error
+      toast.error('Failed to load PDF. The file may be corrupted or invalid.')
+    }
+  }
+
+  // Function to refresh dashboard state from TemporaryDashboard
+  const refreshFromTempDashboard = async () => {
+    try {
+      console.log("Refreshing dashboard from TemporaryDashboard")
+      const response = await fetch('/api/temp-dashboard/get-all')
+      const result = await response.json()
+      
+      if (result.success && result.result.length > 0) {
+        const tempDashboard = result.result[0]
+        if (tempDashboard.containers && tempDashboard.containers.length > 0) {
+          const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+          const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
+          
+          if (pdfContainers.length > 0) {
+            console.log("Refreshing PDF data for", pdfContainers.length, "widgets")
+            const pdfContainer = pdfContainers.find((container: any) => container.id === widgetId)
+            if (pdfContainer) {
+              const genId = `pdf-${Date.now()}`
+              onPdfStored(genId, pdfContainer.pdfData, pdfContainer.pdfFileName || 'uploaded.pdf')
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing from temp dashboard:', error)
+    }
+  }
+
+  const saveToTempDashboard = async (pdfData: string, fileName: string) => {
+    try {
+      // Get current temp dashboard data
+      const response = await fetch('/api/temp-dashboard/get-all')
+      const result = await response.json()
+      
+      if (result.success && result.result.length > 0) {
+        // Update the first temp dashboard with the new PDF data
+        const tempDashboard = result.result[0]
+        const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+        
+        // Find and update the widget container
+        const updatedContainers = containers.map((container: any) => {
+          if (container.id === widgetId) {
+            return {
+              ...container,
+              pdfData: pdfData,
+              pdfFileName: fileName,
+              type: "pdf"
+            }
+          }
+          return container
+        })
+
+        // Update the temp dashboard
+        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            containers: updatedContainers
+          })
+        })
+
+        const updateResult = await updateResponse.json()
+        if (updateResult.success) {
+          console.log("PDF data saved to temp dashboard successfully")
+          // Trigger immediate refresh to display the updated PDF
+          setTimeout(() => {
+            refreshFromTempDashboard()
+          }, 500)
+        } else {
+          console.error("Failed to save PDF data to temp dashboard:", updateResult)
+        }
+              } else {
+          // No temp dashboard exists yet, create one with current widget data
+          console.log("No temp dashboard found, creating one with PDF data")
+          try {
+            const createResponse = await fetch('/api/temp-dashboard/create', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                aspectRatio: '16:9', // Default aspect ratio
+                containers: [{
+                  id: widgetId,
+                  type: 'pdf',
+                  pdfData: pdfData,
+                  pdfFileName: fileName
+                }],
+                screenName: 'Screen 1',
+                screenIndex: 0,
+                totalScreens: 1
+              })
+            })
+
+            const createResult = await createResponse.json()
+            if (createResult.success) {
+              console.log("Created new temp dashboard with PDF data")
+              // Trigger immediate refresh to display the PDF
+              setTimeout(() => {
+                refreshFromTempDashboard()
+              }, 500)
+            } else {
+              console.warn("Failed to create temp dashboard:", createResult.error)
+            }
+          } catch (error) {
+            console.error("Error creating temp dashboard:", error)
+            // Fallback: store PDF data in localStorage as backup
+            try {
+              const backupData = {
+                widgetId,
+                pdfData,
+                fileName,
+                timestamp: Date.now()
+              }
+              localStorage.setItem(`pdf-backup-${widgetId}`, JSON.stringify(backupData))
+              console.log("PDF data backed up to localStorage")
+            } catch (localStorageError) {
+              console.error("Failed to backup PDF data to localStorage:", localStorageError)
+            }
+          }
+        }
+    } catch (error) {
+      console.error("Error saving PDF to temp dashboard:", error)
+    }
+  }
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || file.type !== "application/pdf") {
+      toast.error("Please select a valid PDF file")
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast.error("PDF file size must be less than 10MB")
+      return
+    }
+
+    try {
+      setIsUploading(true)
+      const loadingToast = toast.loading('Uploading PDF...')
+
+      // Convert file to base64
+      const reader = new FileReader()
+      reader.onload = async (event) => {
+        try {
+          const pdfData = event.target?.result as string
+          setCurrentPdfData(pdfData)
+          
+          // Render the uploaded PDF
+          await renderPdfFromData(pdfData)
+          
+          // Save to TemporaryDashboard immediately
+          await saveToTempDashboard(pdfData, file.name)
+          
+          // Generate a unique ID for the PDF
+          const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          
+          // Notify parent component about the stored PDF with data
+          onPdfStored(pdfId, pdfData, file.name)
+          
+          toast.dismiss(loadingToast)
+          toast.success('PDF uploaded and stored successfully!')
+        } catch (error) {
+          console.error("Error processing PDF:", error)
+          toast.dismiss(loadingToast)
+          toast.error("Failed to process PDF")
+        }
+      }
+      
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error("Error uploading PDF:", error)
+      toast.error("Failed to upload PDF")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="pb-2 flex items-center gap-2">
+        <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm cursor-pointer bg-white hover:bg-gray-50 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          <Upload size={16} />
+          <span>{isUploading ? 'Uploading...' : 'Upload PDF'}</span>
+          <input 
+            className="hidden" 
+            type="file" 
+            accept="application/pdf" 
+            onChange={handleUpload}
+            disabled={isUploading}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              setIsSelectModalOpen(true)
+              // start animation immediately
+              requestAnimationFrame(() => setAnimateOpen(true))
+              setIsLoadingExisting(true)
+              const resp = await fetch('/api/notice/get-all')
+              const data = await resp.json()
+              // Filter notices that have pdfData
+              const pdfNotices = (data?.result || []).filter((n: any) => n?.pdfData)
+              console.log('Found PDF notices:', pdfNotices.length, pdfNotices.map((n: any) => ({ 
+                title: n.title, 
+                fileName: n.pdfFileName, 
+                hasPdfData: !!n.pdfData,
+                pdfDataLength: n.pdfData?.length || 0,
+                pdfDataPrefix: n.pdfData?.substring(0, 50) || 'none'
+              })))
+              
+              // Ensure PDF data has proper format for rendering
+              const processedPdfNotices = pdfNotices.map((n: any) => {
+                let pdfData = n.pdfData || ''
+                
+                // Ensure PDF data has data URL prefix for proper rendering
+                if (pdfData && !pdfData.startsWith('data:')) {
+                  pdfData = `data:application/pdf;base64,${pdfData}`
+                  console.log('Added data URL prefix to PDF:', n.pdfFileName)
+                }
+                
+                return {
+                  ...n,
+                  pdfData: pdfData
+                }
+              })
+              
+              // Deduplicate strictly by file name
+              const seen = new Set<string>()
+              const unique = [] as any[]
+              for (const n of processedPdfNotices) {
+                const key = (n?.pdfFileName ?? '').toString().trim().toLowerCase()
+                if (!key) continue
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(n)
+                }
+              }
+              setExistingPdfs(unique)
+            } catch (e) {
+              console.error('Failed to load existing PDFs', e)
+              toast.error('Failed to load existing PDFs. Please try again.')
+              setExistingPdfs([])
+            } finally {
+              setIsLoadingExisting(false)
+            }
+          }}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm bg-white hover:bg-gray-50"
+        >
+          <Upload size={16} />
+          <span>From Existing</span>
+        </button>
+      </div>
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden border rounded-md"
+        style={{ background: "#fff" }}
+      />
+
+      {isSelectModalOpen && createPortal(
+        <div className="fixed inset-0 z-[1000]">
+          <div
+            className={`absolute inset-0 bg-black/50 transition-opacity duration-150 ${animateOpen ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => {
+              setAnimateOpen(false)
+              setTimeout(() => setIsSelectModalOpen(false), 200)
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div
+              className={`relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-[92vw] max-w-5xl max-h-[85vh] overflow-hidden transition-all duration-150 transform ${animateOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-95'}`}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center gap-3 text-base font-semibold text-gray-800">
+                  <div className="p-2 rounded-lg bg-white border border-gray-200"><Upload size={18} className="text-indigo-600" /></div>
+                  Choose Existing PDF
+                </div>
+                <button
+                  onClick={() => {
+                    setAnimateOpen(false)
+                    setTimeout(() => setIsSelectModalOpen(false), 200)
+                  }}
+                  className="h-8 w-8 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-gray-700 grid place-items-center"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="px-6 py-4 border-b border-gray-100 bg-white">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Search by title or file name..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      const q = e.target.value.trim().toLowerCase()
+                      setExistingPdfs((prev: any[]) => prev.map(p => ({ ...p, __hidden: q ? !((p.title||'').toLowerCase().includes(q) || (p.pdfFileName||'').toLowerCase().includes(q)) : false })))
+                    }}
+                  />
+                  <div className="text-xs text-gray-500">{existingPdfs.filter((p: any) => !p.__hidden).length} item{existingPdfs.filter((p: any) => !p.__hidden).length !== 1 ? 's' : ''}</div>
+                </div>
+              </div>
+              <div className="p-6 bg-white">
+                {isLoadingExisting ? (
+                  <div className="flex items-center justify-center py-16 text-sm text-gray-500">Loading PDFs...</div>
+                ) : existingPdfs.length === 0 ? (
+                  <div className="text-center py-16 text-sm text-gray-500">No existing PDF notices found.</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {existingPdfs.filter((p: any) => !p.__hidden).map((n: any) => (
+                      <button
+                        key={n.id}
+                        className="group text-left rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all bg-white p-4 flex items-start gap-3"
+                        onClick={async () => {
+                          try {
+                            console.log('Selecting PDF:', { 
+                              title: n.title, 
+                              fileName: n.pdfFileName, 
+                              hasPdfData: !!n.pdfData,
+                              pdfDataLength: n.pdfData?.length || 0,
+                              pdfDataPrefix: n.pdfData?.substring(0, 50) || 'none'
+                            })
+                            
+                            if (!n.pdfData) {
+                              toast.error('No PDF data found for this file')
+                              return
+                            }
+                            
+                            // Validate PDF data before processing
+                            if (typeof n.pdfData !== 'string' || n.pdfData.trim() === '') {
+                              toast.error('Invalid PDF data format')
+                              return
+                            }
+                            
+                            setCurrentPdfData(n.pdfData)
+                            
+                            // Try to render the PDF first to validate it
+                            try {
+                              await renderPdfFromData(n.pdfData)
+                            } catch (renderError) {
+                              console.error('Error rendering selected PDF:', renderError)
+                              toast.error('Failed to load PDF. The file may be corrupted.')
+                              return
+                            }
+                            
+                            await saveToTempDashboard(n.pdfData, n.pdfFileName || 'uploaded.pdf')
+                            const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+                            onPdfStored(pdfId, n.pdfData, n.pdfFileName || 'uploaded.pdf')
+                            setIsSelectModalOpen(false)
+                            toast.success('PDF selected successfully')
+                          } catch (err) {
+                            console.error('Error selecting existing PDF:', err)
+                            toast.error('Failed to select PDF. Please try again.')
+                          }
+                        }}
+                        title={n.pdfFileName || 'PDF'}
+                      >
+                        <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-blue-50 text-blue-600 grid place-items-center border border-blue-100">PDF</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 truncate">{n.pdfFileName || 'PDF'}</div>
+                          <div className="text-xs text-gray-400 truncate">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>, document.body)
+      }
+    </div>
+  )
 }
 
 // Add this before the EditDashboardDemo component
@@ -186,6 +937,20 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[]
   { id: "category", label: "Category", icon: <ListFilter size={16} /> },
   { id: "image", label: "Image", icon: <ImageIcon size={16} /> },
 ]
+
+// Function to get appropriate tabs based on widget type
+const getTabsForWidgetType = (widgetType: WidgetType | undefined) => {
+  if (widgetType === "image") {
+    // Image widgets: show style, typography, category, and image tabs
+    return SETTINGS_TABS.filter(tab => tab.id !== "content");
+  } else if (widgetType === "pdf") {
+    // PDF widgets: show style and category tabs (no content/image specific)
+    return SETTINGS_TABS.filter(tab => tab.id !== "content" && tab.id !== "image");
+  } else {
+    // Notice widgets: show style, typography, content, and category tabs
+    return SETTINGS_TABS.filter(tab => tab.id !== "image");
+  }
+}
 
 // Define the template type
 
@@ -253,7 +1018,7 @@ function EditDashboardDemo() {
     })
   }
   
-  const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>(null)
+  const [selectedRatio, setSelectedRatio] = useState<AspectRatio | null>('16:9')
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false)
   const [categories, setCategories] = useState<TCategoriesWithNotices[]>([])
   const [activeSettingsWidget, setActiveSettingsWidget] = useState<string | null>(null)
@@ -279,9 +1044,7 @@ function EditDashboardDemo() {
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
   
-  // Add state for confirmation dialog
-  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false)
-  const [pendingSavedState, setPendingSavedState] = useState<any>(null)
+
   
   // Add state for loading existing dashboard
   const [isLoadingExistingDashboard, setIsLoadingExistingDashboard] = useState(false)
@@ -293,71 +1056,585 @@ function EditDashboardDemo() {
   // State for tracking drag over dashboard area
   const [isDragOverDashboard, setIsDragOverDashboard] = useState(false)
 
-  // Add useEffect to load saved state on component mount
+  // Loading states for all buttons
+  const [isSavingDashboard, setIsSavingDashboard] = useState(false)
+  const [isAddingWidget, setIsAddingWidget] = useState(false)
+  const [isRemovingWidget, setIsRemovingWidget] = useState(false)
+  const [isAddingScreen, setIsAddingScreen] = useState(false)
+  const [isRemovingScreen, setIsRemovingScreen] = useState(false)
+  const [isClearingScreens, setIsClearingScreens] = useState(false)
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false)
+  const [isCreatingFromTemplate, setIsCreatingFromTemplate] = useState(false)
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false)
+  const [isUpdatingTemplate, setIsUpdatingTemplate] = useState(false)
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState<string | null>(null) // widgetId for which image is being uploaded
+  const [isImageSelectOpen, setIsImageSelectOpen] = useState(false)
+  const [imageSelectWidgetId, setImageSelectWidgetId] = useState<string | null>(null)
+  const [isLoadingExistingImages, setIsLoadingExistingImages] = useState(false)
+  const [existingImages, setExistingImages] = useState<any[]>([])
+  const [animateImageOpen, setAnimateImageOpen] = useState(false)
+
+
+  // Enhanced localStorage state management
+  const [hasInitialized, setHasInitialized] = useState(false)
+  const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 })
+
+  // TempDashboard state management
+  const [tempDashboardId, setTempDashboardId] = useState<string | null>(null)
+  const [isTempDashboardActive, setIsTempDashboardActive] = useState(false)
+
+  // Template management state
+  const [templates, setTemplates] = useState<DashboardTemplate[]>([])
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState("")
+  const [templateDescription, setTemplateDescription] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterType, setFilterType] = useState("all")
+  
+  // Additional template management state
+  const [showViewAllModal, setShowViewAllModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<DashboardTemplate | null>(null)
+  const [editingTemplate, setEditingTemplate] = useState<DashboardTemplate | null>(null)
+
+  // Enhanced useEffect to load saved state on component mount
   useEffect(() => {
-    // Only run on client side
+    // Only run on client side and after component has mounted
     if (typeof window === 'undefined') return
     
-    const urlParams = new URLSearchParams(window.location.search)
-    const dashboardId = urlParams.get('id')
-    
-    // Don't show confirmation dialog if we're loading an existing dashboard
-    if (dashboardId) {
-      return
-    }
-    
-    const savedState = localStorageUtils.getItem('dashboardState')
-    
-    if (savedState) {
+    // Use a timeout to ensure we're fully on the client side
+    const timer = setTimeout(() => {
       try {
-        const { selectedRatio: savedRatio, screens: savedScreens, currentScreenIndex: savedScreenIndex } = savedState
+        const urlParams = new URLSearchParams(window.location.search)
+        const dashboardId = urlParams.get('id')
         
-        // Check if there was previous content (screens with widgets)
-        if (savedScreens && savedScreens.length > 0 && savedScreens.some(screen => screen.widgets.length > 0)) {
-          // Show confirmation dialog instead of clearing immediately
-          setPendingSavedState(savedState)
-          setShowConfirmationDialog(true)
-        } else {
-          // No previous content, just load the ratio and screens structure
-          setSelectedRatio(savedRatio)
-          if (savedScreens) {
-            setScreens(savedScreens)
-            setCurrentScreenIndex(savedScreenIndex || 0)
+        // Don't show confirmation dialog if we're loading an existing dashboard
+        if (dashboardId) {
+          setHasInitialized(true)
+          return
+        }
+        
+        // Check if localStorage is available
+        if (typeof localStorage === 'undefined') {
+          setHasInitialized(true)
+          return
+        }
+        
+        // Check if localStorageUtils is available
+        if (!localStorageUtils || typeof localStorageUtils.getItem !== 'function') {
+          setHasInitialized(true)
+          return
+        }
+        
+        const savedState = localStorageUtils.getItem('dashboardState')
+        
+        if (savedState) {
+          const { 
+            selectedRatio: savedRatio, 
+            screens: savedScreens, 
+            currentScreenIndex: savedScreenIndex,
+            activeSettingsTab: savedActiveTab,
+            activeSettingsWidget: savedActiveWidget,
+            settingsPosition: savedSettingsPos,
+            scrollPosition: savedScrollPos,
+            isRatioDropdownOpen: savedRatioDropdown,
+            isTemplateDropdownOpen: savedTemplateDropdown,
+            searchTerm: savedSearchTerm,
+            filterType: savedFilterType,
+            templateName: savedTemplateName,
+            templateDescription: savedTemplateDescription,
+            newTemplateName: savedNewTemplateName,
+            newTemplateDescription: savedNewTemplateDescription
+          } = savedState
+          
+          // Check if there was previous content (screens with widgets)
+          if (savedScreens && savedScreens.length > 0 && savedScreens.some((screen: any) => screen.widgets.length > 0)) {
+            // Automatically restore the saved state
+            restoreStateFromSaved(savedState)
+            localStorageUtils.removeItem('dashboardState')
+            
+            // Save to TemporaryDashboard after restoring state
+            setTimeout(() => {
+              autoSaveToTempDashboard()
+            }, 100)
+          } else {
+            // No previous content, just load the ratio and screens structure
+            restoreStateFromSaved(savedState)
+            localStorageUtils.removeItem('dashboardState')
+            
+            // Save to TemporaryDashboard after restoring state
+            setTimeout(() => {
+              autoSaveToTempDashboard()
+            }, 100)
           }
-          localStorageUtils.removeItem('dashboardState')
         }
       } catch (error) {
         console.error('Error loading saved dashboard state:', error)
-        localStorageUtils.removeItem('dashboardState')
+        try {
+          localStorageUtils.removeItem('dashboardState')
+        } catch (e) {
+          console.warn('Could not remove localStorage item:', e)
+        }
       }
-    }
+      
+      setHasInitialized(true)
+    }, 100) // Small delay to ensure hydration is complete
+    
+    return () => clearTimeout(timer)
   }, [])
 
-  // Add useEffect to save state whenever it changes
+  // Function to restore state from saved data
+  const restoreStateFromSaved = (savedState: any) => {
+    if (savedState.selectedRatio) setSelectedRatio(savedState.selectedRatio)
+    if (savedState.screens) {
+      setScreens(savedState.screens)
+      setCurrentScreenIndex(savedState.currentScreenIndex || 0)
+    }
+    if (savedState.activeSettingsTab) setActiveSettingsTab(savedState.activeSettingsTab)
+    if (savedState.activeSettingsWidget) setActiveSettingsWidget(savedState.activeSettingsWidget)
+    if (savedState.settingsPosition) setSettingsPosition(savedState.settingsPosition)
+    if (savedState.scrollPosition) {
+      setScrollPosition(savedState.scrollPosition)
+      // Restore scroll position after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        window.scrollTo(savedState.scrollPosition.x, savedState.scrollPosition.y)
+      }, 100)
+    }
+    if (savedState.isRatioDropdownOpen !== undefined) setIsRatioDropdownOpen(savedState.isRatioDropdownOpen)
+    if (savedState.isTemplateDropdownOpen !== undefined) setIsTemplateDropdownOpen(savedState.isTemplateDropdownOpen)
+    if (savedState.searchTerm !== undefined) setSearchTerm(savedState.searchTerm)
+    if (savedState.filterType !== undefined) setFilterType(savedState.filterType)
+    if (savedState.templateName !== undefined) setTemplateName(savedState.templateName)
+    if (savedState.templateDescription !== undefined) setTemplateDescription(savedState.templateDescription)
+    if (savedState.newTemplateName !== undefined) setNewTemplateName(savedState.newTemplateName)
+    if (savedState.newTemplateDescription !== undefined) setNewTemplateDescription(savedState.newTemplateDescription)
+  }
+
+  // Ensure default Dashboard categories (IMAGE and PDF) exist
   useEffect(() => {
-    // Only run on client side
-    if (typeof window === 'undefined') return
+    const ensureDashboardCategories = async () => {
+      try {
+        // Ensure Dashboard (IMAGE)
+        try {
+          const imgCat: any = await getDashboardCategory()
+          if (!imgCat?.success || !imgCat.result) {
+            await createCategory({ name: 'Dashboard', categoryType: 'IMAGE' } as any)
+          }
+        } catch (e) {
+          console.warn('Could not ensure Dashboard IMAGE category:', e)
+        }
+
+        // Ensure Dashboard (PDF)
+        try {
+          const pdfCat: any = await getDashboardPdfCategory()
+          if (!pdfCat?.success || !pdfCat.result) {
+            await createCategory({ name: 'Dashboard', categoryType: 'PDF' } as any)
+          }
+        } catch (e) {
+          console.warn('Could not ensure Dashboard PDF category:', e)
+        }
+      } catch (e) {
+        console.warn('Error ensuring default Dashboard categories:', e)
+      }
+    }
+
+    ensureDashboardCategories()
+  }, [])
+
+  // Function to auto-save current dashboard state to TemporaryDashboard
+  const autoSaveToTempDashboard = async () => {
+    try {
+      // Get current temp dashboard data
+      const response = await fetch('/api/temp-dashboard/get-all')
+      const result = await response.json()
+      
+      if (result.success && result.result.length > 0) {
+        // Update the first temp dashboard with current state
+        const tempDashboard = result.result[0]
+        
+        // Prepare updated containers with current widget data
+        const updatedContainers = []
+        
+        for (let screenIndex = 0; screenIndex < screens.length; screenIndex++) {
+          const screen = screens[screenIndex]
+          
+          for (const widget of screen.widgets) {
+            const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
+            if (!specificLayout) continue
+
+            const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
+            const containerHeight = (RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0)
+
+            const colWidth = (containerWidth - 11 * 24) / 12
+            const rowHeight = 50
+
+            const leftPx = specificLayout.x * (colWidth + 24)
+            const topPx = specificLayout.y * (rowHeight + 24)
+
+            const leftPercent = (leftPx / containerWidth) * 100
+            const topPercent = (topPx / containerHeight) * 100
+
+            const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
+            const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
+
+            const settings = screen.widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
+
+            const container: any = {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title,
+              category: widget.category,
+              type: widget.type || "notice",
+              settings: settings
+            }
+
+            // Add PDF data if it's a PDF widget
+            if (widget.type === "pdf" && widget.pdfs && widget.pdfs.length > 0) {
+              container.pdfData = widget.pdfs[0].pdfData || ''
+              container.pdfFileName = widget.pdfs[0].fileName || 'uploaded.pdf'
+            }
+
+            updatedContainers.push(container)
+          }
+        }
+
+        // Update the temp dashboard
+        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            containers: updatedContainers,
+            aspectRatio: selectedRatio,
+            screenName: screens[currentScreenIndex]?.name || 'Screen 1',
+            screenIndex: currentScreenIndex,
+            totalScreens: screens.length
+          })
+        })
+
+        const updateResult = await updateResponse.json()
+        if (updateResult.success) {
+          console.log("Dashboard state auto-saved to temp dashboard")
+        } else {
+          console.warn("Failed to auto-save to temp dashboard:", updateResult.error)
+        }
+      } else if (result.success && result.result.length === 0) {
+        // No temp dashboard exists, create one
+        try {
+          const createResponse = await fetch('/api/temp-dashboard/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              aspectRatio: selectedRatio || '16:9',
+              containers: [],
+              screenName: screens[currentScreenIndex]?.name || 'Screen 1',
+              screenIndex: currentScreenIndex,
+              totalScreens: screens.length
+            })
+          })
+
+          const createResult = await createResponse.json()
+          if (createResult.success) {
+            console.log("Created new temp dashboard for auto-save")
+          } else {
+            console.warn("Failed to create temp dashboard for auto-save:", createResult.error)
+          }
+        } catch (createError) {
+          console.warn("Error creating temp dashboard for auto-save:", createError)
+        }
+      } else {
+        console.warn("Failed to get temp dashboards for auto-save:", result.error)
+      }
+    } catch (error) {
+      console.error("Error auto-saving dashboard to temp:", error)
+      // Don't show error to user, just log it for debugging
+    }
+  }
+
+  // Enhanced useEffect to save state whenever it changes
+  useEffect(() => {
+    // Only run on client side and after initialization
+    if (typeof window === 'undefined' || !hasInitialized) return
     
-    // Create a lightweight version of screens without large file data
-    const lightweightScreens = screens.map((screen: any) => ({
-      ...screen,
-      widgets: screen.widgets.map((widget: any) => ({
-        ...widget,
-        // Don't include file, url (base64 data), or other large properties
+    // Use a timeout to ensure we're fully on the client side
+    const timer = setTimeout(() => {
+      // Create a lightweight version of screens without large file data
+      const lightweightScreens = screens.map((screen: any) => ({
+        ...screen,
+        widgets: screen.widgets.map((widget: any) => ({
+          ...widget,
+          // Don't include file, url (base64 data), or other large properties
+        }))
       }))
-    }))
+      
+      const stateToSave = {
+        screens: lightweightScreens,
+        currentScreenIndex,
+        selectedRatio,
+        activeSettingsTab,
+        activeSettingsWidget,
+        settingsPosition,
+        scrollPosition,
+        isRatioDropdownOpen,
+        isTemplateDropdownOpen,
+        searchTerm,
+        filterType,
+        templateName,
+        templateDescription,
+        newTemplateName,
+        newTemplateDescription
+      }
+      
+      try {
+        const success = localStorageUtils.setItem('dashboardState', stateToSave)
+        if (!success) {
+          console.warn('Failed to save dashboard state to localStorage (quota exceeded or data too large)')
+        }
+      } catch (error) {
+        console.warn('Error saving to localStorage:', error)
+      }
+    }, 100) // Small delay to ensure hydration is complete
     
-    const stateToSave = {
-      screens: lightweightScreens,
-      currentScreenIndex,
-      selectedRatio
-    }
+    return () => clearTimeout(timer)
+  }, [
+    screens, 
+    currentScreenIndex, 
+    selectedRatio, 
+    activeSettingsTab, 
+    activeSettingsWidget, 
+    settingsPosition, 
+    scrollPosition,
+    isRatioDropdownOpen,
+    isTemplateDropdownOpen,
+    searchTerm,
+    filterType,
+    templateName,
+    templateDescription,
+    newTemplateName,
+    newTemplateDescription,
+    hasInitialized
+  ])
+
+  // Save scroll position on scroll events
+  useEffect(() => {
+    // Only run on client side and after initialization
+    if (typeof window === 'undefined' || !hasInitialized) return
     
-    const success = localStorageUtils.setItem('dashboardState', stateToSave)
-    if (!success) {
-      console.warn('Failed to save dashboard state to localStorage (quota exceeded or data too large)')
+    const handleScroll = () => {
+      setScrollPosition({
+        x: window.scrollX,
+        y: window.scrollY
+      })
     }
-  }, [screens, currentScreenIndex, selectedRatio])
+
+    // Use a timeout to ensure we're fully on the client side
+    const timer = setTimeout(() => {
+      window.addEventListener('scroll', handleScroll, { passive: true })
+    }, 100)
+    
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [hasInitialized])
+
+  // Auto-save dashboard state to TemporaryDashboard whenever changes are made
+  useEffect(() => {
+    if (!hasInitialized) return
+
+    const autoSaveTimer = setTimeout(async () => {
+      try {
+        // Only auto-save if there are widgets and we have a selected ratio
+        if (screens.some(screen => screen.widgets.length > 0) && selectedRatio) {
+          await autoSaveToTempDashboard()
+        }
+      } catch (error) {
+        console.error('Error auto-saving to temp dashboard:', error)
+      }
+    }, 2000) // Auto-save after 2 seconds of no changes
+
+    return () => clearTimeout(autoSaveTimer)
+  }, [screens, selectedRatio, hasInitialized])
+
+  // Load data from TemporaryDashboard on mount if available
+  useEffect(() => {
+    if (!hasInitialized) return
+
+    const loadFromTempDashboard = async () => {
+      try {
+        const response = await fetch('/api/temp-dashboard/get-all')
+        const result = await response.json()
+        
+        if (result.success && result.result.length > 0) {
+          const tempDashboard = result.result[0]
+          if (tempDashboard.containers && tempDashboard.containers.length > 0) {
+            console.log("Loading dashboard state from TemporaryDashboard")
+            // Set the temp dashboard ID to indicate it's active
+            setTempDashboardId(tempDashboard.id)
+            setIsTempDashboardActive(true)
+            
+            // Load PDF data from temp dashboard containers into widget state
+            const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+            const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
+            
+            if (pdfContainers.length > 0) {
+              console.log("Found PDF containers in temp dashboard:", pdfContainers.length)
+              setWidgets(prev => prev.map(widget => {
+                const pdfContainer = pdfContainers.find((container: any) => container.id === widget.id)
+                if (pdfContainer && widget.type === 'pdf') {
+                  console.log("Updating widget with PDF data:", widget.id, pdfContainer.pdfFileName)
+                  return {
+                    ...widget,
+                    pdfs: [{
+                      id: `pdf-${Date.now()}`,
+                      title: pdfContainer.pdfFileName || 'PDF',
+                      pdfData: pdfContainer.pdfData,
+                      fileName: pdfContainer.pdfFileName || 'uploaded.pdf',
+                      dbId: `pdf-${Date.now()}`
+                    }]
+                  }
+                }
+                return widget
+              }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading from temp dashboard:', error)
+      }
+    }
+
+    // Load on mount
+    loadFromTempDashboard()
+    
+    // Set up real-time polling to refresh dashboard state every 3 seconds
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch('/api/temp-dashboard/get-all')
+        const result = await response.json()
+        
+        if (result.success && result.result.length > 0) {
+          const tempDashboard = result.result[0]
+          if (tempDashboard.containers && tempDashboard.containers.length > 0) {
+            const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+            const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
+            
+            if (pdfContainers.length > 0) {
+              // Update widgets with latest PDF data
+              setWidgets(prev => prev.map(widget => {
+                const pdfContainer = pdfContainers.find((container: any) => container.id === widget.id)
+                if (pdfContainer && widget.type === 'pdf') {
+                  // Check if PDF data has changed
+                  const currentPdfData = widget.pdfs?.[0]?.pdfData
+                  if (pdfContainer.pdfData !== currentPdfData) {
+                    console.log("Refreshing PDF data for widget:", widget.id)
+                    return {
+                      ...widget,
+                      pdfs: [{
+                        id: `pdf-${Date.now()}`,
+                        title: pdfContainer.pdfFileName || 'PDF',
+                        pdfData: pdfContainer.pdfData,
+                        fileName: pdfContainer.pdfFileName || 'uploaded.pdf',
+                        dbId: `pdf-${Date.now()}`
+                      }]
+                    }
+                  }
+                }
+                return widget
+              }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error refreshing dashboard from temp dashboard:', error)
+      }
+    }, 3000) // Check every 3 seconds
+    
+    return () => clearInterval(intervalId)
+  }, [hasInitialized])
+
+  // Save state before page unload
+  useEffect(() => {
+    // Only run on client side and after initialization
+    if (typeof window === 'undefined' || !hasInitialized) return
+    
+    const handleBeforeUnload = () => {
+      try {
+        // Force save current state before page unload
+        const stateToSave = {
+          screens: screens.map((screen: any) => ({
+            ...screen,
+            widgets: screen.widgets.map((widget: any) => ({
+              ...widget,
+              // Don't include file, url (base64 data), or other large properties
+            }))
+          })),
+          currentScreenIndex,
+          selectedRatio,
+          activeSettingsTab,
+          activeSettingsWidget,
+          settingsPosition,
+          scrollPosition: {
+            x: window.scrollX,
+            y: window.scrollY
+          },
+          isRatioDropdownOpen,
+          isTemplateDropdownOpen,
+          searchTerm,
+          filterType,
+          templateName,
+          templateDescription,
+          newTemplateName,
+          newTemplateDescription
+        }
+        
+        localStorageUtils.setItem('dashboardState', stateToSave)
+      } catch (error) {
+        console.warn('Error saving state before unload:', error)
+      }
+    }
+
+    // Use a timeout to ensure we're fully on the client side
+    const timer = setTimeout(() => {
+      window.addEventListener('beforeunload', handleBeforeUnload)
+    }, 100)
+    
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [
+    screens, 
+    currentScreenIndex, 
+    selectedRatio, 
+    activeSettingsTab, 
+    activeSettingsWidget, 
+    settingsPosition, 
+    scrollPosition,
+    isRatioDropdownOpen,
+    isTemplateDropdownOpen,
+    searchTerm,
+    filterType,
+    templateName,
+    templateDescription,
+    newTemplateName,
+    newTemplateDescription,
+    hasInitialized
+  ])
 
   // Debug useEffect to log state changes
   useEffect(() => {
@@ -366,17 +1643,240 @@ function EditDashboardDemo() {
       currentScreenIndex,
       widgets: widgets.length,
       layout: layout.length,
-      selectedRatio
+      selectedRatio,
+      activeSettingsTab,
+      activeSettingsWidget,
+      scrollPosition
     })
-  }, [screens, currentScreenIndex, widgets.length, layout.length, selectedRatio])
+  }, [screens, currentScreenIndex, widgets.length, layout.length, selectedRatio, activeSettingsTab, activeSettingsWidget, scrollPosition])
+
+  // Auto-save to TempDashboard whenever state changes
+  useEffect(() => {
+    // Only auto-save if we have a ratio selected and some content
+    if (selectedRatio && screens.length > 0 && screens.some(screen => screen.widgets.length > 0)) {
+      // Debounce the auto-save to avoid too many database calls
+      const timeoutId = setTimeout(() => {
+        saveToTempDashboard()
+      }, 2000) // Wait 2 seconds after last change
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [screens, selectedRatio]) // Only depend on screens and selectedRatio to avoid infinite loops
 
   // Add function to clear saved state
   const clearSavedState = () => {
     localStorageUtils.removeItem('dashboardState')
+    
+    // Save to TemporaryDashboard after clearing saved state
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+  }
+
+  // Function to save current state to TempDashboard
+  const saveToTempDashboard = async () => {
+    if (!selectedRatio) {
+      toast.error("Please select a display ratio first")
+      return
+    }
+
+    try {
+      // Calculate positions for all screens
+      const allScreenData = []
+      
+      for (let screenIndex = 0; screenIndex < screens.length; screenIndex++) {
+        const screen = screens[screenIndex]
+        
+        // Calculate positions for this screen
+        const positions = await Promise.all(screen.widgets.map(async (widget) => {
+          const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
+          if (!specificLayout) return null
+
+          const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
+          const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
+
+          const colWidth = (containerWidth - 11 * 24) / 12
+          const rowHeight = 50
+
+          const leftPx = specificLayout.x * (colWidth + 24)
+          const topPx = specificLayout.y * (rowHeight + 24)
+
+          const leftPercent = (leftPx / containerWidth) * 100
+          const topPercent = (topPx / containerHeight) * 100
+
+          const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
+          const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
+
+          const settings = screen.widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
+
+          // Handle different widget types
+          if (widget.type === "image" && widget.images && widget.images.length > 0) {
+            // For image displays, collect image IDs
+            const imageNoticeIds = widget.images.map(image => image.dbId).filter(Boolean)
+            
+            return {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title || "Image Display",
+              category: "Dashboard Images",
+              type: "image",
+              noticeIds: imageNoticeIds,
+              settings: {
+                backgroundColor: settings.backgroundColor,
+                backgroundOpacity: settings.backgroundOpacity,
+                cardOpacity: settings.cardOpacity,
+                borderColor: settings.borderColor,
+                borderWidth: settings.borderWidth,
+                fontColor: settings.fontColor,
+                noticeCount: settings.noticeCount,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                fontWeight: settings.fontWeight,
+                autoScroll: settings.autoScroll,
+                showFullContent: settings.showFullContent,
+                categoryFont: settings.categoryFont,
+                categoryFontSize: settings.categoryFontSize,
+                categoryFontWeight: settings.categoryFontWeight,
+                categoryFontColor: settings.categoryFontColor,
+                categoryBackgroundColor: settings.categoryBackgroundColor,
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
+                imageFit: settings.imageFit,
+                imageBorderRadius: settings.imageBorderRadius,
+                showImageTitle: settings.showImageTitle,
+                imageTitleColor: settings.imageTitleColor,
+                imageTitleFontSize: settings.imageTitleFontSize,
+                imageTitleFontWeight: settings.imageTitleFontWeight,
+                imageOverlay: settings.imageOverlay,
+                imageOverlayOpacity: settings.imageOverlayOpacity,
+                imageShadow: settings.imageShadow,
+                imageShadowColor: settings.imageShadowColor,
+                imageShadowBlur: settings.imageShadowBlur,
+                imageShadowOffset: settings.imageShadowOffset,
+                imageZoom: settings.imageZoom,
+                imageRotation: settings.imageRotation,
+                imageBrightness: settings.imageBrightness,
+                imageContrast: settings.imageContrast,
+                imageSaturation: settings.imageSaturation,
+                imageBlur: settings.imageBlur,
+                imageGrayscale: settings.imageGrayscale,
+                imageSepia: settings.imageSepia,
+                imageInvert: settings.imageInvert,
+              },
+            }
+          } else if (widget.type === "notice") {
+            // For notice widgets, use existing logic
+            const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
+
+            return {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title,
+              category: widget.category,
+              type: "notice",
+              noticeIds: noticeIds,
+              settings: {
+                backgroundColor: settings.backgroundColor,
+                backgroundOpacity: settings.backgroundOpacity,
+                cardOpacity: settings.cardOpacity,
+                borderColor: settings.borderColor,
+                borderWidth: settings.borderWidth,
+                fontColor: settings.fontColor,
+                noticeCount: settings.noticeCount,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                fontWeight: settings.fontWeight,
+                autoScroll: settings.autoScroll,
+                showFullContent: settings.showFullContent,
+                categoryFont: settings.categoryFont,
+                categoryFontSize: settings.categoryFontSize,
+                categoryFontWeight: settings.categoryFontWeight,
+                categoryFontColor: settings.categoryFontColor,
+                categoryBackgroundColor: settings.categoryBackgroundColor,
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
+              },
+            }
+          }
+        }))
+
+        // Filter out null positions
+        const validPositions = positions.filter(Boolean)
+
+        // Create temp dashboard data for this screen
+        const tempDashboardData = {
+          aspectRatio: selectedRatio,
+          containers: validPositions,
+          screenName: screen.name,
+          screenIndex: screenIndex,
+          totalScreens: screens.length
+        }
+
+        allScreenData.push(tempDashboardData)
+      }
+
+      // Delete existing temp dashboards if any
+      if (tempDashboardId) {
+        try {
+          await deleteAllTempDashboards()
+        } catch (error) {
+          console.warn("Error deleting existing temp dashboards:", error)
+        }
+      }
+
+      // Create new temp dashboard records
+      const tempDashboardResults = []
+      for (const screenData of allScreenData) {
+        const result = await createTempDashboard(screenData)
+        tempDashboardResults.push(result)
+        
+        if (!result.success) {
+          console.error("Failed to save temp dashboard screen:", result.result)
+          return
+        }
+      }
+
+      // Set the temp dashboard ID from the first result
+      if (tempDashboardResults.length > 0 && tempDashboardResults[0].success) {
+        const newTempDashboardId = tempDashboardResults[0].result.id
+        setTempDashboardId(newTempDashboardId)
+        setIsTempDashboardActive(true)
+        console.log("TempDashboard saved successfully:", tempDashboardResults)
+      }
+
+    } catch (error) {
+      console.error("Error saving to temp dashboard:", error)
+      toast.error(`Error saving to temp dashboard: ${error}`)
+    }
   }
 
   // Screen management functions
-  const addScreen = () => {
+  const addScreen = async () => {
+    try {
+      setIsAddingScreen(true)
+      
     const newScreenId = `screen-${screens.length + 1}`
     const newScreen = {
       id: newScreenId,
@@ -387,13 +1887,27 @@ function EditDashboardDemo() {
     }
     setScreens([...screens, newScreen])
     setCurrentScreenIndex(screens.length) // Switch to the new screen
+    
+    // Save to TemporaryDashboard after adding screen
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+    } catch (error) {
+      console.error("Error adding screen:", error)
+      toast.error("Failed to add screen")
+    } finally {
+      setIsAddingScreen(false)
+    }
   }
 
-  const removeScreen = (screenIndex: number) => {
+  const removeScreen = async (screenIndex: number) => {
     if (screens.length <= 1) {
       toast.error("Cannot remove the last screen")
       return
     }
+    
+    try {
+      setIsRemovingScreen(true)
     
     const newScreens = screens.filter((_, index) => index !== screenIndex)
     setScreens(newScreens)
@@ -401,6 +1915,17 @@ function EditDashboardDemo() {
     // Adjust current screen index if needed
     if (currentScreenIndex >= screenIndex) {
       setCurrentScreenIndex(Math.max(0, currentScreenIndex - 1))
+      }
+      
+      // Save to TemporaryDashboard after removing screen
+      setTimeout(() => {
+        autoSaveToTempDashboard()
+      }, 100)
+    } catch (error) {
+      console.error("Error removing screen:", error)
+      toast.error("Failed to remove screen")
+    } finally {
+      setIsRemovingScreen(false)
     }
   }
 
@@ -411,54 +1936,68 @@ function EditDashboardDemo() {
       name: newName
     }
     setScreens(newScreens)
+    
+    // Save to TemporaryDashboard after renaming screen
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
   }
 
-  // Handle confirmation dialog actions
-  const handleConfirmClear = () => {
-    if (pendingSavedState) {
-      // Load only the ratio, clear everything else
-      setSelectedRatio(pendingSavedState.selectedRatio)
-    }
-    localStorageUtils.removeItem('dashboardState')
-    setShowConfirmationDialog(false)
-    setPendingSavedState(null)
-  }
-
-  const handleCancelClear = () => {
-    if (pendingSavedState) {
-      // Load the saved state (screens will be lightweight version)
-      setScreens(pendingSavedState.screens || [{
+  const clearAllScreens = async () => {
+    try {
+      setIsClearingScreens(true)
+      // Reset to a single empty screen
+      const initialScreen = {
         id: 'screen-1',
         name: 'Screen 1',
         widgets: [],
         layout: [],
         widgetSettings: {}
-      }])
-      setCurrentScreenIndex(pendingSavedState.currentScreenIndex || 0)
-      setSelectedRatio(pendingSavedState.selectedRatio)
-      
-      // Check if there are image widgets that need to be re-uploaded
-      const hasImageWidgets = pendingSavedState.screens?.some((screen: any) => 
-        screen.widgets?.some((widget: any) => 
-          widget.type === 'notice' && widget.images?.length > 0
-        )
-      )
-      
-      if (hasImageWidgets) {
-        toast.info("Dashboard restored! Note: Image displays need to be re-uploaded due to storage limitations.")
-      } else {
-        toast.success("Dashboard restored successfully!", { duration: 1500 })
       }
+      setScreens([initialScreen])
+      setCurrentScreenIndex(0)
+
+      // Clear any temp dashboard data
+      try {
+        await deleteAllTempDashboards()
+        setTempDashboardId(null)
+        setIsTempDashboardActive(false)
+      } catch (error) {
+        console.warn('Error clearing temp dashboards while clearing screens:', error)
+      }
+
+      // Clear saved local state
+      clearSavedState()
+      
+      // Save to TemporaryDashboard after clearing screens
+      setTimeout(() => {
+        autoSaveToTempDashboard()
+      }, 100)
+      
+      toast.success('All screens cleared')
+    } catch (error) {
+      console.error('Error clearing all screens:', error)
+      toast.error('Failed to clear screens')
+    } finally {
+      setIsClearingScreens(false)
     }
-    setShowConfirmationDialog(false)
-    setPendingSavedState(null)
   }
+
+
 
   useEffect(() => {
     const getData = async () => {
-      const categoriesWithNotices = (await getCategoriesWithNotices()) as TResult
+      try {
+        setIsLoadingCategories(true)
+      const categoriesWithNotices = (await getTextCategoriesWithNotices()) as TResult
       if (categoriesWithNotices.success) {
         setCategories(categoriesWithNotices.result as TCategoriesWithNotices[])
+        }
+      } catch (error) {
+        console.error("Error loading categories:", error)
+        toast.error("Failed to load categories")
+      } finally {
+        setIsLoadingCategories(false)
       }
     }
 
@@ -580,6 +2119,11 @@ function EditDashboardDemo() {
             setScreens(newScreens)
             setCurrentScreenIndex(0)
             
+            // Save to TemporaryDashboard after loading existing dashboard
+            setTimeout(() => {
+              autoSaveToTempDashboard()
+            }, 100)
+            
             toast.success(`Dashboard loaded successfully! ${newScreens.length} screen${newScreens.length > 1 ? 's' : ''} found.`, { duration: 1500 })
           } else {
             // Fallback to single dashboard loading for backward compatibility
@@ -680,6 +2224,11 @@ function EditDashboardDemo() {
               
               setScreens([singleScreen])
               setCurrentScreenIndex(0)
+              
+              // Save to TemporaryDashboard after loading existing dashboard
+              setTimeout(() => {
+                autoSaveToTempDashboard()
+              }, 100)
               
               toast.success('Existing dashboard loaded successfully!', { duration: 1500 })
             } else {
@@ -803,6 +2352,7 @@ function EditDashboardDemo() {
   const handleDeleteTemplate = async (templateId: string) => {
     if (confirm("Are you sure you want to delete this template?")) {
       try {
+        setIsDeletingTemplate(true)
         const success = await deleteDashboardTemplate(templateId)
         if (success) {
           setTemplates(prev => prev.filter(t => t.id !== templateId))
@@ -813,6 +2363,8 @@ function EditDashboardDemo() {
       } catch (error) {
         console.error("Error deleting template:", error)
         toast.error("Error deleting template")
+      } finally {
+        setIsDeletingTemplate(false)
       }
     }
   }
@@ -833,6 +2385,8 @@ function EditDashboardDemo() {
     }
 
     try {
+      setIsUpdatingTemplate(true)
+      
       const updatedTemplate: DashboardTemplate = {
         ...editingTemplate,
         name: templateName,
@@ -859,6 +2413,8 @@ function EditDashboardDemo() {
     } catch (error) {
       console.error("Error updating template:", error)
       toast.error("Error updating template")
+    } finally {
+      setIsUpdatingTemplate(false)
     }
   }
 
@@ -867,17 +2423,22 @@ function EditDashboardDemo() {
     setStartPosition({ x: e.clientX, y: e.clientY })
   }
 
-  const addWidget = (type: WidgetType = "notice") => {
+  const addWidget = async (type: WidgetType = "notice") => {
     if (!selectedRatio) return
+
+    try {
+      setIsAddingWidget(true)
 
     const newWidgetId = `widget-${Date.now()}-${Math.floor(Math.random() * 1000)}`
     const widgetTitle = type === "image" ? "Image Display" : 
+                       type === "pdf" ? "PDF Widget" :
                        `Notice Widget ${widgets.length + 1}`
     
     const newWidget: ExtendedWidget = {
       id: newWidgetId,
       title: widgetTitle,
       type: type,
+      ...(type === "pdf" ? { url: "/dashboard/test-pdf-scroll" } : {}),
     }
 
     const newLayout: Layout = {
@@ -898,12 +2459,26 @@ function EditDashboardDemo() {
     setWidgets(prev => [...prev, newWidget])
     setLayout(prev => [...prev, newLayout])
 
+    // Save to TemporaryDashboard after adding widget
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+
     toast.success("Widget added successfully!", { duration: 1200 })
+    } catch (error) {
+      console.error("Error adding widget:", error)
+      toast.error("Failed to add widget")
+    } finally {
+      setIsAddingWidget(false)
+    }
   }
 
-  const removeWidget = (e: React.MouseEvent, id: string) => {
+  const removeWidget = async (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     e.stopPropagation()
+
+    try {
+      setIsRemovingWidget(true)
 
     setWidgets(prev => prev.filter((widget) => widget.id !== id))
     setLayout(prev => prev.filter((item) => item.i !== id))
@@ -914,7 +2489,18 @@ function EditDashboardDemo() {
     })
     setActiveSettingsWidget(null)
 
-            toast.success("Widget removed", { duration: 1200 })
+    // Save to TemporaryDashboard after removing widget
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+
+    toast.success("Widget removed", { duration: 1200 })
+    } catch (error) {
+      console.error("Error removing widget:", error)
+      toast.error("Failed to remove widget")
+    } finally {
+      setIsRemovingWidget(false)
+    }
   }
 
   const handleRatioSelect = (ratio: AspectRatio) => {
@@ -947,6 +2533,11 @@ function EditDashboardDemo() {
         return prev
       }
     })
+
+    // Save to TemporaryDashboard after ratio change
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
   }
 
   const handleDragStart2 = (e: React.DragEvent, category: TCategoriesWithNotices) => {
@@ -1024,6 +2615,19 @@ function EditDashboardDemo() {
       return
     }
 
+    // Validate that TEXT type categories can only be dropped on notice widgets
+    if (widgetId) {
+      const targetWidget = widgets.find(widget => widget.id === widgetId)
+      if (targetWidget && targetWidget.type === "image" && category.categoryType === "TEXT") {
+        toast.error("Text categories cannot be dropped on image widgets. Only image categories are allowed.")
+        return
+      }
+      if (targetWidget && targetWidget.type === "pdf" && category.categoryType === "TEXT") {
+        toast.error("Text categories cannot be dropped on PDF widgets. Only PDF categories are allowed.")
+        return
+      }
+    }
+
     // If widgetId is provided, update existing widget
     if (widgetId) {
       console.log("Updating existing widget:", widgetId, "with category:", category.name)
@@ -1059,6 +2663,11 @@ function EditDashboardDemo() {
       }
 
               toast.success(`Added ${categoryName} to widget`, { duration: 1200 })
+              
+              // Save to TemporaryDashboard after updating widget
+              setTimeout(() => {
+                autoSaveToTempDashboard()
+              }, 100)
     } else {
       console.log("Creating new widget with category:", category.name)
       // Create new widget at drop location
@@ -1072,6 +2681,16 @@ function EditDashboardDemo() {
       return
     }
 
+    // Ensure TEXT type categories only create notice widgets
+    if (category.categoryType === "TEXT") {
+      // TEXT categories can only create notice widgets (which is the default)
+      console.log("Creating notice widget from TEXT category:", category.name)
+    } else {
+      // For non-TEXT categories, show error (they should not be in the TEXT categories list)
+      toast.error(`Category type ${category.categoryType} is not allowed for notice widgets. Only TEXT categories are allowed.`)
+      return
+    }
+
     // Calculate drop position relative to the dashboard container
     const dashboardContainer = e.currentTarget as HTMLElement
     const rect = dashboardContainer.getBoundingClientRect()
@@ -1080,8 +2699,8 @@ function EditDashboardDemo() {
 
     // Convert pixel position to grid position
     // GridLayout configuration: cols=12, rowHeight=50, margin=[12,12]
-    const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
-    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
+    const containerWidth = (RATIO_DIMENSIONS[selectedRatio].width * 1.3) - 32
+    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height * 1.0 // Fixed: Use 100% height instead of 130%
     
     // Calculate grid cell dimensions
     const colWidth = (containerWidth - 11 * 24) / 12 // 11 gaps between 12 columns, each gap is 24px (12px margin on each side)
@@ -1121,14 +2740,19 @@ function EditDashboardDemo() {
     setWidgets(prev => [...prev, newWidget])
     setLayout(prev => [...prev, newLayout])
 
+    // Save to TemporaryDashboard after creating widget
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+
     toast.success(`Created new widget with ${category.name} category!`, { duration: 1200 })
   }
 
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
     if (!selectedRatio) return { width: "0%", height: "0%" }
 
-    const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
-    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
+    const containerWidth = (RATIO_DIMENSIONS[selectedRatio].width * 1.3) - 32
+    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height * 1.0 // Fixed: Use 100% height instead of 130%
 
     const colWidth = (containerWidth - 11 * 24) / 12 // Fixed: 11 gaps between 12 columns, each gap is 24px
     const rowHeight = 50 // Match the new rowHeight
@@ -1147,6 +2771,8 @@ function EditDashboardDemo() {
     const dashboardId = urlParams.get('id')
     
     try {
+      setIsSavingDashboard(true)
+      
       if (dashboardId) {
         // Update existing dashboards - delete old ones and create new ones
         // First, delete existing dashboards for this ID
@@ -1178,8 +2804,8 @@ function EditDashboardDemo() {
           const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
           if (!specificLayout) return null
 
-          const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32
-          const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height
+          const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
+          const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0 // Fixed: Use 100% height instead of 130%
 
           const colWidth = (containerWidth - 11 * 24) / 12
           const rowHeight = 50
@@ -1200,46 +2826,47 @@ function EditDashboardDemo() {
             // For image displays, create notices for each image and collect their IDs
             const imageNoticeIds = []
             
-            // Use a default category for image displays (first available category or create a generic one)
+            // Use the Dashboard category with type IMAGE for dashboard images
             let imageCategoryId = ""
             try {
-              const categories = await getCategories()
-              if (categories.result && categories.result.length > 0) {
-                // Use the first available category
-                imageCategoryId = categories.result[0].id
+              const dashboardCategory: any = await getDashboardCategory()
+              if (dashboardCategory.success && dashboardCategory.result) {
+                // Use the Dashboard category with type IMAGE
+                imageCategoryId = (dashboardCategory.result as any).id
               } else {
-                // Create a default category if none exist
-                const createCategoryResult = await createCategory({ name: "General" })
-                if (createCategoryResult.success) {
-                  const newCategories = await getCategories()
-                  if (newCategories.result && newCategories.result.length > 0) {
-                    imageCategoryId = newCategories.result[0].id
-                  }
+                // Fallback: try to find any IMAGE category if Dashboard category doesn't exist
+                const categoriesResp: any = await getCategories()
+                const imageCategory = categoriesResp.result?.find((cat: any) => cat.categoryType === 'IMAGE')
+                if (imageCategory) {
+                  imageCategoryId = (imageCategory as any).id
+                } else {
+                  console.error("No Dashboard category with type IMAGE found")
                 }
               }
             } catch (error) {
-              console.error("Error handling image display category:", error)
+              console.error("Error handling Dashboard category:", error)
             }
             
             for (const image of widget.images) {
               try {
-                // Create a notice for this image
+                // Create a notice for this image following the same pattern as create-notice page
                 const noticeData = {
-                  title: image.title || "Image Notice",
-                  content: `Image: ${image.title}`,
-                  category: "Image", // Use generic category name
+                  title: image.title || "Dashboard Image",
+                  content: `Dashboard Image: ${image.title}`,
+                  category: "Dashboard", // Use Dashboard category name
                   categoryId: imageCategoryId,
-                  imageUrl: image.url, // Store the full data URL for display
+                  imageUrl: image.url, // Store the full data URL for display (same as imagePreview in create-notice)
                   imageFileName: image.title,
-                  imageData: image.url.split(',')[1], // Store only the base64 data without the prefix
+                  imageData: image.url.split(',')[1], // Store only the base64 data without the prefix (same as convertImageToBase64)
                 }
                 
                 // Create the notice using the server action directly
                 const noticeResult = await createNotice(noticeData)
                 
-                if (noticeResult.success) {
-                  imageNoticeIds.push(noticeResult.message.id)
-                  console.log(`Created notice for image: ${image.title} with ID: ${noticeResult.message.id}`)
+                const created: any = noticeResult as any
+                if (created.success && created.message && typeof created.message !== 'string' && created.message.id) {
+                  imageNoticeIds.push(created.message.id as string)
+                  console.log(`Created notice for image: ${image.title} with ID: ${created.message.id}`)
                 } else {
                   console.error(`Failed to create notice for image: ${image.title}`, noticeResult)
                 }
@@ -1260,8 +2887,8 @@ function EditDashboardDemo() {
               topPercent: `${topPercent.toFixed(2)}%`,
               width: `${widgetWidth.toFixed(2)}%`,
               height: `${widgetHeight.toFixed(2)}%`,
-              title: widget.content || widget.title || "Image Display",
-              category: "Image", // Use generic category name
+              title: widget.content || widget.title || "Dashboard Image Display",
+              category: "Dashboard", // Use Dashboard category name
               type: "image",
               noticeIds: imageNoticeIds, // Use the created notice IDs
               settings: {
@@ -1308,6 +2935,127 @@ function EditDashboardDemo() {
                 imageGrayscale: settings.imageGrayscale,
                 imageSepia: settings.imageSepia,
                 imageInvert: settings.imageInvert,
+              },
+            }
+          } else if (widget.type === "pdf" && widget.pdfs && widget.pdfs.length > 0) {
+            // For PDF widgets, save PDF data directly in the container
+            const pdf = widget.pdfs[0] // Take the first PDF for now
+            
+            // Get PDF data from TemporaryDashboard if not in widget
+            let pdfData = pdf.pdfData
+            if (!pdfData) {
+              try {
+                const tempResponse = await fetch('/api/temp-dashboard/get-all')
+                const tempResult = await tempResponse.json()
+                
+                if (tempResult.success && tempResult.result.length > 0) {
+                  for (const tempDashboard of tempResult.result) {
+                    if (tempDashboard.containers) {
+                      const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
+                      const widgetContainer = containers.find((container: any) => container.id === widget.id)
+                      
+                      if (widgetContainer && widgetContainer.pdfData) {
+                        pdfData = widgetContainer.pdfData
+                        break
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error("Error fetching PDF data from temp dashboard:", error)
+              }
+            }
+
+            // Persist PDF as a Notice under the Dashboard (PDF) category
+            try {
+              // Store the full PDF data with data URL prefix for proper retrieval
+              const fullPdfData = pdfData || ''
+              
+              // Ensure we have the data URL prefix for proper PDF rendering
+              const pdfDataWithPrefix = fullPdfData.startsWith('data:') 
+                ? fullPdfData 
+                : `data:application/pdf;base64,${fullPdfData}`
+
+              if (pdfDataWithPrefix) {
+                // Find or create the Dashboard PDF category
+                let dashboardPdfCategoryId: string | null = null
+                try {
+                  const dashPdfCat: any = await getDashboardPdfCategory()
+                  if (dashPdfCat?.success && dashPdfCat.result) {
+                    dashboardPdfCategoryId = (dashPdfCat.result as any).id
+                  } else {
+                    const created = await createCategory({ name: 'Dashboard', categoryType: 'PDF' } as any)
+                    if ((created as any)?.success) {
+                      const refreshed: any = await getDashboardPdfCategory()
+                      if (refreshed?.success && refreshed.result) {
+                        dashboardPdfCategoryId = (refreshed.result as any).id
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.warn('Error ensuring Dashboard PDF category:', e)
+                }
+
+                if (dashboardPdfCategoryId) {
+                  try {
+                    await createNotice({
+                      title: pdf.fileName || pdf.title || 'Dashboard PDF',
+                      content: '',
+                      category: 'Dashboard',
+                      categoryId: dashboardPdfCategoryId,
+                      pdfData: pdfDataWithPrefix, // Store with data URL prefix
+                      pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
+                      createdAt: new Date() as any,
+                    } as any)
+                    console.log('PDF notice created successfully for dashboard widget')
+                  } catch (e) {
+                    console.warn('Failed to create PDF notice for dashboard widget:', e)
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Error while persisting PDF widget to notice:', e)
+            }
+            
+            return {
+              id: specificLayout.i,
+              x: specificLayout.x,
+              y: specificLayout.y,
+              w: specificLayout.w,
+              h: specificLayout.h,
+              leftPx: `${leftPx.toFixed(1)}px`,
+              topPx: `${topPx.toFixed(1)}px`,
+              leftPercent: `${leftPercent.toFixed(2)}%`,
+              topPercent: `${topPercent.toFixed(2)}%`,
+              width: `${widgetWidth.toFixed(2)}%`,
+              height: `${widgetHeight.toFixed(2)}%`,
+              title: widget.content || widget.title || "Dashboard PDF Widget",
+              category: "Dashboard",
+              type: "pdf",
+              pdfData: pdfData || '',
+              pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
+              settings: {
+                backgroundColor: settings.backgroundColor,
+                backgroundOpacity: settings.backgroundOpacity,
+                cardOpacity: settings.cardOpacity,
+                borderColor: settings.borderColor,
+                borderWidth: settings.borderWidth,
+                fontColor: settings.fontColor,
+                noticeCount: settings.noticeCount,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                fontWeight: settings.fontWeight,
+                autoScroll: settings.autoScroll,
+                showFullContent: settings.showFullContent,
+                categoryFont: settings.categoryFont,
+                categoryFontSize: settings.categoryFontSize,
+                categoryFontWeight: settings.categoryFontWeight,
+                categoryFontColor: settings.categoryFontColor,
+                categoryBackgroundColor: settings.categoryBackgroundColor,
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
               },
             }
           } else {
@@ -1386,6 +3134,16 @@ function EditDashboardDemo() {
       const allSuccessful = dashboardResults.every(result => result.success)
       
       if (allSuccessful) {
+        // Clear TempDashboard after successful save
+        try {
+          await deleteAllTempDashboards()
+          setTempDashboardId(null)
+          setIsTempDashboardActive(false)
+          console.log("TempDashboard cleared after successful save")
+        } catch (error) {
+          console.warn("Error clearing TempDashboard:", error)
+        }
+        
         clearSavedState() // Clear saved state after successful save
         toast.success(`Dashboard saved successfully! ${screens.length} screen${screens.length > 1 ? 's' : ''} created.`, { duration: 2000 })
         console.log("All screens saved successfully:", dashboardResults)
@@ -1397,6 +3155,8 @@ function EditDashboardDemo() {
     } catch (error) {
       console.error("Error saving dashboard:", error)
       toast.error(`Error saving dashboard: ${error}`)
+    } finally {
+      setIsSavingDashboard(false)
     }
   }
 
@@ -1437,6 +3197,11 @@ function EditDashboardDemo() {
         return prev
       })
     }
+
+    // Save to TemporaryDashboard after widget setting change
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
   }
 
   const getPresetColors = () => [
@@ -1462,7 +3227,7 @@ function EditDashboardDemo() {
   // Around line 650
 
   const handleSaveTemplate = () => {
-    setIsTemplateModalOpen(true)
+    setShowTemplateModal(true)
   }
 
   const handleTemplateSave = async (replaceExisting?: boolean) => {
@@ -1560,7 +3325,7 @@ function EditDashboardDemo() {
       if (result.success) {
         // Update local state
         setCustomTemplates([...customTemplates, newTemplate])
-        setIsTemplateModalOpen(false)
+        setShowTemplateModal(false)
         setNewTemplateName("")
         setNewTemplateDescription("")
         setShowDuplicateNameDialog(false)
@@ -1570,7 +3335,7 @@ function EditDashboardDemo() {
         // Show duplicate name dialog for custom template
         setPendingTemplate(newTemplate)
         setShowDuplicateNameDialog(true)
-        setIsTemplateModalOpen(false)
+        setShowTemplateModal(false)
       } else {
         toast.error("Failed to save template to database", { duration: 2000 })
       }
@@ -1582,7 +3347,7 @@ function EditDashboardDemo() {
   }
 
   // Enhanced image upload for image displays with professional features
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, widgetId: string) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, widgetId: string) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -1598,6 +3363,9 @@ function EditDashboardDemo() {
       toast.error('Image file size must be less than 10MB')
       return
     }
+
+    try {
+      setIsUploadingImage(widgetId)
 
     // Show loading toast
     const loadingToast = toast.loading('Processing image...')
@@ -1624,6 +3392,11 @@ function EditDashboardDemo() {
           : widget
       ))
 
+        // Save to TemporaryDashboard after image upload
+        setTimeout(() => {
+          autoSaveToTempDashboard()
+        }, 100)
+
         toast.dismiss(loadingToast)
         toast.success(`Image uploaded successfully! (${img.width}×${img.height})`, {
           description: `${(file.size / 1024 / 1024).toFixed(1)}MB`
@@ -1640,7 +3413,15 @@ function EditDashboardDemo() {
       toast.error('Failed to read image file. Please try again.')
     }
     reader.readAsDataURL(file)
+    } catch (error) {
+      console.error("Error uploading image:", error)
+      toast.error("Failed to upload image")
+    } finally {
+      setIsUploadingImage(null)
+    }
   }
+
+  // PDF widget support removed
 
 
 
@@ -1699,76 +3480,157 @@ function EditDashboardDemo() {
     return Math.max(80, widgetHeight - reservedSpace) // Ensure minimum height of 80px
   }
 
+  // Helper function to determine widget type based on content
+  const getWidgetType = (widget: ExtendedWidget): "notice" | "image" | "pdf" => {
+    // If widget has explicit type, use it
+    if (widget.type) {
+      console.log(`Widget ${widget.id} has explicit type: ${widget.type}`);
+      return widget.type as "notice" | "image" | "pdf";
+    }
+    
+    // If widget has PDFs, treat as pdf widget
+    if ((widget as any).pdfs && (widget as any).pdfs.length > 0) {
+      console.log(`Widget ${widget.id} determined as pdf type due to pdfs array`);
+      return "pdf";
+    }
+    
+    // If widget has images array with content, it's an image widget
+    if (widget.images && widget.images.length > 0) {
+      console.log(`Widget ${widget.id} determined as image type due to images array`);
+      return "image";
+    }
+    
+    // If widget has notices or content, it's a notice widget
+    if (widget.notices || widget.content || widget.category) {
+      console.log(`Widget ${widget.id} determined as notice type due to notices/content/category`);
+      return "notice";
+    }
+    
+    // Default to notice if no clear indication
+    console.log(`Widget ${widget.id} defaulting to notice type`);
+    return "notice";
+  };
+
+  // Helper function to get widget types as a string for display
+  const getWidgetTypesString = (widgets: ExtendedWidget[]): string => {
+    const sortedWidgets = [...widgets].sort((a, b) => {
+      const layoutA = layout.find(l => l.i === a.id);
+      const layoutB = layout.find(l => l.i === b.id);
+      if (!layoutA || !layoutB) return 0;
+      return layoutA.y === layoutB.y ? layoutA.x - layoutB.x : layoutA.y - layoutB.y;
+    });
+    
+    return sortedWidgets.map(widget => getWidgetType(widget)).join(', ');
+  };
+
+  // Helper function to check if two widget arrays have matching types
+  const hasMatchingWidgetTypes = (currentWidgets: ExtendedWidget[], templateWidgets: Widget[]): boolean => {
+    if (currentWidgets.length !== templateWidgets.length) {
+      return false;
+    }
+    
+    // Sort current widgets by position (x, y coordinates) to ensure proper matching
+    const sortedCurrent = [...currentWidgets].sort((a, b) => {
+      const layoutA = layout.find(l => l.i === a.id);
+      const layoutB = layout.find(l => l.i === b.id);
+      if (!layoutA || !layoutB) return 0;
+      return layoutA.y === layoutB.y ? layoutA.x - layoutB.x : layoutA.y - layoutB.y;
+    });
+    
+    // Sort template widgets by their index (assuming they're in the order they should be applied)
+    const sortedTemplate = [...templateWidgets];
+    
+    // Check if each position has matching widget types
+    for (let i = 0; i < sortedCurrent.length; i++) {
+      const currentType = getWidgetType(sortedCurrent[i]);
+      const templateType = getWidgetType(sortedTemplate[i] as ExtendedWidget);
+      
+      if (currentType !== templateType) {
+        console.log(`Widget type mismatch at position ${i}: current=${currentType}, template=${templateType}`);
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   // Add this function inside the EditDashboardDemo component
-  const applyTemplate = (template: DashboardTemplate) => {
-    // Store all existing widget data (categories, notices, content) by position
-    const existingWidgetData = widgets.map((widget) => ({
-      notices: widget.notices || [],
-      topNotices: widget.topNotices || [],
-      category: widget.category,
-      categoryId: widget.categoryId,
-      content: widget.content,
-      customCategoryName: widgetSettings[widget.id]?.customCategoryName || ''
+  const applyTemplate = async (template: DashboardTemplate) => {
+    try {
+      setIsApplyingTemplate(true)
+      
+      // Debug logging for current widgets
+      console.log('Current widgets before applying template:', widgets);
+      console.log('Template widgets:', template.widgets);
+      
+    // Determine positional order of current widgets by their layout (top-left to bottom-right)
+    const currentLayout = [...layout]
+    const currentWidgetsSorted = [...widgets].sort((a, b) => {
+      const la = currentLayout.find(l => l.i === a.id)
+      const lb = currentLayout.find(l => l.i === b.id)
+      if (!la || !lb) return 0
+      return la.y === lb.y ? la.x - lb.x : la.y - lb.y
+    })
+
+    // Build mapping from index -> current widget id and type
+    const indexToCurrent = currentWidgetsSorted.map(w => ({ id: w.id, type: getWidgetType(w as ExtendedWidget) }))
+
+    // Remap template layout positions onto current widget ids in the same index order
+    const templateLayoutSorted = [...template.layout].sort((a, b) => a.y === b.y ? a.x - b.x : a.y - b.y)
+    const remappedLayout = templateLayoutSorted.map((tplItem, idx) => ({
+      ...tplItem,
+      i: indexToCurrent[idx]?.id || tplItem.i
     }))
 
-    // Apply template completely but preserve existing categories and notices for corresponding positions
-    const newWidgets = template.widgets.map((templateWidget, index) => {
-      const existingData = existingWidgetData[index]
-      
-      return {
-        ...templateWidget,
-        // Always preserve existing notices if they exist
-        notices: existingData?.notices || [],
-        topNotices: existingData?.topNotices || [],
-        // Preserve existing category COMPLETELY - don't fall back to template
-        category: existingData?.category || templateWidget.title,
-        categoryId: existingData?.categoryId || '',
-        // Preserve existing content if it exists
-        content: existingData?.content || templateWidget.title
-      }
-    })
+    // Rebuild widgetSettings:
+    // - For Notice widgets: take template settings from matching index and assign to current widget id
+    // - For Image/PDF widgets: keep existing settings
+    const newWidgetSettings: Record<string, any> = { ...widgetSettings }
+    const templateWidgetSettings = template.widgetSettings || {}
 
-    // Update widget settings to apply template colors while preserving only specific user settings
-    const newWidgetSettings = { ...template.widgetSettings }
-    
-    // For each new widget, preserve only specific settings (not colors/styling)
-    newWidgets.forEach((newWidget, index) => {
-      const oldWidget = widgets[index]
-      if (oldWidget && widgetSettings[oldWidget.id]) {
-        const oldSettings = widgetSettings[oldWidget.id]
-        const existingData = existingWidgetData[index]
-        
-        // Check if this widget has an existing category or content
-        const hasExistingCategory = !!(existingData?.category || existingData?.content)
-        
-        // Apply template settings first, then selectively preserve only non-visual settings
-        newWidgetSettings[newWidget.id] = {
-          ...newWidgetSettings[newWidget.id], // Template settings (including colors)
-          // Preserve only content-related settings, not visual/color settings
-          noticeCount: oldSettings.noticeCount || newWidgetSettings[newWidget.id]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount,
-          autoScroll: oldSettings.autoScroll !== undefined ? oldSettings.autoScroll : newWidgetSettings[newWidget.id]?.autoScroll,
-          showFullContent: oldSettings.showFullContent !== undefined ? oldSettings.showFullContent : newWidgetSettings[newWidget.id]?.showFullContent,
-          // Preserve customCategoryName ONLY if the widget has an existing category or content
-          // If there's an existing category, preserve the customCategoryName exactly as it was
-          // If there's no existing category, use the template's customCategoryName
-          customCategoryName: hasExistingCategory 
-            ? oldSettings.customCategoryName ?? '' // Preserve existing customCategoryName exactly as it was (use nullish coalescing)
-            : (newWidgetSettings[newWidget.id]?.customCategoryName || '')
+    // Sort template widgets by their positional order (mirror of templateLayoutSorted order)
+    const templateWidgetsSorted = [...template.widgets]
+
+    remappedLayout.forEach((mappedItem, idx) => {
+      const currentId = mappedItem.i
+      const currentType = indexToCurrent[idx]?.type
+      const templateWidget = templateWidgetsSorted[idx] as ExtendedWidget | undefined
+      const templateWidgetId = templateWidget?.id
+      if (!currentId) return
+
+      if (currentType && currentType !== 'image' && currentType !== 'pdf') {
+        // Notice-like widget: fully affected by template settings
+        if (templateWidgetId && templateWidgetSettings[templateWidgetId]) {
+          newWidgetSettings[currentId] = { ...templateWidgetSettings[templateWidgetId] }
         }
+      } else {
+        // Image/PDF: keep existing settings untouched
+        newWidgetSettings[currentId] = { ...widgetSettings[currentId] }
       }
     })
 
-    // Update the current screen with the new template data
+    // Update the current screen: keep widgets unchanged, only update positions and settings
     const newScreens = [...screens]
     newScreens[currentScreenIndex] = {
       ...newScreens[currentScreenIndex],
-      widgets: newWidgets,
-      layout: template.layout,
+      widgets: [...widgets],
+      layout: remappedLayout,
       widgetSettings: newWidgetSettings
     }
     setScreens(newScreens)
     
-    toast.success(`Applied "${template.name}" template to current screen while preserving all categories and content!`, { duration: 1500 })
+    // Save to TemporaryDashboard after applying template
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+    
+    toast.success(`Applied "${template.name}" template. Notice widgets updated, PDF/Image positions adjusted.`, { duration: 1500 })
+    } catch (error) {
+      console.error("Error applying template:", error)
+      toast.error("Failed to apply template")
+    } finally {
+      setIsApplyingTemplate(false)
+    }
   }
 
   const createDashboardFromTemplate = async (template: DashboardTemplate) => {
@@ -1776,6 +3638,9 @@ function EditDashboardDemo() {
       toast.error("Please select a display ratio first")
       return
     }
+
+    try {
+      setIsCreatingFromTemplate(true)
 
     // Apply template without preserving notices to the current screen
     const newScreens = [...screens]
@@ -1786,6 +3651,11 @@ function EditDashboardDemo() {
       widgetSettings: template.widgetSettings
     }
     setScreens(newScreens)
+
+    // Save to TemporaryDashboard after creating from template
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
 
     // Wait a moment for the state to update
     setTimeout(async () => {
@@ -1804,8 +3674,8 @@ function EditDashboardDemo() {
             const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
             if (!specificLayout) return null
 
-            const containerWidth = RATIO_DIMENSIONS[selectedRatio || "4:3"].width - 32
-            const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height
+                      const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
+          const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0 // Fixed: Use 100% height instead of 130%
 
             const colWidth = (containerWidth - 11 * 24) / 12
             const rowHeight = 50
@@ -1826,46 +3696,47 @@ function EditDashboardDemo() {
               // For image displays, create notices for each image and collect their IDs
               const imageNoticeIds = []
               
-              // Use a default category for image displays (first available category or create a generic one)
+              // Use the Dashboard category with type IMAGE for dashboard images
               let imageCategoryId = ""
               try {
-                const categories = await getCategories()
-                if (categories.result && categories.result.length > 0) {
-                  // Use the first available category
-                  imageCategoryId = categories.result[0].id
+                const dashboardCategory: any = await getDashboardCategory()
+                if (dashboardCategory.success && dashboardCategory.result) {
+                  // Use the Dashboard category with type IMAGE
+                  imageCategoryId = (dashboardCategory.result as any).id
                 } else {
-                  // Create a default category if none exist
-                  const createCategoryResult = await createCategory({ name: "General" })
-                  if (createCategoryResult.success) {
-                    const newCategories = await getCategories()
-                    if (newCategories.result && newCategories.result.length > 0) {
-                      imageCategoryId = newCategories.result[0].id
-                    }
+                  // Fallback: try to find any IMAGE category if Dashboard category doesn't exist
+                  const categoriesResp: any = await getCategories()
+                  const imageCategory = categoriesResp.result?.find((cat: any) => cat.categoryType === 'IMAGE')
+                  if (imageCategory) {
+                    imageCategoryId = (imageCategory as any).id
+                  } else {
+                    console.error("No Dashboard category with type IMAGE found")
                   }
                 }
               } catch (error) {
-                console.error("Error handling image display category:", error)
+                console.error("Error handling Dashboard category:", error)
               }
               
               for (const image of widget.images) {
                 try {
-                                  // Create a notice for this image
-                const noticeData = {
-                  title: image.title || "Image Title",
-                  content: `Image: ${image.title}`,
-                  category: "Image", // Use generic category name
-                  categoryId: imageCategoryId,
-                  imageUrl: image.url, // Store the full data URL for display
-                  imageFileName: image.title,
-                  imageData: image.url.split(',')[1], // Store only the base64 data without the prefix
-                }
+                  // Create a notice for this image following the same pattern as create-notice page
+                  const noticeData = {
+                    title: image.title || "Dashboard Image",
+                    content: `Dashboard Image: ${image.title}`,
+                    category: "Dashboard", // Use Dashboard category name
+                    categoryId: imageCategoryId,
+                    imageUrl: image.url, // Store the full data URL for display (same as imagePreview in create-notice)
+                    imageFileName: image.title,
+                    imageData: image.url.split(',')[1], // Store only the base64 data without the prefix (same as convertImageToBase64)
+                  }
                   
                   // Create the notice using the server action directly
                   const noticeResult = await createNotice(noticeData)
                   
-                  if (noticeResult.success) {
-                    imageNoticeIds.push(noticeResult.message.id)
-                    console.log(`Created notice for image: ${image.title} with ID: ${noticeResult.message.id}`)
+                  const created: any = noticeResult as any
+                  if (created.success && created.message && typeof created.message !== 'string' && created.message.id) {
+                    imageNoticeIds.push(created.message.id as string)
+                    console.log(`Created notice for image: ${image.title} with ID: ${created.message.id}`)
                   } else {
                     console.error(`Failed to create notice for image: ${image.title}`, noticeResult)
                   }
@@ -1886,8 +3757,8 @@ function EditDashboardDemo() {
                 topPercent: `${topPercent.toFixed(2)}%`,
                 width: `${widgetWidth.toFixed(2)}%`,
                 height: `${widgetHeight.toFixed(2)}%`,
-                title: widget.content || widget.title || "Image Display",
-                category: "Image", // Use generic category name
+                title: widget.content || widget.title || "Dashboard Image Display",
+                category: "Dashboard", // Use Dashboard category name
                 type: "image",
                 noticeIds: imageNoticeIds, // Use the created notice IDs
                 settings: {
@@ -2022,32 +3893,31 @@ function EditDashboardDemo() {
       } catch (error) {
         console.error("Error creating dashboard from template:", error)
         toast.error(`Error creating dashboard: ${error}`)
+        } finally {
+          setIsCreatingFromTemplate(false)
       }
     }, 500)
+    } catch (error) {
+      console.error("Error creating dashboard from template:", error)
+      toast.error(`Error creating dashboard: ${error}`)
+      setIsCreatingFromTemplate(false)
+    }
   }
 
-  const isEditing = new URLSearchParams(window.location.search).get('id') !== null
-
-
-
-  // Template management state
-  const [templates, setTemplates] = useState<DashboardTemplate[]>([])
-  const [showTemplateModal, setShowTemplateModal] = useState(false)
-  const [templateName, setTemplateName] = useState("")
-  const [templateDescription, setTemplateDescription] = useState("")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [filterType, setFilterType] = useState("all")
+  const [isEditing, setIsEditing] = useState(false)
   
-  
-  // Enhanced template management state
-  const [showViewAllModal, setShowViewAllModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [showViewModal, setShowViewModal] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<DashboardTemplate | null>(null)
-  const [editingTemplate, setEditingTemplate] = useState<DashboardTemplate | null>(null)
+  // Set isEditing on client side only to prevent hydration issues
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      setIsEditing(urlParams.get('id') !== null)
+    }
+  }, [])
+
+
 
   return (
-    <div className="min-h-screen w-full bg-white">
+    <div className="min-h-screen w-full bg-white" suppressHydrationWarning={true}>
       {/* Header for editing mode */}
       {isEditing && (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -2068,51 +3938,13 @@ function EditDashboardDemo() {
       )}
 
 
-      {/* Minimal Confirmation Dialog */}
-      {showConfirmationDialog && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full border border-gray-100">
-            <div className="p-6">
-              {/* Header */}
-              <div className="text-center mb-4">
-                <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                  Unsaved Changes
-                </h3>
-                <p className="text-sm text-gray-500">
-                  You have a previous dashboard. What would you like to do?
-                </p>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                <button
-                  onClick={handleConfirmClear}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                >
-                  Start Fresh
-                </button>
-                <button
-                  onClick={handleCancelClear}
-                  className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                >
-                  Restore Previous
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
 
 
       <div className="mb-6 flex flex-wrap gap-4 ml-4">
         {isEditing && (
-          <Link href={`/dashboard/view-dashboard/${new URLSearchParams(window.location.search).get('id')}`}>
+          <Link href={`/dashboard/view-dashboard/${typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('id') : ''}`}>
             <Button variant="outline" size="sm" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to View
@@ -2147,22 +3979,101 @@ function EditDashboardDemo() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => addWidget("notice")}
-            disabled={!selectedRatio}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md font-medium ${
-              selectedRatio ? "bg-blue-600 text-white hover:bg-blue-700 border border-blue-500" : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
-            }`}
+            disabled={!selectedRatio || isAddingWidget}
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
+              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 border border-blue-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-600 cursor-not-allowed border border-purple-300 shadow-md"
+            } ${isAddingWidget ? 'animate-pulse' : ''}`}
           >
-            <Plus size={18} /> Create Notice Widget
+            {isAddingWidget ? (
+              <>
+                {/* Professional Loading Animation */}
+                <div className="relative">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-blue-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                </div>
+                <span className="font-medium">Creating Widget...</span>
+                {/* Progress Dots */}
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Plus size={20} className="font-bold" />
+                                    <span>Notice</span>
+              </>
+            )}
+            {/* Shimmer Effect */}
+            {isAddingWidget && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+            )}
           </button>
           
           <button
-            onClick={() => addWidget("image")}
-            disabled={!selectedRatio}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md font-medium ${
-              selectedRatio ? "bg-green-600 text-white hover:bg-green-700 border border-green-500" : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
-            }`}
+            onClick={() => addWidget("pdf")}
+            disabled={!selectedRatio || isAddingWidget}
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
+              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:from-indigo-600 hover:to-indigo-700 border border-indigo-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-600 cursor-not-allowed border border-indigo-300 shadow-md"
+            } ${isAddingWidget ? 'animate-pulse' : ''}`}
           >
-            <ImageIcon size={18} /> Create Image Display
+            {isAddingWidget ? (
+              <>
+                <div className="relative">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-indigo-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                </div>
+                <span className="font-medium">Creating PDF Widget...</span>
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Upload size={20} className="font-bold" />
+                                    <span>PDF Notice</span>
+              </>
+            )}
+            {isAddingWidget && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+            )}
+          </button>
+
+          <button
+            onClick={() => addWidget("image")}
+            disabled={!selectedRatio || isAddingWidget}
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
+              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 border border-green-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-600 cursor-not-allowed border border-orange-300 shadow-md"
+            } ${isAddingWidget ? 'animate-pulse' : ''}`}
+          >
+            {isAddingWidget ? (
+              <>
+                {/* Professional Loading Animation */}
+                <div className="relative">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-green-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                </div>
+                <span className="font-medium">Creating Display...</span>
+                {/* Progress Dots */}
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <ImageIcon size={20} className="font-bold" />
+                                    <span>Image Notice</span>
+              </>
+            )}
+            {/* Shimmer Effect */}
+            {isAddingWidget && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+            )}
           </button>
           
 
@@ -2173,138 +4084,237 @@ function EditDashboardDemo() {
         
 
         
+
+
 
 
 
         <button
           onClick={handleSave}
-          disabled={!selectedRatio || screens.every(screen => screen.widgets.length === 0)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md ml-auto font-medium ${
-            selectedRatio && screens.some(screen => screen.widgets.length > 0)
-              ? "bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-500"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
-          }`}
+          disabled={!selectedRatio || screens.every(screen => screen.widgets.length === 0) || isSavingDashboard}
+          className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 ml-auto font-semibold relative overflow-hidden ${
+            selectedRatio && screens.some(screen => screen.widgets.length > 0) && !isSavingDashboard
+              ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 border border-emerald-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
+              : "bg-gradient-to-r from-rose-100 to-pink-100 text-rose-600 cursor-not-allowed border border-rose-300 shadow-md"
+          } ${isSavingDashboard ? 'animate-pulse' : ''}`}
         >
-          {new URLSearchParams(window.location.search).get('id') ? 'Update Dashboard' : `Save Dashboard (${screens.length} screen${screens.length > 1 ? 's' : ''})`}
+          {isSavingDashboard ? (
+            <>
+              {/* Professional Loading Animation */}
+              <div className="relative">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-emerald-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+              </div>
+              <span className="font-medium">Saving Dashboard...</span>
+              {/* Progress Dots */}
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                <span>{isEditing ? 'Update Dashboard' : `Save Dashboard (${screens.length} screen${screens.length > 1 ? 's' : ''})`}</span>
+              </div>
+            </>
+          )}
+          {/* Shimmer Effect */}
+          {isSavingDashboard && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
+          )}
         </button>
+
+
       </div>
 
-      {/* Screen Management Section */}
-      <div className="mb-8 p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+      {/* Improved Screen Management Section - Left Side */}
+      <div className="mb-4 flex items-center gap-3">
+        {/* Left Side Screen Management */}
+        <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
+          {/* Add Screen Button */}
             <button
               onClick={addScreen}
-              className="group relative bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl border-0 transform hover:scale-105 active:scale-95"
+              disabled={isAddingScreen}
+            className={`group relative bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-2 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md border-0 transform hover:scale-105 active:scale-95 ${
+                isAddingScreen ? 'opacity-75 cursor-not-allowed' : ''
+              }`}
+            title="Add New Screen"
             >
-              <div className="flex items-center gap-2">
-                <div className="p-1 bg-white bg-opacity-20 rounded-lg group-hover:bg-opacity-30 transition-all">
-                  <Plus size={18} className="text-white" />
-                </div>
-                <span>Add New Screen</span>
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-sm"></div>
+                  {isAddingScreen ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+              <Plus size={16} className="text-white" />
+            )}
+          </button>
+
+          {/* Clear All Screens Button */}
+          <button
+            onClick={clearAllScreens}
+            disabled={isClearingScreens}
+            className={`group relative bg-gradient-to-r from-rose-500 to-rose-600 text-white p-2 rounded-lg hover:from-rose-600 hover:to-rose-700 transition-all duration-200 shadow-sm hover:shadow-md border-0 transform hover:scale-105 active:scale-95 ${
+              isClearingScreens ? 'opacity-75 cursor-not-allowed' : ''
+            }`}
+            title="Clear All Screens"
+          >
+            {isClearingScreens ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Trash2 size={16} className="text-white" />
+            )}
+          </button>
+          
+          {/* Navigation Arrows */}
+          {screens.length > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setCurrentScreenIndex(currentScreenIndex > 0 ? currentScreenIndex - 1 : screens.length - 1)
+                  // Save to TemporaryDashboard after screen change
+                  setTimeout(() => {
+                    autoSaveToTempDashboard()
+                  }, 100)
+                }}
+                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
+                title="Previous Screen"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15,18 9,12 15,6"></polyline>
+                </svg>
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentScreenIndex(currentScreenIndex < screens.length - 1 ? currentScreenIndex + 1 : 0)
+                  // Save to TemporaryDashboard after screen change
+                  setTimeout(() => {
+                    autoSaveToTempDashboard()
+                  }, 100)
+                }}
+                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
+                title="Next Screen"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9,18 15,12 9,6"></polyline>
+                </svg>
             </button>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-2xl font-bold text-blue-600">{screens.length}</div>
-              <div className="text-xs text-slate-500 uppercase tracking-wide">Active Screens</div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Screen Tabs with Enhanced Design */}
-        <div className="relative">
-          <div className="flex items-center gap-3 overflow-x-auto pb-3 scrollbar-hide">
+          )}
+          
+          {/* Screen Tabs - Wider and Safer */}
+          <div className="flex items-center gap-2">
             {screens.map((screen, index) => (
               <div
                 key={screen.id}
-                className={`group relative flex items-center gap-3 px-5 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 min-w-fit ${
+                className={`group relative flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-all duration-200 min-w-[80px] justify-center ${
                   index === currentScreenIndex
-                    ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-lg shadow-blue-200/50'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-slate-50 hover:shadow-md'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'
                 }`}
-                onClick={() => setCurrentScreenIndex(index)}
+                onClick={() => {
+                  setCurrentScreenIndex(index)
+                  // Save to TemporaryDashboard after screen change
+                  setTimeout(() => {
+                    autoSaveToTempDashboard()
+                  }, 100)
+                }}
               >
-                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === currentScreenIndex 
-                    ? 'bg-blue-500 shadow-sm shadow-blue-400' 
-                    : 'bg-slate-300 group-hover:bg-blue-400'
-                }`} />
-                <span className="font-semibold text-sm whitespace-nowrap">{screen.name}</span>
+                {/* Screen Number */}
+                <span className="text-sm font-medium">{index + 1}</span>
+                
+                {/* Remove Button - Only show on hover and when more than 1 screen, positioned at top right corner */}
                 {screens.length > 1 && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       removeScreen(index)
                     }}
-                    className="ml-2 p-1.5 hover:bg-red-100 rounded-lg transition-all duration-200 group/remove opacity-0 group-hover:opacity-100"
+                    disabled={isRemovingScreen}
+                    className={`absolute -top-2 -right-2 p-1.5 hover:bg-red-100 rounded-full transition-all duration-200 opacity-0 group-hover:opacity-100 bg-white border border-red-200 shadow-sm ${
+                      isRemovingScreen ? 'cursor-not-allowed' : ''
+                    }`}
                     title="Remove screen"
                   >
-                    <X size={14} className="text-red-500 group-hover/remove:text-red-700" />
+                    {isRemovingScreen ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-500"></div>
+                    ) : (
+                      <X size={12} className="text-red-500 hover:text-red-700" />
+                    )}
                   </button>
                 )}
+                
+                {/* Active Indicator */}
                 {index === currentScreenIndex && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-blue-500 rounded-full"></div>
                 )}
               </div>
             ))}
           </div>
           
-
+          {/* Screen Count */}
+          <div className="text-sm text-gray-500 font-medium px-1.5">
+            {screens.length} screen{screens.length !== 1 ? 's' : ''}
+          </div>
         </div>
       </div>
 
-      <div className="mb-6 p-5 bg-white rounded-xl shadow-sm border border-slate-200 w-full">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-slate-100 rounded-lg">
-            <GripVertical className="w-5 h-5 text-slate-600" />
+      {/* Minimal Notice Categories Section */}
+      <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-gray-100 rounded-md">
+              <GripVertical className="w-4 h-4 text-gray-600" />
           </div>
-          <div>
-            <h3 className="text-xl font-semibold text-slate-800">Notice Categories</h3>
-            <p className="text-sm text-slate-500 mt-1">Drag categories to widgets to populate with notices</p>
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap gap-3">
-          {categories.length === 0 ? (
-            <div className="w-full text-center py-8">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-slate-100 rounded-full mb-3">
-                <ListFilter className="w-6 h-6 text-slate-400" />
-              </div>
-              <p className="text-slate-500 text-sm font-medium">No categories available</p>
+                      <div>
+              <h3 className="text-sm font-semibold text-gray-800">Notice Categories</h3>
+              <p className="text-xs text-gray-500">Drag to create widgets</p>
             </div>
-          ) : (
-            categories.map((category) => (
-              <div
-                key={category.id}
-                draggable
-                onDragStart={(e) => handleDragStart2(e, category)}
-                className="group relative bg-slate-50 hover:bg-blue-50 px-4 py-3 rounded-xl cursor-move border border-slate-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105"
+          </div>
+          <div className="text-xs text-gray-400 font-medium">
+            {categories.length} category{categories.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+          
+        <div className="flex flex-wrap gap-2">
+            {categories.length === 0 ? (
+            <div className="w-full text-center py-4">
+              <div className="inline-flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full mb-2">
+                <ListFilter className="w-4 h-4 text-gray-500" />
+                </div>
+              <p className="text-gray-500 text-xs">No categories available</p>
+              </div>
+            ) : (
+                          categories.map((category) => (
+                <div
+                  key={category.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart2(e, category)}
+                  title={`${category.name} - Text Category (Drag to create notice widget only)`}
+                className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-md cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-1.5 bg-slate-200 group-hover:bg-blue-200 rounded-lg transition-colors">
-                    <GripVertical className="w-4 h-4 text-slate-600 group-hover:text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-800 group-hover:text-blue-800 transition-colors text-sm truncate">
-                      {category.name}
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-gray-200 group-hover:bg-blue-200 rounded transition-colors">
+                    <GripVertical className="w-3 h-3 text-gray-600 group-hover:text-blue-600" />
                     </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                      <span className="text-xs text-slate-600 font-medium">
-                        {category.notices.length} {category.notices.length === 1 ? 'notice' : 'notices'}
-                      </span>
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-800 group-hover:text-blue-800 text-sm truncate">
+                        {category.name}
+                      </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                      <span className="text-xs text-gray-500">
+                          {category.notices.length} {category.notices.length === 1 ? 'notice' : 'notices'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))
           )}
         </div>
-        
-
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -2321,20 +4331,21 @@ function EditDashboardDemo() {
           </div>
           
       {selectedRatio && (
-        <div
-          className={`border-4 border-dashed rounded-lg mx-auto overflow-hidden bg-white p-4 relative transition-all duration-200 ${
-            isDragOverDashboard 
-              ? 'border-blue-400 bg-blue-50 shadow-lg' 
-              : 'border-gray-300'
-          }`}
-          style={{
-            width: RATIO_DIMENSIONS[selectedRatio].width,
-            height: RATIO_DIMENSIONS[selectedRatio].height,
-          }}
-          onDrop={(e) => handleDrop(e)}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-        >
+        <div className="dashboard-screen-container">
+          <div
+            className={`border-4 border-dashed rounded-lg overflow-hidden bg-white p-4  relative transition-all duration-200 ${
+              isDragOverDashboard 
+                ? 'border-amber-500 bg-amber-50 shadow-lg' 
+                : 'border-amber-400'
+            }`}
+            style={{
+              width: RATIO_DIMENSIONS[selectedRatio].width * 1.0, // Increased screen size by 30% for better visibility
+              height: RATIO_DIMENSIONS[selectedRatio].height * 1.0, // Fixed: Use 100% height to maintain aspect ratio without exceeding 100%
+            }}
+            onDrop={(e) => handleDrop(e)}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
           {/* Drop zone indicator */}
           {isDragOverDashboard && (
             <div className="absolute inset-0 pointer-events-none bg-blue-50 bg-opacity-50 border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center">
@@ -2352,8 +4363,14 @@ function EditDashboardDemo() {
             layout={layout}
             cols={12}
             rowHeight={50}
-            width={RATIO_DIMENSIONS[selectedRatio].width - 32}
-            onLayoutChange={(newLayout: Layout[]) => setLayout(newLayout)}
+            width={(RATIO_DIMENSIONS[selectedRatio].width * 1.0) -136}
+                                    onLayoutChange={(newLayout: Layout[]) => {
+                          setLayout(newLayout)
+                          // Save to TemporaryDashboard after layout change
+                          setTimeout(() => {
+                            autoSaveToTempDashboard()
+                          }, 100)
+                        }}
             margin={[12, 12]}
             draggableHandle=".widget-drag-handle"
           >
@@ -2395,24 +4412,30 @@ function EditDashboardDemo() {
                   onDragOver={handleWidgetDragOver}
                   onDragLeave={handleWidgetDragLeave}
                 >
-                  <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md z-10">
+                  {/* Widget Controls - Responsive positioning for small widgets */}
+                  <div className="absolute top-1 left-1 bg-gray-800 text-white text-xs px-1.5 py-0.5 rounded z-10">
                     {dimensions.width} × {dimensions.height}
                   </div>
 
-                  <div className="absolute top-2 right-10 z-10">
+                  <div className="absolute top-1 right-8 z-10">
                     <button
                       onClick={() => toggleWidgetSettings(widget.id)}
-                      className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                      className="p-0.5 hover:bg-gray-100 rounded transition-colors"
                     >
-                      <Settings size={20} className="text-gray-600" />
+                      <Settings size={16} className="text-gray-600" />
                     </button>
                   </div>
 
                   <button
                     onClick={(e) => removeWidget(e, widget.id)}
-                    className="absolute top-2 right-2 p-1 hover:bg-red-100 rounded-full transition-colors z-10"
+                    disabled={isRemovingWidget}
+                    className="absolute top-1 right-1 p-0.5 hover:bg-red-100 rounded transition-colors z-10"
                   >
-                    <X size={20} className="text-red-500" />
+                    {isRemovingWidget ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-500"></div>
+                    ) : (
+                    <X size={16} className="text-red-500" />
+                    )}
                   </button>
 
                   <div
@@ -2441,16 +4464,6 @@ function EditDashboardDemo() {
                       {settings.customCategoryName || 
                         (widget.type === "image" ? "Image Display" : 
                          widget.content || widget.title)}
-                      {widget.type === "notice" && widget.topNotices && widget.topNotices.length > 0 && (
-                        <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                          {widget.topNotices.length} notices
-                        </span>
-                      )}
-                      {widget.type === "image" && widget.images && widget.images.length > 0 && (
-                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                          {widget.images.length} image{widget.images.length > 1 ? 's' : ''}
-                        </span>
-                      )}
 
                     </h3>
                   </div>
@@ -2624,16 +4637,68 @@ function EditDashboardDemo() {
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
                                 <div className="bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-2xl border border-gray-200">
                                   <div className="flex items-center gap-3">
-                                    <label className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-                                      <Upload size={16} />
-                                      Replace
+                                                                        <label className={`cursor-pointer flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
+                                      isUploadingImage === widget.id ? 'opacity-75 cursor-not-allowed animate-pulse' : ''
+                                    }`}>
+                                      {isUploadingImage === widget.id ? (
+                                        <div className="relative">
+                                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                          <div className="absolute inset-0 w-4 h-4 border-2 border-transparent border-t-blue-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}></div>
+                                        </div>
+                                      ) : (
+                                        <Upload size={18} className="font-bold" />
+                                      )}
+                                      <span className="font-medium">
+                                        {isUploadingImage === widget.id ? 'Processing Image...' : 'Replace Image'}
+                                      </span>
+                                      {isUploadingImage === widget.id && (
+                                        <div className="flex gap-1">
+                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                        </div>
+                                      )}
                                                     <input
                                                       type="file"
                                                       accept="image/*"
                                                       onChange={(e) => handleImageUpload(e, widget.id)}
                                                       className="hidden"
+                                        disabled={isUploadingImage === widget.id}
                                                     />
                                                   </label>
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          setImageSelectWidgetId(widget.id)
+                                          setIsImageSelectOpen(true)
+                                          requestAnimationFrame(() => setAnimateImageOpen(true))
+                                          setIsLoadingExistingImages(true)
+                                          const resp = await fetch('/api/notice/get-all')
+                                          const data = await resp.json()
+                                          const imageNotices = (data?.result || []).filter((n: any) => n?.imageUrl || n?.imageData)
+                                          const seen = new Set<string>()
+                                          const unique: any[] = []
+                                          for (const n of imageNotices) {
+                                            const key = (n?.imageFileName ?? '').toString().trim().toLowerCase()
+                                            if (!key) continue
+                                            if (!seen.has(key)) {
+                                              seen.add(key)
+                                              unique.push(n)
+                                            }
+                                          }
+                                          setExistingImages(unique)
+                                        } catch (e) {
+                                          console.error('Failed to load existing images', e)
+                                          setExistingImages([])
+                                        } finally {
+                                          setIsLoadingExistingImages(false)
+                                        }
+                                      }}
+                                      className="flex items-center gap-2 px-3 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium border"
+                                    >
+                                      <ImageIcon size={16} />
+                                      From Existing
+                                    </button>
                                     <button
                                       onClick={() => toggleWidgetSettings(widget.id)}
                                       className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
@@ -2659,21 +4724,101 @@ function EditDashboardDemo() {
                               <p className="text-sm opacity-75 mb-6" style={{ color: settings.fontColor }}>
                                 JPG, PNG, GIF, WebP • Max 10MB
                               </p>
-                              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 hover:border-blue-400 hover:text-blue-600 transition-all duration-200 text-xs font-medium">
+                              <label className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 hover:border-blue-400 hover:text-blue-600 transition-all duration-200 text-xs font-medium ${
+                                isUploadingImage === widget.id ? 'opacity-75 cursor-not-allowed' : ''
+                              }`}>
+                                {isUploadingImage === widget.id ? (
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                ) : (
                                 <Upload size={12} />
-                                Browse Files
+                                )}
+                                {isUploadingImage === widget.id ? 'Uploading...' : 'Browse Files'}
                             <input
                               type="file"
                               accept="image/*"
                               onChange={(e) => handleImageUpload(e, widget.id)}
                                   className="hidden"
+                                  disabled={isUploadingImage === widget.id}
                             />
                               </label>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    setImageSelectWidgetId(widget.id)
+                                    setIsImageSelectOpen(true)
+                                    requestAnimationFrame(() => setAnimateImageOpen(true))
+                                    setIsLoadingExistingImages(true)
+                                    const resp = await fetch('/api/notice/get-all')
+                                    const data = await resp.json()
+                                    const imageNotices = (data?.result || []).filter((n: any) => n?.imageUrl || n?.imageData)
+                                    const seen = new Set<string>()
+                                    const unique: any[] = []
+                                    for (const n of imageNotices) {
+                                      const key = (n?.imageFileName ?? '').toString().trim().toLowerCase()
+                                      if (!key) continue
+                                      if (!seen.has(key)) {
+                                        seen.add(key)
+                                        unique.push(n)
+                                      }
+                                    }
+                                    setExistingImages(unique)
+                                  } catch (e) {
+                                    console.error('Failed to load existing images', e)
+                                    setExistingImages([])
+                                  } finally {
+                                    setIsLoadingExistingImages(false)
+                                  }
+                                }}
+                                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 text-xs font-medium"
+                              >
+                                <ImageIcon size={12} /> From Existing
+                              </button>
                             </div>
                           </div>
                         )}
                       </div>
                     )}
+
+                    {/* PDF widget content: inline upload + render + auto-scroll */}
+                    {widget.type === "pdf" && (
+                      <InlinePdfWidget 
+                        widgetId={widget.id}
+                        onPdfStored={(pdfId: string, pdfData: string, fileName: string) => {
+                          // Store PDF reference in widget with proper PDF data
+                          setWidgets(prev => prev.map(w => 
+                            w.id === widget.id 
+                              ? { 
+                                  ...w, 
+                                  pdfs: [{ 
+                                    id: pdfId, 
+                                    title: fileName || 'PDF', 
+                                    pdfData: pdfData, 
+                                    fileName: fileName || 'uploaded.pdf', 
+                                    dbId: pdfId 
+                                  }] 
+                                }
+                              : w
+                          ))
+                          
+                          // Immediately save to TemporaryDashboard
+                          setTimeout(() => {
+                            autoSaveToTempDashboard()
+                          }, 100)
+                          
+                          // Also save the current widget state to ensure PDF data is included
+                          const currentWidget = widgets.find(w => w.id === widget.id)
+                          if (currentWidget && currentWidget.type === 'pdf' && currentWidget.pdfs && currentWidget.pdfs.length > 0) {
+                            // Force save the current state to include the new PDF data
+                            setTimeout(() => {
+                              autoSaveToTempDashboard()
+                            }, 500)
+                          }
+                        }}
+                      />
+                    )}
+
+                    {/* PDF widget rendering removed */}
 
 
                   </div>
@@ -2681,15 +4826,16 @@ function EditDashboardDemo() {
               )
             })}
                       </ClientOnlyGridLayout>
+          </div>
         </div>
       )}
         </div>
 
         {/* Template Section - Right Side (1/4 width) */}
         <div className="xl:col-span-1">
-          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg p-6 border border-amber-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Templates</h3>
+              <h3 className="text-lg font-semibold text-amber-800">Templates</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleViewAllTemplates}
@@ -2715,7 +4861,7 @@ function EditDashboardDemo() {
                 placeholder="Search templates..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white/80 backdrop-blur-sm shadow-sm"
               />
             </div>
 
@@ -2752,7 +4898,7 @@ function EditDashboardDemo() {
                     </svg>
                   </div>
                   <p className="text-sm">No templates available for {widgets.length} widget{widgets.length !== 1 ? 's' : ''}</p>
-                  <p className="text-xs text-gray-400 mt-1">Create a template with {widgets.length} widget{widgets.length !== 1 ? 's' : ''} or add more widgets</p>
+                  <p className="text-xs text-gray-400 mt-1">Create a template with {widgets.length} widget{widgets.length !== 1 ? 's' : ''}, or adjust your current widgets</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -2764,7 +4910,6 @@ function EditDashboardDemo() {
                       
                       // Filter by widget count to match current screen
                       const matchesWidgetCount = template.widgets.length === widgets.length;
-                      
                       return matchesSearch && matchesWidgetCount;
                     })
                     .map((template) => (
@@ -2792,10 +4937,23 @@ function EditDashboardDemo() {
                             </button>
                             <button
                               onClick={() => applyTemplate(template)}
-                              className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                              disabled={isApplyingTemplate}
+                              className={`text-xs bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 px-3 py-1.5 rounded-lg hover:from-blue-200 hover:to-blue-300 transition-all duration-200 font-medium shadow-sm hover:shadow-md ${
+                                isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                              }`}
                               title="Apply Template"
                             >
-                              Apply
+                              {isApplyingTemplate ? (
+                                <div className="flex items-center gap-1">
+                                  <div className="relative">
+                                    <div className="w-3 h-3 border border-blue-400/30 border-t-blue-600 rounded-full animate-spin"></div>
+                                    <div className="absolute inset-0 w-3 h-3 border border-transparent border-t-blue-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}></div>
+                                  </div>
+                                  <span className="text-xs">Applying...</span>
+                                </div>
+                              ) : (
+                                'Apply'
+                              )}
                             </button>
                             {userRole !== 'MODERATOR' && (
                               <>
@@ -2808,10 +4966,17 @@ function EditDashboardDemo() {
                                 </button>
                                 <button
                                   onClick={() => handleDeleteTemplate(template.id)}
-                                  className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                                  disabled={isDeletingTemplate}
+                                  className={`text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 ${
+                                    isDeletingTemplate ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
                                   title="Delete Template"
                                 >
-                                  Delete
+                                  {isDeletingTemplate ? (
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-700"></div>
+                                  ) : (
+                                    'Delete'
+                                  )}
                                 </button>
                               </>
                             )}
@@ -2863,21 +5028,31 @@ function EditDashboardDemo() {
 
           {/* Tabs */}
           <div className="flex border-b border-gray-200 bg-gray-50 animate-in slide-in-from-top-2 duration-300 delay-100">
-            {SETTINGS_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSettingsTab(tab.id)}
-                className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-all duration-200 flex-1 min-w-0
-                  ${
-                    activeSettingsTab === tab.id
-                      ? "text-blue-700 border-b-2 border-blue-600 bg-white shadow-sm"
-                      : "text-gray-600 hover:bg-white hover:text-gray-800"
-                  }`}
-              >
-                {tab.icon}
-                <span className="truncate">{tab.label}</span>
-              </button>
-            ))}
+            {(() => {
+              const activeWidget = widgets.find(w => w.id === activeSettingsWidget);
+              const availableTabs = getTabsForWidgetType(activeWidget?.type);
+              
+              // If current active tab is not available for this widget type, switch to first available tab
+              if (activeSettingsWidget && !availableTabs.find(tab => tab.id === activeSettingsTab)) {
+                setActiveSettingsTab(availableTabs[0].id);
+              }
+              
+              return availableTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSettingsTab(tab.id)}
+                  className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-all duration-200 flex-1 min-w-0
+                    ${
+                      activeSettingsTab === tab.id
+                        ? "text-blue-700 border-b-2 border-blue-600 bg-white shadow-sm"
+                        : "text-gray-600 hover:bg-white hover:text-gray-800"
+                    }`}
+                >
+                  {tab.icon}
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              ));
+            })()}
           </div>
 
           {/* Settings Content with proper scrolling */}
@@ -3156,7 +5331,10 @@ function EditDashboardDemo() {
                     <input
                       type="range"
                       min="1"
-                      max="10"
+                      max={(() => {
+                        const activeWidget = widgets.find(w => w.id === activeSettingsWidget);
+                        return activeWidget && activeWidget.notices ? Math.max(1, activeWidget.notices.length) : 10;
+                      })()}
                       value={widgetSettings[activeSettingsWidget]?.noticeCount || DEFAULT_WIDGET_SETTINGS.noticeCount}
                       onChange={(e) =>
                         updateWidgetSetting(activeSettingsWidget, "noticeCount", Number.parseInt(e.target.value))
@@ -3935,9 +6113,19 @@ function EditDashboardDemo() {
                 </button>
                 <button
                   onClick={() => handleTemplateSave()}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  disabled={isSavingTemplate}
+                  className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${
+                    isSavingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                  }`}
                 >
-                  Save Template
+                  {isSavingTemplate ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Template'
+                  )}
                 </button>
               </div>
             </div>
@@ -4174,9 +6362,19 @@ function EditDashboardDemo() {
                       <div className="mt-3 flex gap-2">
                         <button
                           onClick={() => applyTemplate(template)}
-                          className="flex-1 text-xs bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors"
+                          disabled={isApplyingTemplate}
+                          className={`flex-1 text-xs bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors ${
+                            isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                          }`}
                         >
-                          Apply Template
+                          {isApplyingTemplate ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                              Applying...
+                            </>
+                          ) : (
+                            'Apply Template'
+                          )}
                         </button>
                       </div>
                     </div>
@@ -4264,15 +6462,120 @@ function EditDashboardDemo() {
               </button>
               <button
                   onClick={handleUpdateTemplate}
-                  className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                disabled={isUpdatingTemplate}
+                className={`flex-1 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors ${
+                  isUpdatingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
               >
-                  Update Template
+                {isUpdatingTemplate ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Template'
+                )}
               </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Image Select Modal */}
+      {isImageSelectOpen && createPortal(
+        <div className="fixed inset-0 z-[1000]">
+          <div
+            className={`absolute inset-0 bg-black/50 transition-opacity duration-150 ${animateImageOpen ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => {
+              setAnimateImageOpen(false)
+              setTimeout(() => {
+                setIsImageSelectOpen(false)
+                setImageSelectWidgetId(null)
+              }, 150)
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div
+              className={`relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-[92vw] max-w-5xl max-h-[85vh] overflow-hidden transition-all duration-150 transform ${animateImageOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-95'}`}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                <div className="flex items-center gap-3 text-base font-semibold text-gray-800">
+                  <div className="p-2 rounded-lg bg-white border border-gray-200"><ImageIcon size={18} className="text-emerald-600" /></div>
+                  Choose Existing Image
+                </div>
+                <button
+                  onClick={() => {
+                    setAnimateImageOpen(false)
+                    setTimeout(() => {
+                      setIsImageSelectOpen(false)
+                      setImageSelectWidgetId(null)
+                    }, 150)
+                  }}
+                  className="h-8 w-8 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-gray-700 grid place-items-center"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-6 bg-white">
+                {isLoadingExistingImages ? (
+                  <div className="flex items-center justify-center py-16 text-sm text-gray-500">Loading images...</div>
+                ) : existingImages.length === 0 ? (
+                  <div className="text-center py-16 text-sm text-gray-500">No existing image notices found.</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {existingImages.map((n: any) => {
+                      const url = reconstructImageUrl(n)
+                      return (
+                        <button
+                          key={n.id}
+                          className="text-left rounded-xl border border-gray-200 hover:border-emerald-300 hover:shadow-md transition-all bg-white p-3 flex flex-col gap-3"
+                          onClick={async () => {
+                            try {
+                              if (!imageSelectWidgetId || !url) return
+                              setWidgets(prev => prev.map(w => w.id === imageSelectWidgetId ? {
+                                ...w,
+                                images: [{
+                                  id: `img-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                                  url,
+                                  title: n.imageFileName || n.title || 'Image',
+                                  dbId: n.id
+                                }]
+                              } : w))
+                              setTimeout(() => { autoSaveToTempDashboard() }, 100)
+                              setAnimateImageOpen(false)
+                              setTimeout(() => {
+                                setIsImageSelectOpen(false)
+                                setImageSelectWidgetId(null)
+                              }, 150)
+                              toast.success('Image selected successfully')
+                            } catch (err) {
+                              console.error('Error selecting existing image:', err)
+                              toast.error('Failed to select image')
+                            }
+                          }}
+                          title={n.imageFileName || n.title || 'Image'}
+                        >
+                          <div className="w-full h-28 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
+                            {url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={url} alt={n.title || 'Image'} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="text-xs text-gray-400">No preview</div>
+                            )}
+                          </div>
+                          <div className="text-sm font-medium text-gray-900 truncate">{n.imageFileName || n.title || 'Image'}</div>
+                          <div className="text-xs text-gray-400 truncate">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>, document.body)
+      }
 
       {/* View Template Modal */}
       {showViewModal && selectedTemplate && (
@@ -4399,9 +6702,19 @@ function EditDashboardDemo() {
                   setShowViewModal(false)
                   setSelectedTemplate(null)
                 }}
-                className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                disabled={isApplyingTemplate}
+                className={`w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium ${
+                  isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
               >
-                Apply Template
+                {isApplyingTemplate ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Applying Template...
+                  </>
+                ) : (
+                  'Apply Template'
+                )}
               </button>
             </div>
           </div>
@@ -4411,4 +6724,4 @@ function EditDashboardDemo() {
   )
 }
 
-export default EditDashboardDemo
+export default ClientOnlyDashboard

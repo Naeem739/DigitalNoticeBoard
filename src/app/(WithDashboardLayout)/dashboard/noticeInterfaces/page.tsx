@@ -22,10 +22,10 @@ if (typeof document !== 'undefined') {
   style.textContent = animationStyles
   document.head.appendChild(style)
 }
-import { getAllDashboards, deleteDashboard } from '@/app/actions/dashboard.action'
+import { deleteDashboard, deleteAllDashboards } from '@/app/actions/dashboard.action'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, Layout, Eye, Calendar, BarChart3, Edit } from 'lucide-react'
+import { Trash2, Layout, Calendar, BarChart3, Edit } from 'lucide-react'
 import { toast } from 'sonner'
 import { BellLoader } from '@/components/ui/loader'
 
@@ -40,6 +40,7 @@ export default function NoticeInterfaces() {
   const [dashboards, setDashboards] = useState<TDashboard[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [clearingAll, setClearingAll] = useState(false)
   const [currentPage, setCurrentPage] = useState(1);
   const dashboardsPerPage = 6;
   const indexOfLastDashboard = currentPage * dashboardsPerPage;
@@ -93,6 +94,30 @@ export default function NoticeInterfaces() {
     }
   }
 
+  const handleClearAll = async () => {
+    if (!confirm(`Are you sure you want to delete ALL ${dashboards.length} dashboard interfaces? This action cannot be undone and will permanently remove all interfaces.`)) {
+      return
+    }
+
+    try {
+      setClearingAll(true)
+      const result = await deleteAllDashboards()
+      
+      if (result.success) {
+        setDashboards([])
+        setCurrentPage(1)
+        toast.success(`Successfully deleted all ${dashboards.length} dashboard interfaces`)
+      } else {
+        toast.error('Failed to delete all dashboard interfaces')
+      }
+    } catch (error) {
+      console.error('Error deleting all dashboard interfaces:', error)
+      toast.error('Error deleting all dashboard interfaces')
+    } finally {
+      setClearingAll(false)
+    }
+  }
+
   const formatDate = (date: Date | undefined) => {
     if (!date) return 'N/A'
     return new Date(date).toLocaleDateString('en-US', {
@@ -143,9 +168,32 @@ export default function NoticeInterfaces() {
           <h1 className="text-3xl font-bold">Notice Interfaces</h1>
           <p className="text-gray-600 mt-2">Manage all dashboard interfaces</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Layout className="w-6 h-6 text-blue-600" />
-          <span className="text-lg font-semibold">{dashboards.length} Interfaces</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Layout className="w-6 h-6 text-blue-600" />
+            <span className="text-lg font-semibold">{dashboards.length} Interfaces</span>
+          </div>
+          {dashboards.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleClearAll}
+              disabled={clearingAll}
+              className="flex items-center gap-2 transition-all duration-200 hover:scale-105"
+            >
+              {clearingAll ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Clearing...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  <span>Clear All</span>
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -178,19 +226,6 @@ export default function NoticeInterfaces() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Dashboard Interface</CardTitle>
                     <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (typeof window !== 'undefined') {
-                            window.open(`/dashboard/view-dashboard/${dashboard.id}`, '_blank')
-                          }
-                        }}
-                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-110"
-                        title="View Interface"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

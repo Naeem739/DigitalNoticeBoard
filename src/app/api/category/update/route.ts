@@ -6,7 +6,7 @@ export async function PUT(request: Request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const body = await request.json();
-    const { name, icon, editedName } = body;
+    const { name, icon, editedName, categoryType } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -22,6 +22,7 @@ export async function PUT(request: Request) {
         ...(name && { name }),
         ...(icon !== undefined && { icon }),
         ...(editedName !== undefined && { editedName }),
+        ...(categoryType && { categoryType }),
       },
     });
 

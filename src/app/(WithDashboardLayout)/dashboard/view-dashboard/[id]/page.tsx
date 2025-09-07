@@ -311,9 +311,9 @@ export default function ViewDashboard() {
                               <img
                                 src={reconstructImageUrl(notice)}
                                 alt={notice.title}
-                                className="w-full h-full object-cover rounded"
+                                className="w-full h-full rounded"
                                 style={{
-                                  objectFit: settings.imageFit || 'cover',
+                                  objectFit: settings.imageFit || 'contain',
                                   borderRadius: `${settings.imageBorderRadius || 8}px`
                                 }}
                               />

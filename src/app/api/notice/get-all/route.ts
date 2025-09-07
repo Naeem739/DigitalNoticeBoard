@@ -10,7 +10,8 @@ export async function GET() {
           select: {
             id: true,
             name: true,
-            editedName: true
+            editedName: true,
+            categoryType: true
           }
         }
       }
@@ -30,6 +31,7 @@ export async function GET() {
       imageFileName: notice.imageFileName,
       imageData: notice.imageData,
       categoryName: notice.categoryRelation?.editedName || notice.categoryRelation?.name || 'Uncategorized',
+      categoryType: notice.categoryRelation?.categoryType || 'TEXT',
       categoryRelation: notice.categoryRelation,
       createdAt: notice.createdAt
     }));

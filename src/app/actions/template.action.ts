@@ -263,6 +263,29 @@ export async function checkTemplateNameExists(name: string, excludeId?: string):
 
 export async function createDashboardTemplate(data: Omit<DashboardTemplate, 'id'>, replaceExisting?: boolean): Promise<{ success: boolean; template?: DashboardTemplate; error?: string }> {
   try {
+    // Validate required fields
+    if (!data.name || !data.widgets || !data.layout || !data.widgetSettings) {
+      return { success: false, error: "Missing required template data" }
+    }
+
+    // Clean widgets data to ensure they're serializable
+    const cleanedWidgets = data.widgets.map(widget => {
+      const cleanedWidget = { ...widget }
+      
+      // If this is an image widget, ensure images don't contain File objects
+      if (widget.type === 'image' && widget.images) {
+        cleanedWidget.images = widget.images.map(image => ({
+          id: image.id,
+          url: image.url,
+          title: image.title,
+          dbId: image.dbId
+          // Explicitly exclude the 'file' property
+        }))
+      }
+      
+      return cleanedWidget
+    })
+
     // Check if template name already exists
     const nameExists = await checkTemplateNameExists(data.name)
     
@@ -286,7 +309,7 @@ export async function createDashboardTemplate(data: Omit<DashboardTemplate, 'id'
           where: { id: existingTemplate.id },
           data: {
             description: data.description,
-            widgets: data.widgets,
+            widgets: cleanedWidgets,
             layout: data.layout,
             widgetSettings: data.widgetSettings
           }
@@ -298,7 +321,7 @@ export async function createDashboardTemplate(data: Omit<DashboardTemplate, 'id'
       data: {
         name: data.name,
         description: data.description,
-        widgets: data.widgets,
+        widgets: cleanedWidgets,
         layout: data.layout,
         widgetSettings: data.widgetSettings
       }
@@ -322,6 +345,15 @@ export async function createDashboardTemplate(data: Omit<DashboardTemplate, 'id'
     }
   } catch (error) {
     console.error("Error creating dashboard template:", error)
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('payload')) {
+        return { success: false, error: "Invalid template data - contains non-serializable content" }
+      }
+      return { success: false, error: error.message }
+    }
+    
     return { success: false, error: "Database error" }
   }
 }

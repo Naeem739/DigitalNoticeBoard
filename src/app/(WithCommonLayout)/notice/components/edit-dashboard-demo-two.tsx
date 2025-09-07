@@ -255,9 +255,9 @@ export function WidgetContainer({ data }: WidgetContainerProps) {
                       <img
                         src={image.imageData}
                         alt={image.title}
-                        className="w-full h-full object-cover rounded-lg"
+                        className="w-full h-full rounded-lg"
                         style={{
-                          objectFit: widget.settings?.imageFit as any || "cover",
+                          objectFit: widget.settings?.imageFit as any || "contain",
                           borderRadius: `${widget.settings?.imageBorderRadius || 8}px`,
                         }}
                       />

@@ -12,19 +12,26 @@ export type Widget = {
   id: string
   title: string
   content?: string
+  url?: string
   categoryId?: string
   category?: string
   notices?: TNotice[]
   topNotices?: TNotice[]
-  type?: "notice" | "image"
+  type?: "notice" | "image" | "pdf"
   images?: Array<{
     id: string
     url: string
     title: string
-    file: File
+    file?: File  // Make file optional since it's not serializable
     dbId?: string
   }>
-
+  pdfs?: Array<{
+    id: string
+    title: string
+    pdfData: string
+    fileName: string
+    dbId?: string
+  }>
 }
 
 // Add the WidgetSettings type

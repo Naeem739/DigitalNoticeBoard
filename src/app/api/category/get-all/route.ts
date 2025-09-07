@@ -22,6 +22,7 @@ export async function GET() {
         name: category.name,
         icon: category.icon,
         editedName: category.editedName,
+        categoryType: category.categoryType,
         createdAt: category.createdAt,
         updatedAt: category.updatedAt,
         noticeCount: category.notices.length

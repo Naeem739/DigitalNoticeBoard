@@ -1,11 +1,20 @@
 'use client'
 import { NoticeBoardLoader } from "@/components/ui/loader";
 import { WidgetContainer } from "./components/edit-dashboard-demo-two";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const ShowNoticesPage = () => {
   // Optionally, you can add a loading state if you want to show a loader while WidgetContainer fetches
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   if (loading) {
     return (

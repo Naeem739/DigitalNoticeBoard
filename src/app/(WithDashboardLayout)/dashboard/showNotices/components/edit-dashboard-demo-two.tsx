@@ -2,9 +2,10 @@
 
 import { TDashboard2, TNotice, Category } from "@/types/types"
 import { useState, useEffect } from "react"
-import { Pencil, Trash2, X, Check, ChevronDown, Filter, AlertCircle, Search, Save, XCircle, Download } from "lucide-react"
+import { Pencil, Trash2, X, Check, ChevronDown, Filter, AlertCircle, Search, Save, XCircle, Download, FileText } from "lucide-react"
 import { toast, Toaster } from "react-hot-toast"
 import { useSession } from "next-auth/react"
+import { deleteAllNotices, deleteNoticesByCategory } from "@/app/actions/notice.action"
 
 interface WidgetContainerProps {
   data: TDashboard2
@@ -16,18 +17,19 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   const userRole = session?.user?.role
   
   // Deep clone data to make it mutable
-  const [localData, setLocalData] = useState<TDashboard2>(() => {
-    if (typeof window === 'undefined') {
-      return data;
-    }
-    return JSON.parse(JSON.stringify(data));
-  });
+  const [localData, setLocalData] = useState<TDashboard2>(data);
   const [notices, setNotices] = useState<TNotice[]>([]);
+  // Map for ordering Dashboard Images by creation time
+  const [dashboardImageOrderMap, setDashboardImageOrderMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   
   // States for category filter
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedCategoryType, setSelectedCategoryType] = useState("all");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showCategoryTypeDropdown, setShowCategoryTypeDropdown] = useState(false);
   
   // State for edit modal
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -47,6 +49,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   
   // Loading states for operations
   const [isLoading, setIsLoading] = useState<{id: string, operation: string} | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
 
   // State for content modal
   const [contentModalOpen, setContentModalOpen] = useState(false);
@@ -66,10 +69,29 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const noticesPerPage = 5;
 
+  // Add state for categories
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // Helper: get display name for a category
+  const getCategoryDisplayName = (cat: Category) => cat.editedName || cat.name;
+  // Helper: build unique option label including type to avoid ambiguity
+  const getCategoryOptionLabel = (cat: Category) => `${getCategoryDisplayName(cat)} (${cat.categoryType})`;
+  // Helper: list of categories visible for current selected type
+  const getVisibleCategories = () =>
+    selectedCategoryType === "all"
+      ? categories
+      : categories.filter(c => c.categoryType === selectedCategoryType);
+
   // Set client-side flag
   useEffect(() => {
     setIsClient(true);
+    setMounted(true);
   }, []);
+
+  // Reset current page when search term or category changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, selectedCategoryType]);
 
   // Fetch all notices on component mount
   useEffect(() => {
@@ -77,16 +99,26 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     
     const fetchNotices = async () => {
       try {
-        console.log('Fetching notices...');
         const response = await fetch('/api/notice/get-all');
         const result = await response.json();
-        console.log('Fetch result:', result);
         
         if (result.success) {
-          setNotices(result.result || []);
-          console.log('Notices set:', result.result);
+          const noticesData = result.result || [];
+          console.log('Fetched notices with image/PDF data:', noticesData.filter((notice: any) => 
+            notice.imageData || notice.imageFileName || notice.imageUrl || notice.pdfData || notice.pdfFileName || notice.pdfUrl
+          ).map((notice: any) => ({
+            title: notice.title,
+            categoryId: notice.categoryId,
+            categoryType: notice.categoryType,
+            hasImageData: !!notice.imageData,
+            hasImageFileName: !!notice.imageFileName,
+            hasImageUrl: !!notice.imageUrl,
+            hasPdfData: !!notice.pdfData,
+            hasPdfFileName: !!notice.pdfFileName,
+            hasPdfUrl: !!notice.pdfUrl
+          })));
+          setNotices(noticesData);
         } else {
-          console.error('Failed to fetch notices:', result.message);
           toast.error('Failed to fetch notices');
         }
       } catch (error) {
@@ -100,19 +132,143 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     fetchNotices();
   }, [isClient]);
 
-  // Get unique categories from notices for filter dropdown
-  const categoryOptions = ["all", ...new Set(notices.map(notice => notice.categoryName || 'Uncategorized'))];
+  // Fetch all categories on component mount
+  useEffect(() => {
+    if (!isClient) return;
+    
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/category/get-all');
+        const result = await response.json();
+        
+        if (result.success) {
+          setCategories(result.result || []);
+        } else {
+          toast.error('Failed to fetch categories');
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        toast.error('Failed to fetch categories');
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, [isClient]);
+
+  // Build stable numbering for Dashboard Image notices (earliest = 1)
+  useEffect(() => {
+    if (!notices || notices.length === 0) {
+      setDashboardImageOrderMap({});
+      return;
+    }
+    const dashboardImageNotices = notices.filter(n =>
+      typeof n.title === 'string' && n.title.startsWith('Dashboard Image')
+    );
+    const sorted = [...dashboardImageNotices].sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+      return aTime - bTime; // earliest first
+    });
+    const map: Record<string, number> = {};
+    sorted.forEach((n, idx) => {
+      if (n.id) map[n.id] = idx + 1;
+    });
+    setDashboardImageOrderMap(map);
+  }, [notices]);
+
+  // Get unique categories from fetched categories for filter dropdown (type-aware)
+  const categoryOptions = [
+    "all",
+    ...getVisibleCategories().map(getCategoryOptionLabel)
+  ];
   
-  // Filter notices based on selected category and search term
+  // Calculate counts for each category label (respecting selected type)
+  const getCategoryCount = (categoryLabel: string) => {
+    if (categoryLabel === "all") {
+      return notices.filter(n => n.title && n.title.trim() !== '' && (selectedCategoryType === "all" || n.categoryType === selectedCategoryType)).length;
+    }
+    const categoryObj = categories.find(cat => getCategoryOptionLabel(cat) === categoryLabel);
+    if (!categoryObj) return 0;
+    return notices.filter(n => n.title && n.title.trim() !== '' && n.categoryId === categoryObj.id).length;
+  };
+  
+  // Get unique category types from notices for filter dropdown
+  const categoryTypeOptions = ["all", "TEXT", "IMAGE", "PDF"];
+  
+  // Calculate counts for each category type
+  const getCategoryTypeCount = (type: string) => {
+    if (type === "all") {
+      return notices.filter(notice => notice.title && notice.title.trim() !== '').length;
+    }
+    return notices.filter(notice => 
+      notice.title && notice.title.trim() !== '' && notice.categoryType === type
+    ).length;
+  };
+  
+  // Ensure selectedCategory stays valid when type changes
+  useEffect(() => {
+    if (selectedCategory === "all") return;
+    const visibleLabels = getVisibleCategories().map(getCategoryOptionLabel);
+    if (!visibleLabels.includes(selectedCategory)) {
+      setSelectedCategory("all");
+    }
+  }, [selectedCategoryType, categories]);
+
+  // Filter notices based on selected category, category type, and search term
   const filteredNotices = notices
     .filter(notice => notice.title && notice.title.trim() !== '')
-    .filter(notice => selectedCategory === "all" || notice.categoryName === selectedCategory)
-    .filter(notice => 
-      !searchTerm || 
-      notice.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (notice.categoryName && notice.categoryName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (notice.content && notice.content.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    .filter(notice => {
+      if (selectedCategory === "all") return true;
+      // Resolve selected label back to category
+      const categoryObj = categories.find(cat => getCategoryOptionLabel(cat) === selectedCategory);
+      if (!categoryObj) return false;
+      return notice.categoryId === categoryObj.id;
+    })
+    .filter(notice => {
+      // Special handling for TEXT filter - exclude any notices with image data
+      if (selectedCategoryType === "TEXT") {
+        // If filtering by TEXT, exclude notices that have image data
+        if (notice.imageData || notice.imageFileName || notice.imageUrl) {
+          console.log(`Excluding image notice "${notice.title}" from TEXT filter`);
+          return false;
+        }
+      }
+      
+      // Special handling for IMAGE filter - only show notices with image data
+      if (selectedCategoryType === "IMAGE") {
+        // If filtering by IMAGE, only show notices that have image data
+        if (!notice.imageData && !notice.imageFileName && !notice.imageUrl) {
+          console.log(`Excluding non-image notice "${notice.title}" from IMAGE filter`);
+          return false;
+        }
+      }
+      
+      // Special handling for PDF filter - only show notices with PDF data
+      if (selectedCategoryType === "PDF") {
+        // If filtering by PDF, only show notices that have PDF data
+        if (!notice.pdfData && !notice.pdfFileName && !notice.pdfUrl) {
+          console.log(`Excluding non-PDF notice "${notice.title}" from PDF filter`);
+          return false;
+        }
+      }
+      
+      return selectedCategoryType === "all" || notice.categoryType === selectedCategoryType;
+    })
+    .filter(notice => {
+      if (!searchTerm) return true;
+      
+      const searchLower = searchTerm.toLowerCase();
+      const titleMatch = notice.title.toLowerCase().includes(searchLower);
+      // Find the category name for search
+      const categoryObj = categories.find(cat => cat.id === notice.categoryId);
+      const categoryName = categoryObj ? (categoryObj.editedName || categoryObj.name) : '';
+      const categoryMatch = categoryName && categoryName.toLowerCase().includes(searchLower);
+      const contentMatch = notice.content && notice.content.toLowerCase().includes(searchLower);
+      
+      return titleMatch || categoryMatch || contentMatch;
+    });
   
   // Calculate pagination
   const indexOfLastNotice = currentPage * noticesPerPage;
@@ -124,6 +280,18 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   const handlePageChange = (pageNumber: number) => {
     setCurrentPage(pageNumber);
   };
+
+  // Handle clearing all filters
+  const handleClearFilters = () => {
+    setSelectedCategory("all");
+    setSelectedCategoryType("all");
+    setSearchTerm("");
+    setShowSearch(false);
+    setCurrentPage(1);
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = selectedCategory !== "all" || selectedCategoryType !== "all" || searchTerm.trim() !== "";
 
   // Handle opening the edit modal
   const handleEdit = (notice: TNotice) => {
@@ -310,6 +478,53 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     }
   };
 
+  // Handle clear all notices
+  const handleClearAll = async () => {
+    // Determine what to delete based on selected category
+    const isAllCategories = selectedCategory === "all";
+    const categoryToDelete = isAllCategories ? "all categories" : selectedCategory;
+    const noticesToDelete = isAllCategories ? notices.length : filteredNotices.length;
+    
+    if (!confirm(`Are you sure you want to delete ALL ${noticesToDelete} notices from "${categoryToDelete}"? This action cannot be undone and will permanently remove these notices.`)) {
+      return;
+    }
+
+    try {
+      setClearingAll(true);
+      
+      let result;
+      if (isAllCategories) {
+        // Delete all notices
+        result = await deleteAllNotices();
+      } else {
+        // Delete notices by category
+        result = await deleteNoticesByCategory(selectedCategory);
+      }
+      
+      if (result.success) {
+        // Update the notices list by removing the deleted notices
+        if (isAllCategories) {
+          setNotices([]);
+        } else {
+          // Find the category by name to get its ID
+        const categoryObj = categories.find(cat => (cat.editedName || cat.name) === selectedCategory);
+        if (categoryObj) {
+          setNotices(prev => prev.filter(notice => notice.categoryId !== categoryObj.id));
+        }
+        }
+        setCurrentPage(1);
+        toast.success(`Successfully deleted ${noticesToDelete} notices from "${categoryToDelete}"`);
+      } else {
+        toast.error('Failed to delete notices');
+      }
+    } catch (error) {
+      console.error('Error deleting notices:', error);
+      toast.error('Error deleting notices');
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
   // Handle image preview toggle
   const toggleImagePreview = (noticeId: string) => {
     setShowImagePreview(showImagePreview === noticeId ? null : noticeId);
@@ -462,7 +677,10 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     setSelectedContent({
       title: notice.title,
       content: notice.content || '',
-      category: notice.categoryName || 'Uncategorized'
+                category: (() => {
+            const categoryObj = categories.find(cat => cat.id === notice.categoryId);
+            return categoryObj ? (categoryObj.editedName || categoryObj.name) : 'Uncategorized';
+          })()
     });
     setContentModalOpen(true);
   };
@@ -537,16 +755,21 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     }
   };
 
-  if (!isClient || loading) {
+    // Don't render anything until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return null;
+  }
+
+  if (!isClient || loading || categoriesLoading) {
     return (
-      <div className="flex justify-center items-center h-64 w-full" suppressHydrationWarning>
+      <div className="flex justify-center items-center h-64 w-full">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg transition-all duration-300 pb-20" suppressHydrationWarning>
+          <div className="w-full bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg transition-all duration-300 pb-20">
       <div className="p-6">
       {/* Toast configuration for top middle */}
       <Toaster
@@ -580,50 +803,99 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
           Notice Management
         </h1>
         
-        <div className="flex flex-col md:flex-row w-full md:w-auto space-y-4 md:space-y-0 md:space-x-4">
-          {/* Category filter dropdown - moved to left */}
-          <div className="relative w-full md:w-64 order-2 md:order-1">
+        <div className="flex flex-col md:flex-row w-full md:w-auto space-y-2 md:space-y-0 md:space-x-2">
+          {/* Category filter dropdown */}
+          <div className="relative w-full md:w-40">
             <div 
-              className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3 cursor-pointer shadow-sm hover:shadow transition-all duration-200"
+              className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all duration-200 text-sm"
               onClick={() => setShowDropdown(!showDropdown)}
             >
-              <div className="flex items-center">
-                <Filter className="h-4 w-4 text-indigo-500 mr-2" />
-                <span className="text-gray-700">
-                  {selectedCategory === "all" ? "All Categories" : selectedCategory}
+              <div className="flex items-center space-x-2">
+                <Filter className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-600 font-medium">
+                  {selectedCategory === "all" ? "Categories" : selectedCategory}
                 </span>
               </div>
-              <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
             </div>
             
             {showDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-60 overflow-auto" suppressHydrationWarning>
-                {categoryOptions.map((category) => (
-                  <div 
-                    key={category}
-                    className={`px-4 py-2 hover:bg-indigo-50 cursor-pointer transition-colors duration-150 ${selectedCategory === category ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-gray-700'}`}
-                    onClick={() => {
-                      setSelectedCategory(category);
-                      setShowDropdown(false);
-                    }}
-                  >
-                    {category === "all" ? "All Categories" : category}
-                  </div>
-                ))}
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-48 overflow-auto">
+                {categoryOptions.map((category) => {
+                  const isSelected = selectedCategory === category;
+                  return (
+                    <div 
+                      key={category}
+                      className={`px-3 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors duration-150 flex items-center justify-between text-sm ${isSelected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                      onClick={() => {
+                        setSelectedCategory(category);
+                        setShowDropdown(false);
+                      }}
+                    >
+                      <span className="truncate">
+                        {category === "all" ? "All Categories" : category}
+                      </span>
+                      {isSelected && (
+                        <Check className="h-4 w-4 text-blue-600" />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
           
-          {/* Search bar - on right side */}
-          <div className="relative w-full md:w-64 order-1 md:order-2">
+          {/* Category Type filter dropdown */}
+          <div className="relative w-full md:w-36">
+            <div 
+              className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all duration-200 text-sm"
+              onClick={() => setShowCategoryTypeDropdown(!showCategoryTypeDropdown)}
+            >
+              <div className="flex items-center space-x-2">
+                <FileText className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-600 font-medium">
+                  {selectedCategoryType === "all" ? "Types" : selectedCategoryType}
+                </span>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${showCategoryTypeDropdown ? 'rotate-180' : ''}`} />
+            </div>
+            
+            {showCategoryTypeDropdown && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-48 overflow-auto">
+                {categoryTypeOptions.map((categoryType) => {
+                  const isSelected = selectedCategoryType === categoryType;
+                  return (
+                    <div 
+                      key={categoryType}
+                      className={`px-3 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors duration-150 flex items-center justify-between text-sm ${isSelected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                      onClick={() => {
+                        setSelectedCategoryType(categoryType);
+                        setShowCategoryTypeDropdown(false);
+                      }}
+                    >
+                      <span className="truncate">
+                        {categoryType === "all" ? "All Types" : categoryType}
+                      </span>
+                      {isSelected && (
+                        <Check className="h-4 w-4 text-blue-600" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          
+          {/* Search bar */}
+          <div className="relative w-full md:w-40">
             {showSearch ? (
-              <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden" suppressHydrationWarning>
+              <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by title, category, or content..."
-                  className="w-full p-3 outline-none"
+                  placeholder="Search..."
+                  className="w-full px-3 py-2 text-sm outline-none"
                   autoFocus
                 />
                 <button
@@ -631,74 +903,113 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                     setShowSearch(false);
                     setSearchTerm("");
                   }}
-                  className="p-3 text-gray-500 hover:text-gray-700"
+                  className="px-3 py-2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
               <button
                 onClick={() => setShowSearch(true)}
-                className="w-full md:w-auto flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-3 transition-colors duration-200 shadow-sm"
+                className="w-full flex items-center justify-center bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm text-gray-600 rounded-lg px-3 py-2 transition-all duration-200 text-sm font-medium"
               >
-                <Search className="h-5 w-5 mr-2" />
+                <Search className="h-4 w-4 mr-2" />
                 <span>Search</span>
               </button>
             )}
           </div>
+
+          {/* Clear Filters button */}
+          {hasActiveFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="w-full md:w-auto flex items-center justify-center bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm text-gray-600 rounded-lg px-3 py-2 transition-all duration-200 text-sm font-medium"
+            >
+              <X className="h-4 w-4 mr-2" />
+              <span>Clear</span>
+            </button>
+          )}
+
+          {/* Delete All button */}
+          {userRole !== 'USER' && filteredNotices.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              disabled={clearingAll}
+              className="w-full md:w-auto flex items-center justify-center bg-white border border-red-200 hover:border-red-300 hover:shadow-sm text-red-600 rounded-lg px-3 py-2 transition-all duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {clearingAll ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  <span>Delete All</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
       
       
 
       {notices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-10 border border-gray-200" suppressHydrationWarning>
+        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-10 border border-gray-200">
           <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
           <p className="text-gray-600 text-lg font-medium">No notices found in the database</p>
         </div>
       ) : filteredNotices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-10 border border-gray-200" suppressHydrationWarning>
+        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-10 border border-gray-200">
           <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
                                   <p className="text-gray-600 text-lg font-medium">
               {searchTerm
                 ? "No notices match your search"
-                : selectedCategory === "all" 
+                : selectedCategory === "all" && selectedCategoryType === "all"
                   ? "No notices found" 
-                  : `No notices found in the "${selectedCategory}" category`}
+                  : selectedCategory !== "all" && selectedCategoryType === "all"
+                    ? `No notices found in the "${selectedCategory}" category`
+                    : selectedCategory === "all" && selectedCategoryType !== "all"
+                      ? `No notices found with type "${selectedCategoryType}"`
+                      : `No notices found in "${selectedCategory}" with type "${selectedCategoryType}"`}
             </p>
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-xl shadow-md border border-gray-200" suppressHydrationWarning>
+          <div className="overflow-hidden rounded-xl shadow-md border border-gray-200 bg-white">
             <div className="overflow-x-auto">
               <table className="min-w-full bg-white">
                                  <thead>
-                   <tr className="bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
-                     <th className="py-3 px-6 text-left font-medium tracking-wider">Category</th>
-                     <th className="py-3 px-6 text-left font-medium tracking-wider">Notice Title</th>
+                   <tr className="bg-white border-b border-gray-200">
+                     <th className="py-3 px-6 text-left font-medium tracking-wider text-gray-700">Notice Title</th>
                      {userRole !== 'USER' && (
-                       <th className="py-3 px-6 text-center font-medium tracking-wider w-32">Actions</th>
+                       <th className="py-3 px-6 text-center font-medium tracking-wider w-32 text-gray-700">Actions</th>
                      )}
                    </tr>
                  </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-100">
                   {currentNotices.map((notice, index) => (
                     <tr 
                       key={notice.id || index} 
-                      className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-indigo-50 transition-colors duration-150`}
+                      className="bg-white hover:bg-gray-50 transition-colors duration-150"
                     >
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                           {notice.categoryName || 'Uncategorized'}
-                        </span>
-                      </td>
                       <td className="py-4 px-6">
                         <div className="flex flex-col">
-                          <span className="text-gray-700 font-medium">{notice.title}</span>
+                          <span className="text-gray-700 font-medium">
+                            {(() => {
+                              const isDashboardImage = typeof notice.title === 'string' && notice.title.startsWith('Dashboard Image');
+                              if (isDashboardImage) {
+                                const num = dashboardImageOrderMap[notice.id];
+                                return `Dashboard Image - ${num ?? ''}`;
+                              }
+                              return notice.title;
+                            })()}
+                          </span>
                           
-                                                    {/* Content for all roles - inline with title */}
+                          {/* Content for all roles - inline with title */}
                           <div className="mt-2">
-                            {notice.content ? (
+                            {notice.content && !notice.imageData && !notice.pdfData ? (
                               <button
                                 onClick={() => openContentModal(notice)}
                                 className="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition-colors duration-150 flex items-center gap-1"
@@ -708,9 +1019,11 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                               </button>
-                            ) : (
+                            ) : notice.content ? (
+                              <span className="text-gray-500 text-sm italic">Content available (view in edit mode)</span>
+                            ) : !notice.imageData && !notice.pdfData ? (
                               <span className="text-gray-500 text-sm italic">No content available</span>
-                            )}
+                            ) : null}
                           </div>
                           {/* Image controls */}
                           {notice.imageData && (
@@ -730,17 +1043,6 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                                   </svg>
                                   Show Preview
                                 </button>
-                                {userRole !== 'USER' && (
-                                  <button
-                                    onClick={() => handleEdit(notice)}
-                                    className="flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 transition-colors font-medium"
-                                  >
-                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                    Edit
-                                  </button>
-                                )}
                                 <button
                                   onClick={() => handleDownload(notice)}
                                   className="flex items-center px-3 py-1.5 bg-purple-100 text-purple-700 rounded-md text-sm hover:bg-purple-200 transition-colors font-medium"
@@ -770,17 +1072,6 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                                   </svg>
                                   Show Preview
                                 </button>
-                                {userRole !== 'USER' && (
-                                  <button
-                                    onClick={() => handleEdit(notice)}
-                                    className="flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 transition-colors font-medium"
-                                  >
-                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                    Edit
-                                  </button>
-                                )}
                                 <button
                                   onClick={() => handlePdfDownload(notice)}
                                   className="flex items-center px-3 py-1.5 bg-purple-100 text-purple-700 rounded-md text-sm hover:bg-purple-200 transition-colors font-medium"
@@ -833,7 +1124,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
       {/* Professional Pagination Footer */}
       {totalPages > 1 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40" suppressHydrationWarning>
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
           <div className="flex justify-center items-center py-6 px-6">
             <div className="flex items-center space-x-4">
               {/* Previous Button */}
@@ -902,7 +1193,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
       {/* Edit Notice Modal */}
       {editModalOpen && editingNotice && userRole !== 'USER' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" suppressHydrationWarning>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
@@ -924,7 +1215,10 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                     Category
                   </label>
                                      <div className="bg-gray-100 px-4 py-2 rounded-lg text-gray-800">
-                     {editingNotice.categoryName || 'Uncategorized'}
+                     {(() => {
+                  const categoryObj = categories.find(cat => cat.id === editingNotice.categoryId);
+                  return categoryObj ? (categoryObj.editedName || categoryObj.name) : 'Uncategorized';
+                })()}
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
                     Category cannot be changed from this interface
