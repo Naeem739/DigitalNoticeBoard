@@ -1035,6 +1035,8 @@ function EditDashboardDemo() {
 
   // First, add a new state for custom templates and template modal
   // Add these after the existing state declarations (around line 370)
+  // UI toggles
+  const [showScreenControls, setShowScreenControls] = useState(true)
 
   const [customTemplates, setCustomTemplates] = useState<DashboardTemplate[]>([])
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
@@ -1074,6 +1076,33 @@ function EditDashboardDemo() {
   const [isLoadingExistingImages, setIsLoadingExistingImages] = useState(false)
   const [existingImages, setExistingImages] = useState<any[]>([])
   const [animateImageOpen, setAnimateImageOpen] = useState(false)
+
+  // Counts for special widgets sourced from notices (same as showNotices page uses)
+  const [pdfCount, setPdfCount] = useState<number | null>(null)
+  const [imageCount, setImageCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    const fetchCountsFromNotices = async () => {
+      try {
+        const response = await fetch('/api/notice/get-all')
+        const data = await response.json()
+        if (data?.success && Array.isArray(data.result)) {
+          const notices = data.result
+          const pdfs = notices.filter((n: any) => !!n.pdfData)
+          const images = notices.filter((n: any) => !!n.imageData)
+          setPdfCount(pdfs.length)
+          setImageCount(images.length)
+        } else {
+          setPdfCount(0)
+          setImageCount(0)
+        }
+      } catch (e) {
+        setPdfCount(0)
+        setImageCount(0)
+      }
+    }
+    fetchCountsFromNotices()
+  }, [])
 
 
   // Enhanced localStorage state management
@@ -2589,6 +2618,12 @@ function EditDashboardDemo() {
     }
   }
 
+  // Drag start for special widgets (pdf/image)
+  const handleDragStartSpecial = (e: React.DragEvent, type: 'pdf' | 'image') => {
+    e.dataTransfer.setData("specialType", type)
+    e.dataTransfer.effectAllowed = "copy"
+  }
+
   const handleDrop = (e: React.DragEvent, widgetId?: string) => {
     e.preventDefault()
     e.stopPropagation()
@@ -2604,10 +2639,17 @@ function EditDashboardDemo() {
       target.style.backgroundColor = ''
     }
     
+    const specialType = e.dataTransfer.getData("specialType") as 'pdf' | 'image'
     const categoryId = e.dataTransfer.getData("categoryId")
     const categoryName = e.dataTransfer.getData("categoryName")
     
-    console.log("Drop event - categoryId:", categoryId, "categoryName:", categoryName, "widgetId:", widgetId, "Current widgets:", widgets.length)
+    console.log("Drop event - specialType:", specialType, "categoryId:", categoryId, "categoryName:", categoryName, "widgetId:", widgetId, "Current widgets:", widgets.length)
+
+    // If a special widget (pdf/image) is dragged, create that widget immediately
+    if (!widgetId && specialType) {
+      addWidget(specialType)
+      return
+    }
 
     const category = categories.find((cat) => cat.id === categoryId)
     if (!category) {
@@ -3976,108 +4018,7 @@ function EditDashboardDemo() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => addWidget("notice")}
-            disabled={!selectedRatio || isAddingWidget}
-            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
-              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 border border-blue-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-600 cursor-not-allowed border border-purple-300 shadow-md"
-            } ${isAddingWidget ? 'animate-pulse' : ''}`}
-          >
-            {isAddingWidget ? (
-              <>
-                {/* Professional Loading Animation */}
-                <div className="relative">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-blue-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                </div>
-                <span className="font-medium">Creating Widget...</span>
-                {/* Progress Dots */}
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </>
-            ) : (
-              <>
-                <Plus size={20} className="font-bold" />
-                                    <span>Notice</span>
-              </>
-            )}
-            {/* Shimmer Effect */}
-            {isAddingWidget && (
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
-            )}
-          </button>
-          
-          <button
-            onClick={() => addWidget("pdf")}
-            disabled={!selectedRatio || isAddingWidget}
-            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
-              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:from-indigo-600 hover:to-indigo-700 border border-indigo-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-600 cursor-not-allowed border border-indigo-300 shadow-md"
-            } ${isAddingWidget ? 'animate-pulse' : ''}`}
-          >
-            {isAddingWidget ? (
-              <>
-                <div className="relative">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-indigo-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                </div>
-                <span className="font-medium">Creating PDF Widget...</span>
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </>
-            ) : (
-              <>
-                <Upload size={20} className="font-bold" />
-                                    <span>PDF Notice</span>
-              </>
-            )}
-            {isAddingWidget && (
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
-            )}
-          </button>
-
-          <button
-            onClick={() => addWidget("image")}
-            disabled={!selectedRatio || isAddingWidget}
-            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
-              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 border border-green-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-600 cursor-not-allowed border border-orange-300 shadow-md"
-            } ${isAddingWidget ? 'animate-pulse' : ''}`}
-          >
-            {isAddingWidget ? (
-              <>
-                {/* Professional Loading Animation */}
-                <div className="relative">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-green-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                </div>
-                <span className="font-medium">Creating Display...</span>
-                {/* Progress Dots */}
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </>
-            ) : (
-              <>
-                <ImageIcon size={20} className="font-bold" />
-                                    <span>Image Notice</span>
-              </>
-            )}
-            {/* Shimmer Effect */}
-            {isAddingWidget && (
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
-            )}
-          </button>
-          
-
-        </div>
+        <div className="flex items-center gap-3"></div>
         
 
 
@@ -4133,8 +4074,18 @@ function EditDashboardDemo() {
       </div>
 
       {/* Improved Screen Management Section - Left Side */}
-      <div className="mb-4 flex items-center gap-3">
-        {/* Left Side Screen Management */}
+      <div className="mb-2 flex items-center gap-3">
+        {/* Toggle visibility */}
+        <button
+          onClick={() => setShowScreenControls(v => !v)}
+          className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-100"
+          title={showScreenControls ? 'Hide screen controls' : 'Show screen controls'}
+        >
+          {showScreenControls ? 'Hide' : 'Show'} screens
+        </button>
+
+        {showScreenControls && (
+        /* Left Side Screen Management */
         <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
           {/* Add Screen Button */}
             <button
@@ -4259,24 +4210,19 @@ function EditDashboardDemo() {
             {screens.length} screen{screens.length !== 1 ? 's' : ''}
           </div>
         </div>
+        )}
       </div>
 
       {/* Minimal Notice Categories Section */}
-      <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-gray-100 rounded-md">
-              <GripVertical className="w-4 h-4 text-gray-600" />
+      <div className="mb-3 p-2 bg-white rounded-lg border border-gray-200">
+        <div className="flex items-center gap-3 mb-2 flex-wrap">
+          <div className="p-1.5 bg-gray-100 rounded-md">
+            <GripVertical className="w-4 h-4 text-gray-600" />
           </div>
-                      <div>
-              <h3 className="text-sm font-semibold text-gray-800">Notice Categories</h3>
-              <p className="text-xs text-gray-500">Drag to create widgets</p>
-            </div>
-          </div>
-          <div className="text-xs text-gray-400 font-medium">
-            {categories.length} category{categories.length !== 1 ? 's' : ''}
-            </div>
-          </div>
+          <h3 className="text-sm font-semibold text-gray-800 mr-2">Notice Categories</h3>
+          {/* Special widgets moved beside categories below */}
+        </div>
+        
           
         <div className="flex flex-wrap gap-2">
             {categories.length === 0 ? (
@@ -4287,7 +4233,8 @@ function EditDashboardDemo() {
               <p className="text-gray-500 text-xs">No categories available</p>
               </div>
             ) : (
-                          categories.map((category) => (
+              <>
+                {categories.map((category) => (
                 <div
                   key={category.id}
                   draggable
@@ -4312,7 +4259,55 @@ function EditDashboardDemo() {
                     </div>
                   </div>
                 </div>
-              ))
+                ))}
+
+                {/* Special widgets placed at the end with same design as categories */}
+                <div
+                  draggable
+                  onDragStart={(e) => handleDragStartSpecial(e, 'pdf')}
+                  title="PDF (Drag to create PDF widget)"
+                  className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-md cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 bg-gray-200 group-hover:bg-blue-200 rounded transition-colors">
+                      <GripVertical className="w-3 h-3 text-gray-600 group-hover:text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-800 group-hover:text-blue-800 text-sm truncate flex items-center gap-1">
+                        <Upload className="w-3 h-3 text-indigo-600" />
+                        PDF
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></div>
+                        <span className="text-xs text-gray-500">{pdfCount ?? '…'} PDF{(pdfCount ?? 0) === 1 ? '' : 's'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  draggable
+                  onDragStart={(e) => handleDragStartSpecial(e, 'image')}
+                  title="IMAGES (Drag to create Image widget)"
+                  className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-md cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 bg-gray-200 group-hover:bg-blue-200 rounded transition-colors">
+                      <GripVertical className="w-3 h-3 text-gray-600 group-hover:text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-800 group-hover:text-blue-800 text-sm truncate flex items-center gap-1">
+                        <ImageIcon className="w-3 h-3 text-green-600" />
+                        IMAGES
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+                        <span className="text-xs text-gray-500">{imageCount ?? '…'} Image{(imageCount ?? 0) === 1 ? '' : 's'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
           )}
         </div>
       </div>
