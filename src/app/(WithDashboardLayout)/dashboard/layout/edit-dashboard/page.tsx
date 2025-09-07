@@ -39,7 +39,11 @@ import { Button } from "@/components/ui/button"
 import { SpinningBellLoader, WaveLoader } from "@/components/ui/loader"
 import { localStorageUtils } from "@/lib/utils"
 import { useSession } from "next-auth/react"
-import * as pdfjsLib from "pdfjs-dist"
+import InlinePdfWidget from "./components/InlinePdfWidget"
+import ImageWidget from "./components/ImageWidget"
+import TemplatesPanel from "./components/TemplatesPanel"
+import WidgetSettingsPanel from "./components/WidgetSettingsPanel"
+import ScreenControls from "./components/ScreenControls"
 
 // Client-only wrapper for GridLayout to prevent hydration issues
 const ClientOnlyGridLayout = ({ children, ...props }: any) => {
@@ -211,724 +215,6 @@ interface ExtendedWidget extends Widget {
 
 }
 
-// Inline PDF widget component with upload + render + auto-scroll + TemporaryDashboard storage
-function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfStored: (pdfId: string, pdfData: string, fileName: string) => void }) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const rafRef = useRef<number | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [currentPdfData, setCurrentPdfData] = useState<string | null>(null)
-  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false)
-  const [isLoadingExisting, setIsLoadingExisting] = useState(false)
-  const [existingPdfs, setExistingPdfs] = useState<Array<any>>([])
-  const [animateOpen, setAnimateOpen] = useState(false)
-
-  // Configure worker once on mount (client-side only)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
-        "pdfjs-dist/build/pdf.worker.min.mjs",
-        import.meta.url
-      ).toString()
-    }
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [])
-
-  // Load existing PDF data from TemporaryDashboard on mount and set up real-time updates
-  useEffect(() => {
-    const loadExistingPdf = async () => {
-      try {
-        const response = await fetch('/api/temp-dashboard/get-all')
-        const result = await response.json()
-        
-        if (result.success && result.result.length > 0) {
-          // Find the temp dashboard that contains this widget
-          for (const tempDashboard of result.result) {
-            if (tempDashboard.containers) {
-              const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-              const widgetContainer = containers.find((container: any) => container.id === widgetId)
-              
-              if (widgetContainer && widgetContainer.pdfData) {
-                console.log("Found PDF data in temp dashboard for widget:", widgetId)
-                setCurrentPdfData(widgetContainer.pdfData)
-                try {
-                  await renderPdfFromData(widgetContainer.pdfData)
-                } catch (renderError) {
-                  console.error('Error rendering PDF from temp dashboard:', renderError)
-                  toast.error('Failed to load PDF from saved data. The file may be corrupted.')
-                }
-                break
-              }
-            }
-          }
-        }
-        
-        // If no PDF data found in temp dashboard, try to recover from localStorage backup
-        if (!currentPdfData) {
-          try {
-            const backupKey = `pdf-backup-${widgetId}`
-            const backupData = localStorage.getItem(backupKey)
-            if (backupData) {
-              const parsed = JSON.parse(backupData)
-              // Check if backup is recent (within last hour)
-              if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
-                setCurrentPdfData(parsed.pdfData)
-                try {
-                  await renderPdfFromData(parsed.pdfData)
-                  console.log("Recovered PDF data from localStorage backup")
-                  
-                  // Try to save to temp dashboard again
-                  setTimeout(() => {
-                    saveToTempDashboard(parsed.pdfData, parsed.fileName)
-                  }, 1000)
-                } catch (renderError) {
-                  console.error('Error rendering PDF from localStorage backup:', renderError)
-                  toast.error('Failed to load PDF from backup. The file may be corrupted.')
-                }
-              } else {
-                // Remove old backup
-                localStorage.removeItem(backupKey)
-              }
-            }
-          } catch (backupError) {
-            console.error("Error recovering PDF data from backup:", backupError)
-          }
-        }
-      } catch (error) {
-        console.error("Error loading existing PDF from temp dashboard:", error)
-        
-        // Try to recover from localStorage backup as fallback
-        try {
-          const backupKey = `pdf-backup-${widgetId}`
-          const backupData = localStorage.getItem(backupKey)
-          if (backupData) {
-            const parsed = JSON.parse(backupData)
-            if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
-              setCurrentPdfData(parsed.pdfData)
-              try {
-                await renderPdfFromData(parsed.pdfData)
-                console.log("Recovered PDF data from localStorage backup after API error")
-              } catch (renderError) {
-                console.error('Error rendering PDF from localStorage backup after API error:', renderError)
-                toast.error('Failed to load PDF from backup. The file may be corrupted.')
-              }
-            }
-          }
-        } catch (backupError) {
-          console.error("Error recovering PDF data from backup after API error:", backupError)
-        }
-      }
-    }
-
-    // Load on mount
-    loadExistingPdf()
-    
-    // Set up real-time polling to check for updates every 2 seconds
-    const intervalId = setInterval(async () => {
-      try {
-        const response = await fetch('/api/temp-dashboard/get-all')
-        const result = await response.json()
-        
-        if (result.success && result.result.length > 0) {
-          for (const tempDashboard of result.result) {
-            if (tempDashboard.containers) {
-              const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-              const widgetContainer = containers.find((container: any) => container.id === widgetId)
-              
-              if (widgetContainer && widgetContainer.pdfData && widgetContainer.pdfData !== currentPdfData) {
-                console.log("PDF data updated in temp dashboard for widget:", widgetId)
-                setCurrentPdfData(widgetContainer.pdfData)
-                try {
-                  await renderPdfFromData(widgetContainer.pdfData)
-                } catch (renderError) {
-                  console.error('Error rendering updated PDF from temp dashboard:', renderError)
-                  toast.error('Failed to load updated PDF. The file may be corrupted.')
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error polling temp dashboard for updates:", error)
-      }
-    }, 2000) // Check every 2 seconds
-    
-    return () => clearInterval(intervalId)
-  }, [widgetId, currentPdfData])
-
-  // Auto-save to TemporaryDashboard whenever PDF data changes
-  useEffect(() => {
-    if (currentPdfData) {
-      const autoSaveTimer = setTimeout(() => {
-        saveToTempDashboard(currentPdfData, 'auto-saved.pdf')
-      }, 1000) // Save after 1 second of no changes
-      
-      return () => clearTimeout(autoSaveTimer)
-    }
-  }, [currentPdfData])
-
-  // Auto-save entire dashboard state to TemporaryDashboard
-  const autoSaveDashboardToTemp = async () => {
-    try {
-      // Get current temp dashboard data
-      const response = await fetch('/api/temp-dashboard/get-all')
-      const result = await response.json()
-      
-      if (result.success && result.result.length > 0) {
-        // Update the first temp dashboard with current state
-        const tempDashboard = result.result[0]
-        const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-        
-        // Update the widget container with current PDF data
-        const updatedContainers = containers.map((container: any) => {
-          if (container.id === widgetId && currentPdfData) {
-            return {
-              ...container,
-              pdfData: currentPdfData,
-              pdfFileName: 'auto-saved.pdf',
-              type: "pdf"
-            }
-          }
-          return container
-        })
-
-        // Update the temp dashboard
-        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            containers: updatedContainers
-          })
-        })
-
-        const updateResult = await updateResponse.json()
-        if (updateResult.success) {
-          console.log("Dashboard state auto-saved to temp dashboard")
-        }
-      }
-    } catch (error) {
-      console.error("Error auto-saving dashboard to temp:", error)
-    }
-  }
-
-  // Auto-save dashboard state when component unmounts
-  useEffect(() => {
-    return () => {
-      if (currentPdfData) {
-        autoSaveDashboardToTemp()
-      }
-    }
-  }, [currentPdfData])
-
-  const startAutoScroll = () => {
-    const container = containerRef.current
-    if (!container) return
-    // Reset to the top before starting
-    container.scrollTop = 0
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    const step = () => {
-      container.scrollBy(0, 0.5)
-      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1
-      if (atBottom) {
-        container.scrollTop = 0
-      }
-      rafRef.current = requestAnimationFrame(step)
-    }
-    rafRef.current = requestAnimationFrame(step)
-  }
-
-  const renderPdfFromData = async (pdfData: string) => {
-    const container = containerRef.current
-    if (!container) return
-    
-    try {
-      // Clear container and show loading state
-      container.innerHTML = ""
-      
-      // Validate PDF data
-      if (!pdfData || pdfData.trim() === '') {
-        throw new Error('No PDF data provided')
-      }
-      
-      // Check if PDF data is valid base64
-      const base64Regex = /^data:application\/pdf;base64,/
-      if (!base64Regex.test(pdfData) && !pdfData.startsWith('data:application/pdf')) {
-        // Try to add the data URL prefix if missing
-        if (!pdfData.startsWith('data:')) {
-          pdfData = `data:application/pdf;base64,${pdfData}`
-        }
-      }
-
-      // Show loading indicator
-      const loadingDiv = document.createElement('div')
-      loadingDiv.className = 'flex items-center justify-center h-32 text-gray-500'
-      loadingDiv.innerHTML = `
-        <div class="text-center">
-          <div class="animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600 mx-auto mb-2"></div>
-          <p class="text-sm">Loading PDF...</p>
-        </div>
-      `
-      container.appendChild(loadingDiv)
-
-      // Load PDF document
-      const pdf = await pdfjsLib.getDocument(pdfData).promise
-      
-      // Clear loading indicator
-      container.innerHTML = ""
-
-      // Render each page
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        try {
-          const page = await pdf.getPage(pageNum)
-          // Fit page width to container to avoid horizontal scroll
-          const containerWidth = container.clientWidth || 600
-          const baseViewport = page.getViewport({ scale: 1 })
-          const fitScale = containerWidth / baseViewport.width
-          const viewport = page.getViewport({ scale: fitScale })
-          
-          // Render at higher pixel density for crisp text
-          const outputScale = typeof window !== "undefined" ? Math.max(2, window.devicePixelRatio || 1) : 2
-          const canvas = document.createElement("canvas")
-          const context = canvas.getContext("2d")
-          
-          if (!context) {
-            throw new Error('Failed to get canvas context')
-          }
-          
-          // Set canvas size for high DPI rendering
-          canvas.width = Math.floor(viewport.width * outputScale)
-          canvas.height = Math.floor(viewport.height * outputScale)
-          
-          // Set CSS size to display size (no blur) - this ensures it fits the widget
-          canvas.style.width = "100%"
-          canvas.style.height = "auto"
-          
-          // Scale context for high DPI rendering
-          context.scale(outputScale, outputScale)
-          
-          await page.render({ 
-            canvasContext: context, 
-            viewport,
-            canvas
-          }).promise
-          container.appendChild(canvas)
-        } catch (pageError) {
-          console.error(`Error rendering PDF page ${pageNum}:`, pageError)
-          // Continue with other pages even if one fails
-        }
-      }
-
-      // Ensure we begin from the first page
-      container.scrollTop = 0
-      startAutoScroll()
-      
-    } catch (error) {
-      console.error('Error rendering PDF:', error)
-      
-      // Clear container and show error message
-      container.innerHTML = ""
-      
-      const errorDiv = document.createElement('div')
-      errorDiv.className = 'flex items-center justify-center h-32 text-red-500'
-      errorDiv.innerHTML = `
-        <div class="text-center">
-          <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
-            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-            </svg>
-          </div>
-          <p class="text-sm font-medium">Failed to load PDF</p>
-          <p class="text-xs text-gray-400 mt-1">The PDF file may be corrupted or invalid</p>
-        </div>
-      `
-      container.appendChild(errorDiv)
-      
-      // Show toast error
-      toast.error('Failed to load PDF. The file may be corrupted or invalid.')
-    }
-  }
-
-  // Function to refresh dashboard state from TemporaryDashboard
-  const refreshFromTempDashboard = async () => {
-    try {
-      console.log("Refreshing dashboard from TemporaryDashboard")
-      const response = await fetch('/api/temp-dashboard/get-all')
-      const result = await response.json()
-      
-      if (result.success && result.result.length > 0) {
-        const tempDashboard = result.result[0]
-        if (tempDashboard.containers && tempDashboard.containers.length > 0) {
-          const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-          const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
-          
-          if (pdfContainers.length > 0) {
-            console.log("Refreshing PDF data for", pdfContainers.length, "widgets")
-            const pdfContainer = pdfContainers.find((container: any) => container.id === widgetId)
-            if (pdfContainer) {
-              const genId = `pdf-${Date.now()}`
-              onPdfStored(genId, pdfContainer.pdfData, pdfContainer.pdfFileName || 'uploaded.pdf')
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error refreshing from temp dashboard:', error)
-    }
-  }
-
-  const saveToTempDashboard = async (pdfData: string, fileName: string) => {
-    try {
-      // Get current temp dashboard data
-      const response = await fetch('/api/temp-dashboard/get-all')
-      const result = await response.json()
-      
-      if (result.success && result.result.length > 0) {
-        // Update the first temp dashboard with the new PDF data
-        const tempDashboard = result.result[0]
-        const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-        
-        // Find and update the widget container
-        const updatedContainers = containers.map((container: any) => {
-          if (container.id === widgetId) {
-            return {
-              ...container,
-              pdfData: pdfData,
-              pdfFileName: fileName,
-              type: "pdf"
-            }
-          }
-          return container
-        })
-
-        // Update the temp dashboard
-        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            containers: updatedContainers
-          })
-        })
-
-        const updateResult = await updateResponse.json()
-        if (updateResult.success) {
-          console.log("PDF data saved to temp dashboard successfully")
-          // Trigger immediate refresh to display the updated PDF
-          setTimeout(() => {
-            refreshFromTempDashboard()
-          }, 500)
-        } else {
-          console.error("Failed to save PDF data to temp dashboard:", updateResult)
-        }
-              } else {
-          // No temp dashboard exists yet, create one with current widget data
-          console.log("No temp dashboard found, creating one with PDF data")
-          try {
-            const createResponse = await fetch('/api/temp-dashboard/create', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                aspectRatio: '16:9', // Default aspect ratio
-                containers: [{
-                  id: widgetId,
-                  type: 'pdf',
-                  pdfData: pdfData,
-                  pdfFileName: fileName
-                }],
-                screenName: 'Screen 1',
-                screenIndex: 0,
-                totalScreens: 1
-              })
-            })
-
-            const createResult = await createResponse.json()
-            if (createResult.success) {
-              console.log("Created new temp dashboard with PDF data")
-              // Trigger immediate refresh to display the PDF
-              setTimeout(() => {
-                refreshFromTempDashboard()
-              }, 500)
-            } else {
-              console.warn("Failed to create temp dashboard:", createResult.error)
-            }
-          } catch (error) {
-            console.error("Error creating temp dashboard:", error)
-            // Fallback: store PDF data in localStorage as backup
-            try {
-              const backupData = {
-                widgetId,
-                pdfData,
-                fileName,
-                timestamp: Date.now()
-              }
-              localStorage.setItem(`pdf-backup-${widgetId}`, JSON.stringify(backupData))
-              console.log("PDF data backed up to localStorage")
-            } catch (localStorageError) {
-              console.error("Failed to backup PDF data to localStorage:", localStorageError)
-            }
-          }
-        }
-    } catch (error) {
-      console.error("Error saving PDF to temp dashboard:", error)
-    }
-  }
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || file.type !== "application/pdf") {
-      toast.error("Please select a valid PDF file")
-      return
-    }
-
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
-      toast.error("PDF file size must be less than 10MB")
-      return
-    }
-
-    try {
-      setIsUploading(true)
-      const loadingToast = toast.loading('Uploading PDF...')
-
-      // Convert file to base64
-      const reader = new FileReader()
-      reader.onload = async (event) => {
-        try {
-          const pdfData = event.target?.result as string
-          setCurrentPdfData(pdfData)
-          
-          // Render the uploaded PDF
-          await renderPdfFromData(pdfData)
-          
-          // Save to TemporaryDashboard immediately
-          await saveToTempDashboard(pdfData, file.name)
-          
-          // Generate a unique ID for the PDF
-          const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          
-          // Notify parent component about the stored PDF with data
-          onPdfStored(pdfId, pdfData, file.name)
-          
-          toast.dismiss(loadingToast)
-          toast.success('PDF uploaded and stored successfully!')
-        } catch (error) {
-          console.error("Error processing PDF:", error)
-          toast.dismiss(loadingToast)
-          toast.error("Failed to process PDF")
-        }
-      }
-      
-      reader.readAsDataURL(file)
-    } catch (error) {
-      console.error("Error uploading PDF:", error)
-      toast.error("Failed to upload PDF")
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="pb-2 flex items-center gap-2">
-        <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm cursor-pointer bg-white hover:bg-gray-50 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-          <Upload size={16} />
-          <span>{isUploading ? 'Uploading...' : 'Upload PDF'}</span>
-          <input 
-            className="hidden" 
-            type="file" 
-            accept="application/pdf" 
-            onChange={handleUpload}
-            disabled={isUploading}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              setIsSelectModalOpen(true)
-              // start animation immediately
-              requestAnimationFrame(() => setAnimateOpen(true))
-              setIsLoadingExisting(true)
-              const resp = await fetch('/api/notice/get-all')
-              const data = await resp.json()
-              // Filter notices that have pdfData
-              const pdfNotices = (data?.result || []).filter((n: any) => n?.pdfData)
-              console.log('Found PDF notices:', pdfNotices.length, pdfNotices.map((n: any) => ({ 
-                title: n.title, 
-                fileName: n.pdfFileName, 
-                hasPdfData: !!n.pdfData,
-                pdfDataLength: n.pdfData?.length || 0,
-                pdfDataPrefix: n.pdfData?.substring(0, 50) || 'none'
-              })))
-              
-              // Ensure PDF data has proper format for rendering
-              const processedPdfNotices = pdfNotices.map((n: any) => {
-                let pdfData = n.pdfData || ''
-                
-                // Ensure PDF data has data URL prefix for proper rendering
-                if (pdfData && !pdfData.startsWith('data:')) {
-                  pdfData = `data:application/pdf;base64,${pdfData}`
-                  console.log('Added data URL prefix to PDF:', n.pdfFileName)
-                }
-                
-                return {
-                  ...n,
-                  pdfData: pdfData
-                }
-              })
-              
-              // Deduplicate strictly by file name
-              const seen = new Set<string>()
-              const unique = [] as any[]
-              for (const n of processedPdfNotices) {
-                const key = (n?.pdfFileName ?? '').toString().trim().toLowerCase()
-                if (!key) continue
-                if (!seen.has(key)) {
-                  seen.add(key)
-                  unique.push(n)
-                }
-              }
-              setExistingPdfs(unique)
-            } catch (e) {
-              console.error('Failed to load existing PDFs', e)
-              toast.error('Failed to load existing PDFs. Please try again.')
-              setExistingPdfs([])
-            } finally {
-              setIsLoadingExisting(false)
-            }
-          }}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm bg-white hover:bg-gray-50"
-        >
-          <Upload size={16} />
-          <span>From Existing</span>
-        </button>
-      </div>
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden border rounded-md"
-        style={{ background: "#fff" }}
-      />
-
-      {isSelectModalOpen && createPortal(
-        <div className="fixed inset-0 z-[1000]">
-          <div
-            className={`absolute inset-0 bg-black/50 transition-opacity duration-150 ${animateOpen ? 'opacity-100' : 'opacity-0'}`}
-            onClick={() => {
-              setAnimateOpen(false)
-              setTimeout(() => setIsSelectModalOpen(false), 200)
-            }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div
-              className={`relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-[92vw] max-w-5xl max-h-[85vh] overflow-hidden transition-all duration-150 transform ${animateOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-95'}`}
-            >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div className="flex items-center gap-3 text-base font-semibold text-gray-800">
-                  <div className="p-2 rounded-lg bg-white border border-gray-200"><Upload size={18} className="text-indigo-600" /></div>
-                  Choose Existing PDF
-                </div>
-                <button
-                  onClick={() => {
-                    setAnimateOpen(false)
-                    setTimeout(() => setIsSelectModalOpen(false), 200)
-                  }}
-                  className="h-8 w-8 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-gray-700 grid place-items-center"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="px-6 py-4 border-b border-gray-100 bg-white">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    placeholder="Search by title or file name..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) => {
-                      const q = e.target.value.trim().toLowerCase()
-                      setExistingPdfs((prev: any[]) => prev.map(p => ({ ...p, __hidden: q ? !((p.title||'').toLowerCase().includes(q) || (p.pdfFileName||'').toLowerCase().includes(q)) : false })))
-                    }}
-                  />
-                  <div className="text-xs text-gray-500">{existingPdfs.filter((p: any) => !p.__hidden).length} item{existingPdfs.filter((p: any) => !p.__hidden).length !== 1 ? 's' : ''}</div>
-                </div>
-              </div>
-              <div className="p-6 bg-white">
-                {isLoadingExisting ? (
-                  <div className="flex items-center justify-center py-16 text-sm text-gray-500">Loading PDFs...</div>
-                ) : existingPdfs.length === 0 ? (
-                  <div className="text-center py-16 text-sm text-gray-500">No existing PDF notices found.</div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
-                    {existingPdfs.filter((p: any) => !p.__hidden).map((n: any) => (
-                      <button
-                        key={n.id}
-                        className="group text-left rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all bg-white p-4 flex items-start gap-3"
-                        onClick={async () => {
-                          try {
-                            console.log('Selecting PDF:', { 
-                              title: n.title, 
-                              fileName: n.pdfFileName, 
-                              hasPdfData: !!n.pdfData,
-                              pdfDataLength: n.pdfData?.length || 0,
-                              pdfDataPrefix: n.pdfData?.substring(0, 50) || 'none'
-                            })
-                            
-                            if (!n.pdfData) {
-                              toast.error('No PDF data found for this file')
-                              return
-                            }
-                            
-                            // Validate PDF data before processing
-                            if (typeof n.pdfData !== 'string' || n.pdfData.trim() === '') {
-                              toast.error('Invalid PDF data format')
-                              return
-                            }
-                            
-                            setCurrentPdfData(n.pdfData)
-                            
-                            // Try to render the PDF first to validate it
-                            try {
-                              await renderPdfFromData(n.pdfData)
-                            } catch (renderError) {
-                              console.error('Error rendering selected PDF:', renderError)
-                              toast.error('Failed to load PDF. The file may be corrupted.')
-                              return
-                            }
-                            
-                            await saveToTempDashboard(n.pdfData, n.pdfFileName || 'uploaded.pdf')
-                            const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-                            onPdfStored(pdfId, n.pdfData, n.pdfFileName || 'uploaded.pdf')
-                            setIsSelectModalOpen(false)
-                            toast.success('PDF selected successfully')
-                          } catch (err) {
-                            console.error('Error selecting existing PDF:', err)
-                            toast.error('Failed to select PDF. Please try again.')
-                          }
-                        }}
-                        title={n.pdfFileName || 'PDF'}
-                      >
-                        <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-blue-50 text-blue-600 grid place-items-center border border-blue-100">PDF</div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-gray-900 truncate">{n.pdfFileName || 'PDF'}</div>
-                          <div className="text-xs text-gray-400 truncate">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>, document.body)
-      }
-    </div>
-  )
-}
-
 // Add this before the EditDashboardDemo component
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: "style", label: "Appearance", icon: <Palette size={16} /> },
@@ -1035,6 +321,8 @@ function EditDashboardDemo() {
 
   // First, add a new state for custom templates and template modal
   // Add these after the existing state declarations (around line 370)
+  // UI toggles
+  const [showScreenControls, setShowScreenControls] = useState(true)
 
   const [customTemplates, setCustomTemplates] = useState<DashboardTemplate[]>([])
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
@@ -1074,6 +362,33 @@ function EditDashboardDemo() {
   const [isLoadingExistingImages, setIsLoadingExistingImages] = useState(false)
   const [existingImages, setExistingImages] = useState<any[]>([])
   const [animateImageOpen, setAnimateImageOpen] = useState(false)
+
+  // Counts for special widgets sourced from notices (same as showNotices page uses)
+  const [pdfCount, setPdfCount] = useState<number | null>(null)
+  const [imageCount, setImageCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    const fetchCountsFromNotices = async () => {
+      try {
+        const response = await fetch('/api/notice/get-all')
+        const data = await response.json()
+        if (data?.success && Array.isArray(data.result)) {
+          const notices = data.result
+          const pdfs = notices.filter((n: any) => !!n.pdfData)
+          const images = notices.filter((n: any) => !!n.imageData)
+          setPdfCount(pdfs.length)
+          setImageCount(images.length)
+        } else {
+          setPdfCount(0)
+          setImageCount(0)
+        }
+      } catch (e) {
+        setPdfCount(0)
+        setImageCount(0)
+      }
+    }
+    fetchCountsFromNotices()
+  }, [])
 
 
   // Enhanced localStorage state management
@@ -2589,6 +1904,12 @@ function EditDashboardDemo() {
     }
   }
 
+  // Drag start for special widgets (pdf/image)
+  const handleDragStartSpecial = (e: React.DragEvent, type: 'pdf' | 'image') => {
+    e.dataTransfer.setData("specialType", type)
+    e.dataTransfer.effectAllowed = "copy"
+  }
+
   const handleDrop = (e: React.DragEvent, widgetId?: string) => {
     e.preventDefault()
     e.stopPropagation()
@@ -2604,10 +1925,17 @@ function EditDashboardDemo() {
       target.style.backgroundColor = ''
     }
     
+    const specialType = e.dataTransfer.getData("specialType") as 'pdf' | 'image'
     const categoryId = e.dataTransfer.getData("categoryId")
     const categoryName = e.dataTransfer.getData("categoryName")
     
-    console.log("Drop event - categoryId:", categoryId, "categoryName:", categoryName, "widgetId:", widgetId, "Current widgets:", widgets.length)
+    console.log("Drop event - specialType:", specialType, "categoryId:", categoryId, "categoryName:", categoryName, "widgetId:", widgetId, "Current widgets:", widgets.length)
+
+    // If a special widget (pdf/image) is dragged, create that widget immediately
+    if (!widgetId && specialType) {
+      addWidget(specialType)
+      return
+    }
 
     const category = categories.find((cat) => cat.id === categoryId)
     if (!category) {
@@ -3976,108 +3304,7 @@ function EditDashboardDemo() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => addWidget("notice")}
-            disabled={!selectedRatio || isAddingWidget}
-            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
-              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 border border-blue-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-600 cursor-not-allowed border border-purple-300 shadow-md"
-            } ${isAddingWidget ? 'animate-pulse' : ''}`}
-          >
-            {isAddingWidget ? (
-              <>
-                {/* Professional Loading Animation */}
-                <div className="relative">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-blue-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                </div>
-                <span className="font-medium">Creating Widget...</span>
-                {/* Progress Dots */}
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </>
-            ) : (
-              <>
-                <Plus size={20} className="font-bold" />
-                                    <span>Notice</span>
-              </>
-            )}
-            {/* Shimmer Effect */}
-            {isAddingWidget && (
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
-            )}
-          </button>
-          
-          <button
-            onClick={() => addWidget("pdf")}
-            disabled={!selectedRatio || isAddingWidget}
-            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
-              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:from-indigo-600 hover:to-indigo-700 border border-indigo-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-indigo-100 to-blue-100 text-indigo-600 cursor-not-allowed border border-indigo-300 shadow-md"
-            } ${isAddingWidget ? 'animate-pulse' : ''}`}
-          >
-            {isAddingWidget ? (
-              <>
-                <div className="relative">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-indigo-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                </div>
-                <span className="font-medium">Creating PDF Widget...</span>
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </>
-            ) : (
-              <>
-                <Upload size={20} className="font-bold" />
-                                    <span>PDF Notice</span>
-              </>
-            )}
-            {isAddingWidget && (
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
-            )}
-          </button>
-
-          <button
-            onClick={() => addWidget("image")}
-            disabled={!selectedRatio || isAddingWidget}
-            className={`flex items-center gap-3 px-5 py-3 rounded-xl transition-all duration-300 font-semibold relative overflow-hidden ${
-              selectedRatio && !isAddingWidget ? "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 border border-green-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" : "bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-600 cursor-not-allowed border border-orange-300 shadow-md"
-            } ${isAddingWidget ? 'animate-pulse' : ''}`}
-          >
-            {isAddingWidget ? (
-              <>
-                {/* Professional Loading Animation */}
-                <div className="relative">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-green-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                </div>
-                <span className="font-medium">Creating Display...</span>
-                {/* Progress Dots */}
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </>
-            ) : (
-              <>
-                <ImageIcon size={20} className="font-bold" />
-                                    <span>Image Notice</span>
-              </>
-            )}
-            {/* Shimmer Effect */}
-            {isAddingWidget && (
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
-            )}
-          </button>
-          
-
-        </div>
+        <div className="flex items-center gap-3"></div>
         
 
 
@@ -4133,150 +3360,31 @@ function EditDashboardDemo() {
       </div>
 
       {/* Improved Screen Management Section - Left Side */}
-      <div className="mb-4 flex items-center gap-3">
-        {/* Left Side Screen Management */}
-        <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
-          {/* Add Screen Button */}
-            <button
-              onClick={addScreen}
-              disabled={isAddingScreen}
-            className={`group relative bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-2 rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md border-0 transform hover:scale-105 active:scale-95 ${
-                isAddingScreen ? 'opacity-75 cursor-not-allowed' : ''
-              }`}
-            title="Add New Screen"
-            >
-                  {isAddingScreen ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
-              <Plus size={16} className="text-white" />
-            )}
-          </button>
-
-          {/* Clear All Screens Button */}
-          <button
-            onClick={clearAllScreens}
-            disabled={isClearingScreens}
-            className={`group relative bg-gradient-to-r from-rose-500 to-rose-600 text-white p-2 rounded-lg hover:from-rose-600 hover:to-rose-700 transition-all duration-200 shadow-sm hover:shadow-md border-0 transform hover:scale-105 active:scale-95 ${
-              isClearingScreens ? 'opacity-75 cursor-not-allowed' : ''
-            }`}
-            title="Clear All Screens"
-          >
-            {isClearingScreens ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            ) : (
-              <Trash2 size={16} className="text-white" />
-            )}
-          </button>
-          
-          {/* Navigation Arrows */}
-          {screens.length > 1 && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  setCurrentScreenIndex(currentScreenIndex > 0 ? currentScreenIndex - 1 : screens.length - 1)
-                  // Save to TemporaryDashboard after screen change
-                  setTimeout(() => {
-                    autoSaveToTempDashboard()
-                  }, 100)
-                }}
-                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
-                title="Previous Screen"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15,18 9,12 15,6"></polyline>
-                </svg>
-              </button>
-              <button
-                onClick={() => {
-                  setCurrentScreenIndex(currentScreenIndex < screens.length - 1 ? currentScreenIndex + 1 : 0)
-                  // Save to TemporaryDashboard after screen change
-                  setTimeout(() => {
-                    autoSaveToTempDashboard()
-                  }, 100)
-                }}
-                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
-                title="Next Screen"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9,18 15,12 9,6"></polyline>
-                </svg>
-            </button>
-          </div>
-          )}
-          
-          {/* Screen Tabs - Wider and Safer */}
-          <div className="flex items-center gap-2">
-            {screens.map((screen, index) => (
-              <div
-                key={screen.id}
-                className={`group relative flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-all duration-200 min-w-[80px] justify-center ${
-                  index === currentScreenIndex
-                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'
-                }`}
-                onClick={() => {
-                  setCurrentScreenIndex(index)
-                  // Save to TemporaryDashboard after screen change
-                  setTimeout(() => {
-                    autoSaveToTempDashboard()
-                  }, 100)
-                }}
-              >
-                {/* Screen Number */}
-                <span className="text-sm font-medium">{index + 1}</span>
-                
-                {/* Remove Button - Only show on hover and when more than 1 screen, positioned at top right corner */}
-                {screens.length > 1 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      removeScreen(index)
-                    }}
-                    disabled={isRemovingScreen}
-                    className={`absolute -top-2 -right-2 p-1.5 hover:bg-red-100 rounded-full transition-all duration-200 opacity-0 group-hover:opacity-100 bg-white border border-red-200 shadow-sm ${
-                      isRemovingScreen ? 'cursor-not-allowed' : ''
-                    }`}
-                    title="Remove screen"
-                  >
-                    {isRemovingScreen ? (
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-500"></div>
-                    ) : (
-                      <X size={12} className="text-red-500 hover:text-red-700" />
-                    )}
-                  </button>
-                )}
-                
-                {/* Active Indicator */}
-                {index === currentScreenIndex && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-blue-500 rounded-full"></div>
-                )}
-              </div>
-            ))}
-          </div>
-          
-          {/* Screen Count */}
-          <div className="text-sm text-gray-500 font-medium px-1.5">
-            {screens.length} screen{screens.length !== 1 ? 's' : ''}
-          </div>
-        </div>
-      </div>
+      <ScreenControls
+        showScreenControls={showScreenControls}
+        setShowScreenControls={setShowScreenControls}
+        screens={screens.map(({ id, name }) => ({ id, name }))}
+        currentScreenIndex={currentScreenIndex}
+        setCurrentScreenIndex={setCurrentScreenIndex}
+        addScreen={addScreen}
+        clearAllScreens={clearAllScreens}
+        removeScreen={removeScreen}
+        isAddingScreen={isAddingScreen}
+        isClearingScreens={isClearingScreens}
+        isRemovingScreen={isRemovingScreen}
+        autoSaveToTempDashboard={autoSaveToTempDashboard}
+      />
 
       {/* Minimal Notice Categories Section */}
-      <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-gray-100 rounded-md">
-              <GripVertical className="w-4 h-4 text-gray-600" />
+      <div className="mb-3 p-2 bg-white rounded-lg border border-gray-200">
+        <div className="flex items-center gap-3 mb-2 flex-wrap">
+          <div className="p-1.5 bg-gray-100 rounded-md">
+            <GripVertical className="w-4 h-4 text-gray-600" />
           </div>
-                      <div>
-              <h3 className="text-sm font-semibold text-gray-800">Notice Categories</h3>
-              <p className="text-xs text-gray-500">Drag to create widgets</p>
-            </div>
-          </div>
-          <div className="text-xs text-gray-400 font-medium">
-            {categories.length} category{categories.length !== 1 ? 's' : ''}
-            </div>
-          </div>
+          <h3 className="text-sm font-semibold text-gray-800 mr-2">Notice Categories</h3>
+          {/* Special widgets moved beside categories below */}
+        </div>
+        
           
         <div className="flex flex-wrap gap-2">
             {categories.length === 0 ? (
@@ -4287,7 +3395,8 @@ function EditDashboardDemo() {
               <p className="text-gray-500 text-xs">No categories available</p>
               </div>
             ) : (
-                          categories.map((category) => (
+              <>
+                {categories.map((category) => (
                 <div
                   key={category.id}
                   draggable
@@ -4312,7 +3421,55 @@ function EditDashboardDemo() {
                     </div>
                   </div>
                 </div>
-              ))
+                ))}
+
+                {/* Special widgets placed at the end with same design as categories */}
+                <div
+                  draggable
+                  onDragStart={(e) => handleDragStartSpecial(e, 'pdf')}
+                  title="PDF (Drag to create PDF widget)"
+                  className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-md cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 bg-gray-200 group-hover:bg-blue-200 rounded transition-colors">
+                      <GripVertical className="w-3 h-3 text-gray-600 group-hover:text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-800 group-hover:text-blue-800 text-sm truncate flex items-center gap-1">
+                        <Upload className="w-3 h-3 text-indigo-600" />
+                        PDF
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></div>
+                        <span className="text-xs text-gray-500">{pdfCount ?? '…'} PDF{(pdfCount ?? 0) === 1 ? '' : 's'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  draggable
+                  onDragStart={(e) => handleDragStartSpecial(e, 'image')}
+                  title="IMAGES (Drag to create Image widget)"
+                  className="group relative bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-md cursor-move border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 bg-gray-200 group-hover:bg-blue-200 rounded transition-colors">
+                      <GripVertical className="w-3 h-3 text-gray-600 group-hover:text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-800 group-hover:text-blue-800 text-sm truncate flex items-center gap-1">
+                        <ImageIcon className="w-3 h-3 text-green-600" />
+                        IMAGES
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+                        <span className="text-xs text-gray-500">{imageCount ?? '…'} Image{(imageCount ?? 0) === 1 ? '' : 's'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
           )}
         </div>
       </div>
@@ -4553,231 +3710,19 @@ function EditDashboardDemo() {
                       </>
                     )}
 
-                    {/* Enhanced Professional Image Display Content */}
+                    {/* Image Widget */}
                     {widget.type === "image" && (
-                      <div className="flex flex-col h-full">
-                        {widget.images && widget.images.length > 0 ? (
-                          <div className="flex-grow flex items-center justify-center relative overflow-hidden">
-                            <div className="relative w-full h-full group">
-                              {/* Professional Image Container with Enhanced Styling */}
-                              <div
-                                className="w-full h-full relative overflow-hidden"
-                                style={{
-                                  borderRadius: `${settings.imageBorderRadius}px`,
-                                  boxShadow: settings.imageShadow 
-                                    ? `${settings.imageShadowOffset}px ${settings.imageShadowOffset}px ${settings.imageShadowBlur}px ${settings.imageShadowColor}`
-                                    : 'none',
-                                }}
-                              >
-                                {/* Image with Professional Filters */}
-                              <img
-                                src={widget.images[0].url}
-                                alt={widget.images[0].title}
-                                  className="w-full h-full transition-all duration-300"
-                                style={{
-                                  objectFit: settings.imageFit as any,
-                                  borderRadius: `${settings.imageBorderRadius}px`,
-                                    transform: `rotate(${settings.imageRotation}deg)`,
-                                    filter: `
-                                      brightness(${settings.imageBrightness}%) 
-                                      contrast(${settings.imageContrast}%) 
-                                      saturate(${settings.imageSaturation}%) 
-                                      blur(${settings.imageBlur}px)
-                                      ${settings.imageGrayscale ? 'grayscale(100%)' : ''}
-                                      ${settings.imageSepia ? 'sepia(100%)' : ''}
-                                      ${settings.imageInvert ? 'invert(100%)' : ''}
-                                    `,
-                                    cursor: settings.imageZoom ? 'zoom-in' : 'default',
-                                }}
-                                onError={() => {
-                                  toast.error('Image could not be loaded')
-                                }}
-                              />
-                                
-                                {/* Professional Overlay */}
-                                {settings.imageOverlay && (
-                                  <div
-                                    className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
-                                    style={{
-                                      opacity: settings.imageOverlayOpacity,
-                                    }}
-                                  />
-                                )}
-                                
-                                {/* Enhanced Image Title */}
-                              {settings.showImageTitle && (
-                                <div
-                                    className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent"
-                                  style={{
-                                    color: settings.imageTitleColor,
-                                    fontSize: `${settings.imageTitleFontSize}px`,
-                                    fontWeight: settings.imageTitleFontWeight,
-                                  }}
-                                >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex-1 min-w-0">
-                                        <p className="truncate font-medium">{widget.images[0].title}</p>
-                                        {widget.images[0].width && widget.images[0].height && (
-                                          <p className="text-xs opacity-75 mt-1">
-                                            {widget.images[0].width} × {widget.images[0].height}
-                                            {widget.images[0].size && (
-                                              <span className="ml-2">
-                                                ({(widget.images[0].size / 1024 / 1024).toFixed(1)}MB)
-                                              </span>
-                                            )}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                </div>
-                              )}
-                              </div>
-                              
-                              {/* Professional Control Overlay */}
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                <div className="bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-2xl border border-gray-200">
-                                  <div className="flex items-center gap-3">
-                                                                        <label className={`cursor-pointer flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
-                                      isUploadingImage === widget.id ? 'opacity-75 cursor-not-allowed animate-pulse' : ''
-                                    }`}>
-                                      {isUploadingImage === widget.id ? (
-                                        <div className="relative">
-                                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                          <div className="absolute inset-0 w-4 h-4 border-2 border-transparent border-t-blue-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}></div>
-                                        </div>
-                                      ) : (
-                                        <Upload size={18} className="font-bold" />
-                                      )}
-                                      <span className="font-medium">
-                                        {isUploadingImage === widget.id ? 'Processing Image...' : 'Replace Image'}
-                                      </span>
-                                      {isUploadingImage === widget.id && (
-                                        <div className="flex gap-1">
-                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                          <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                                        </div>
-                                      )}
-                                                    <input
-                                                      type="file"
-                                                      accept="image/*"
-                                                      onChange={(e) => handleImageUpload(e, widget.id)}
-                                                      className="hidden"
-                                        disabled={isUploadingImage === widget.id}
-                                                    />
-                                                  </label>
-                                    <button
-                                      onClick={async () => {
-                                        try {
-                                          setImageSelectWidgetId(widget.id)
-                                          setIsImageSelectOpen(true)
-                                          requestAnimationFrame(() => setAnimateImageOpen(true))
-                                          setIsLoadingExistingImages(true)
-                                          const resp = await fetch('/api/notice/get-all')
-                                          const data = await resp.json()
-                                          const imageNotices = (data?.result || []).filter((n: any) => n?.imageUrl || n?.imageData)
-                                          const seen = new Set<string>()
-                                          const unique: any[] = []
-                                          for (const n of imageNotices) {
-                                            const key = (n?.imageFileName ?? '').toString().trim().toLowerCase()
-                                            if (!key) continue
-                                            if (!seen.has(key)) {
-                                              seen.add(key)
-                                              unique.push(n)
-                                            }
-                                          }
-                                          setExistingImages(unique)
-                                        } catch (e) {
-                                          console.error('Failed to load existing images', e)
-                                          setExistingImages([])
-                                        } finally {
-                                          setIsLoadingExistingImages(false)
-                                        }
-                                      }}
-                                      className="flex items-center gap-2 px-3 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium border"
-                                    >
-                                      <ImageIcon size={16} />
-                                      From Existing
-                                    </button>
-                                    <button
-                                      onClick={() => toggleWidgetSettings(widget.id)}
-                                      className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
-                                    >
-                                      <Settings size={16} />
-                                      Settings
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            className="flex flex-col items-center justify-center h-full border-2 border-dashed rounded-xl transition-all duration-300 hover:border-blue-400 hover:bg-blue-50/30"
-                            style={{
-                              borderColor: settings.fontColor,
-                              opacity: 0.6,
-                              fontFamily: settings.fontFamily,
-                            }}
-                          >
-                            <div className="text-center flex flex-col items-center justify-center h-full">
-                              <p className="text-sm opacity-75 mb-6" style={{ color: settings.fontColor }}>
-                                JPG, PNG, GIF, WebP • Max 10MB
-                              </p>
-                              <label className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 hover:border-blue-400 hover:text-blue-600 transition-all duration-200 text-xs font-medium ${
-                                isUploadingImage === widget.id ? 'opacity-75 cursor-not-allowed' : ''
-                              }`}>
-                                {isUploadingImage === widget.id ? (
-                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                                ) : (
-                                <Upload size={12} />
-                                )}
-                                {isUploadingImage === widget.id ? 'Uploading...' : 'Browse Files'}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleImageUpload(e, widget.id)}
-                                  className="hidden"
-                                  disabled={isUploadingImage === widget.id}
-                            />
-                              </label>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    setImageSelectWidgetId(widget.id)
-                                    setIsImageSelectOpen(true)
-                                    requestAnimationFrame(() => setAnimateImageOpen(true))
-                                    setIsLoadingExistingImages(true)
-                                    const resp = await fetch('/api/notice/get-all')
-                                    const data = await resp.json()
-                                    const imageNotices = (data?.result || []).filter((n: any) => n?.imageUrl || n?.imageData)
-                                    const seen = new Set<string>()
-                                    const unique: any[] = []
-                                    for (const n of imageNotices) {
-                                      const key = (n?.imageFileName ?? '').toString().trim().toLowerCase()
-                                      if (!key) continue
-                                      if (!seen.has(key)) {
-                                        seen.add(key)
-                                        unique.push(n)
-                                      }
-                                    }
-                                    setExistingImages(unique)
-                                  } catch (e) {
-                                    console.error('Failed to load existing images', e)
-                                    setExistingImages([])
-                                  } finally {
-                                    setIsLoadingExistingImages(false)
-                                  }
-                                }}
-                                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 text-xs font-medium"
-                              >
-                                <ImageIcon size={12} /> From Existing
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <ImageWidget
+                        widget={widget as any}
+                        settings={settings}
+                        onSetWidgetImages={(images) => {
+                          setWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, images } : w))
+                        }}
+                        onOpenSettings={() => toggleWidgetSettings(widget.id)}
+                        onAutoSave={() => {
+                          setTimeout(() => { autoSaveToTempDashboard() }, 100)
+                        }}
+                      />
                     )}
 
                     {/* PDF widget content: inline upload + render + auto-scroll */}
@@ -4833,162 +3778,48 @@ function EditDashboardDemo() {
 
         {/* Template Section - Right Side (1/4 width) */}
         <div className="xl:col-span-1">
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg p-6 border border-amber-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-amber-800">Templates</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleViewAllTemplates}
-                  className="bg-gray-600 text-white px-2 py-1 rounded text-xs hover:bg-gray-700 transition-colors"
-                >
-                  View All
-                </button>
-                {userRole !== 'MODERATOR' && (
-                  <button
-                    onClick={() => setShowTemplateModal(true)}
-                    className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 transition-colors"
-                  >
-                    Save Current
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Search */}
-            <div className="mb-4">
-              <input
-                type="text"
-                placeholder="Search templates..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-3 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white/80 backdrop-blur-sm shadow-sm"
+          <TemplatesPanel
+            userRole={userRole}
+            templates={templates}
+            widgets={widgets}
+            layout={layout}
+            isLoadingTemplates={isLoadingTemplates}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            isApplyingTemplate={isApplyingTemplate}
+            isDeletingTemplate={isDeletingTemplate}
+            isUpdatingTemplate={isUpdatingTemplate}
+            isSavingTemplate={isSavingTemplate}
+            onViewAll={handleViewAllTemplates}
+            onView={handleViewTemplate}
+            onEdit={handleEditTemplate}
+            onDelete={handleDeleteTemplate}
+            onApply={applyTemplate}
+            showTemplateModal={showTemplateModal}
+            setShowTemplateModal={setShowTemplateModal}
+            templateName={templateName}
+            setTemplateName={setTemplateName}
+            templateDescription={templateDescription}
+            setTemplateDescription={setTemplateDescription}
+            onSaveTemplate={() => handleTemplateSave()}
+            showDuplicateNameDialog={showDuplicateNameDialog}
+            setShowDuplicateNameDialog={setShowDuplicateNameDialog}
+            pendingTemplate={pendingTemplate}
+            onReplaceTemplate={handleReplaceTemplate}
+            onTryAnotherName={handleTryAnotherName}
+            showViewAllModal={showViewAllModal}
+            setShowViewAllModal={setShowViewAllModal}
+            showEditModal={showEditModal}
+            setShowEditModal={setShowEditModal}
+            editingTemplate={editingTemplate}
+            onUpdateTemplate={handleUpdateTemplate}
+            showViewModal={showViewModal}
+            setShowViewModal={setShowViewModal}
+            selectedTemplate={selectedTemplate}
+            hexToRgba={hexToRgba}
+            defaultWidgetSettings={DEFAULT_WIDGET_SETTINGS}
               />
             </div>
-
-            {/* Templates List */}
-            <div className="space-y-2">
-              {/* Template Count Header */}
-              <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                {widgets.length === 0 ? (
-                  <span className="text-amber-600">
-                    Add widgets to see available templates
-                  </span>
-                ) : (
-                  <>
-                    <span>
-                      {templates.filter(t => t.widgets.length === widgets.length).length} template{templates.filter(t => t.widgets.length === widgets.length).length !== 1 ? 's' : ''} available for {widgets.length} widget{widgets.length !== 1 ? 's' : ''}
-                    </span>
-                    {templates.length > templates.filter(t => t.widgets.length === widgets.length).length && (
-                      <span className="text-gray-400">
-                        {templates.length - templates.filter(t => t.widgets.length === widgets.length).length} other template{templates.length - templates.filter(t => t.widgets.length === widgets.length).length !== 1 ? 's' : ''} available
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-              {isLoadingTemplates ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
-                </div>
-              ) : templates.filter(template => template.widgets.length === widgets.length).length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm">No templates available for {widgets.length} widget{widgets.length !== 1 ? 's' : ''}</p>
-                  <p className="text-xs text-gray-400 mt-1">Create a template with {widgets.length} widget{widgets.length !== 1 ? 's' : ''}, or adjust your current widgets</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {templates
-                    .filter(template => {
-                      // Filter by search term
-                      const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        template.description?.toLowerCase().includes(searchTerm.toLowerCase());
-                      
-                      // Filter by widget count to match current screen
-                      const matchesWidgetCount = template.widgets.length === widgets.length;
-                      return matchesSearch && matchesWidgetCount;
-                    })
-                    .map((template) => (
-                      <div
-                        key={template.id}
-                        className="border border-gray-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-sm transition-all"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-900 text-sm">{template.name}</h4>
-                            {template.description && (
-                              <p className="text-xs text-gray-600 mt-1">{template.description}</p>
-                            )}
-                            <div className="text-xs text-gray-500 mt-1">
-                              {template.widgets.length} widgets
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleViewTemplate(template)}
-                              className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
-                              title="View Template"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() => applyTemplate(template)}
-                              disabled={isApplyingTemplate}
-                              className={`text-xs bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 px-3 py-1.5 rounded-lg hover:from-blue-200 hover:to-blue-300 transition-all duration-200 font-medium shadow-sm hover:shadow-md ${
-                                isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
-                              }`}
-                              title="Apply Template"
-                            >
-                              {isApplyingTemplate ? (
-                                <div className="flex items-center gap-1">
-                                  <div className="relative">
-                                    <div className="w-3 h-3 border border-blue-400/30 border-t-blue-600 rounded-full animate-spin"></div>
-                                    <div className="absolute inset-0 w-3 h-3 border border-transparent border-t-blue-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}></div>
-                                  </div>
-                                  <span className="text-xs">Applying...</span>
-                                </div>
-                              ) : (
-                                'Apply'
-                              )}
-                            </button>
-                            {userRole !== 'MODERATOR' && (
-                              <>
-                                <button
-                                  onClick={() => handleEditTemplate(template)}
-                                  className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
-                                  title="Edit Template"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteTemplate(template.id)}
-                                  disabled={isDeletingTemplate}
-                                  className={`text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 ${
-                                    isDeletingTemplate ? 'opacity-50 cursor-not-allowed' : ''
-                                  }`}
-                                  title="Delete Template"
-                                >
-                                  {isDeletingTemplate ? (
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-700"></div>
-                                  ) : (
-                                    'Delete'
-                                  )}
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Draggable Settings Modal */}
@@ -6047,441 +4878,6 @@ function EditDashboardDemo() {
         </>
       )}
 
-      {/* Template Save Modal */}
-      {showTemplateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Save as Template</h3>
-                    <button
-                  onClick={() => setShowTemplateModal(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X size={20} />
-                    </button>
-                </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Template Name
-                  </label>
-                    <input
-                    type="text"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    placeholder="Enter template name..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    value={templateDescription}
-                    onChange={(e) => setTemplateDescription(e.target.value)}
-                    placeholder="Describe your template..."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div className="text-sm text-blue-700">
-                      <p className="font-medium">Template Preview</p>
-                      <p className="text-blue-600 mt-1">
-                        {widgets.length} widgets • {layout.length} layout items
-                      </p>
-                </div>
-              </div>
-                </div>
-          </div>
-
-              <div className="flex gap-3 mt-6">
-          <button
-                  onClick={() => setShowTemplateModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleTemplateSave()}
-                  disabled={isSavingTemplate}
-                  className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${
-                    isSavingTemplate ? 'opacity-75 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {isSavingTemplate ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Template'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Duplicate Name Confirmation Dialog */}
-      {showDuplicateNameDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Template Name Already Exists</h3>
-                <button
-                  onClick={() => {
-                    setShowDuplicateNameDialog(false)
-                    setPendingTemplate(null)
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-yellow-50 p-4 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <div className="text-sm text-yellow-700">
-                      <p className="font-medium">Template "{pendingTemplate?.name || templateName}" already exists</p>
-                      <p className="text-yellow-600 mt-1">
-                        Choose an option to proceed:
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <button
-                    onClick={handleReplaceTemplate}
-                    className="w-full px-4 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Replace Existing Template
-                  </button>
-                  
-                  <button
-                    onClick={handleTryAnotherName}
-                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Try Another Name
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setShowDuplicateNameDialog(false)
-                      setPendingTemplate(null)
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* View All Templates Modal */}
-      {showViewAllModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full border border-gray-200 max-h-[80vh] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-gray-900">All Templates</h3>
-            <button
-                  onClick={() => setShowViewAllModal(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-                  <X size={24} />
-            </button>
-          </div>
-        </div>
-            
-            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
-              {templates.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">No Templates Found</h4>
-                  <p className="text-gray-500">Create your first template to get started.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {templates.map((template) => (
-                    <div key={template.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-3">
-                        <h4 className="font-medium text-gray-900">{template.name}</h4>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleViewTemplate(template)}
-                            className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
-                          >
-                            View
-                          </button>
-                          {userRole !== 'MODERATOR' && (
-                            <>
-                              <button
-                                onClick={() => handleEditTemplate(template)}
-                                className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTemplate(template.id)}
-                                className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                              >
-                                Delete
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {template.description && (
-                        <p className="text-sm text-gray-600 mb-3">{template.description}</p>
-                      )}
-                      
-                      {/* Template Preview - Same structure as View modal */}
-                      <div className="w-full flex justify-center mb-3">
-                        <div className="bg-white border border-gray-200 rounded-lg p-2" style={{ width: 240, height: 'auto', minHeight: 200 }}>
-                          <div className="relative w-full" style={{ height: `${Math.max(200, Math.max(...template.layout.map(l => (l.y + l.h) * 20)) + 10)}px` }}>
-                            {template.layout.map((layoutItem) => {
-                              const widget = template.widgets.find(w => w.id === layoutItem.i)
-                              if (!widget) return null
-                              
-                              const widgetSettings = template.widgetSettings?.[widget.id] || DEFAULT_WIDGET_SETTINGS
-                              
-                              // Generate background colors
-                              const bgColor = hexToRgba(widgetSettings.backgroundColor, widgetSettings.backgroundOpacity)
-                              const cardBgColor = hexToRgba(widgetSettings.backgroundColor, widgetSettings.cardOpacity)
-                              const categoryBgColor = widgetSettings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
-                              
-                              return (
-                                <div
-                                  key={widget.id}
-                                  className="rounded-lg shadow-md absolute"
-                                  style={{
-                                    left: `${(layoutItem.x / 12) * 100}%`,
-                                    top: `${layoutItem.y * 20}px`,
-                                    width: `${(layoutItem.w / 12) * 100}%`,
-                                    height: `${layoutItem.h * 20}px`,
-                                    backgroundColor: bgColor,
-                                    borderColor: widgetSettings.borderColor,
-                                    borderWidth: `${widgetSettings.borderWidth}px`,
-                                    borderStyle: "solid",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    overflow: "hidden",
-                                  }}
-                                >
-                                  {/* Widget Header */}
-                                  <div
-                                    className="p-1 flex-shrink-0"
-                                    style={{
-                                      backgroundColor: categoryBgColor,
-                                      height: `${Math.min(widgetSettings.categoryHeight, 20)}px`,
-                                      borderBottom: widgetSettings.categoryBorderWidth > 0
-                                        ? `${widgetSettings.categoryBorderWidth}px solid ${widgetSettings.categoryBorderColor}`
-                                        : "none",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                  >
-                                    <div
-                                      className="text-xs font-semibold text-center"
-                                      style={{
-                                        color: widgetSettings.categoryFontColor,
-                                        fontFamily: widgetSettings.categoryFont,
-                                        fontSize: `${Math.min(widgetSettings.categoryFontSize, 10)}px`,
-                                        fontWeight: widgetSettings.categoryFontWeight,
-                                      }}
-                                    >
-                                      {/* Empty title - just structure */}
-                                    </div>
-                                  </div>
-
-                                  {/* Widget Content */}
-                                  <div className="p-1 flex-grow flex flex-col overflow-hidden">
-                                    <div className="space-y-1 flex-grow overflow-y-auto">
-                                      {/* Render empty notice placeholders */}
-                                      {Array.from({ length: 2 }).map((_, index) => (
-                                        <div
-                                          key={index}
-                                          className="rounded shadow p-1"
-                                          style={{
-                                            backgroundColor: cardBgColor,
-                                            borderLeft: `2px solid ${widgetSettings.borderColor}`,
-                                            fontFamily: widgetSettings.fontFamily,
-                                            height: '20px', // Smaller height for preview
-                                          }}
-                                        >
-                                          {/* Empty notice - just structure */}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                      {/* End Template Preview */}
-                      
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{template.widgets.length} widgets</span>
-                        <span>{template.layout.length} layout items</span>
-                      </div>
-                      
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={() => applyTemplate(template)}
-                          disabled={isApplyingTemplate}
-                          className={`flex-1 text-xs bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors ${
-                            isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          {isApplyingTemplate ? (
-                            <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
-                              Applying...
-                            </>
-                          ) : (
-                            'Apply Template'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Template Modal */}
-      {showEditModal && editingTemplate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Edit Template</h3>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false)
-                    setEditingTemplate(null)
-                    setTemplateName("")
-                    setTemplateDescription("")
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-            <div className="space-y-4">
-              <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Template Name
-                </label>
-                <input
-                  type="text"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    placeholder="Enter template name..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description (Optional)
-                </label>
-                <textarea
-                    value={templateDescription}
-                    onChange={(e) => setTemplateDescription(e.target.value)}
-                  placeholder="Describe your template..."
-                  rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-                <div className="bg-yellow-50 p-3 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <div className="text-sm text-yellow-700">
-                      <p className="font-medium">Update Current Dashboard</p>
-                      <p className="text-yellow-600 mt-1">
-                        This will update the template with your current dashboard layout and settings.
-                      </p>
-                    </div>
-                  </div>
-              </div>
-            </div>
-
-              <div className="flex gap-3 mt-6">
-              <button
-                  onClick={() => {
-                    setShowEditModal(false)
-                    setEditingTemplate(null)
-                    setTemplateName("")
-                    setTemplateDescription("")
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                  onClick={handleUpdateTemplate}
-                disabled={isUpdatingTemplate}
-                className={`flex-1 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors ${
-                  isUpdatingTemplate ? 'opacity-75 cursor-not-allowed' : ''
-                }`}
-              >
-                {isUpdatingTemplate ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Updating...
-                  </>
-                ) : (
-                  'Update Template'
-                )}
-              </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Image Select Modal */}
       {isImageSelectOpen && createPortal(
         <div className="fixed inset-0 z-[1000]">
@@ -6577,149 +4973,7 @@ function EditDashboardDemo() {
         </div>, document.body)
       }
 
-      {/* View Template Modal */}
-      {showViewModal && selectedTemplate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
-            {/* Template card content */}
-            <div className="p-6">
-              {/* Template name with close button */}
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">{selectedTemplate.name}</h3>
-                <button
-                  onClick={() => {
-                    setShowViewModal(false)
-                    setSelectedTemplate(null)
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              
-              {/* Template description */}
-              {selectedTemplate.description && (
-                <p className="text-sm text-gray-600 mb-4">{selectedTemplate.description}</p>
-              )}
-              
-              {/* Template Preview */}
-              <div className="w-full flex justify-center mb-4">
-                <div className="bg-white border border-gray-200 rounded-lg p-2" style={{ width: '100%', height: 'auto', minHeight: 200 }}>
-                  <div className="relative w-full" style={{ height: `${Math.max(200, Math.max(...selectedTemplate.layout.map(l => (l.y + l.h) * 25)) + 15)}px` }}>
-                    {selectedTemplate.layout.map((layoutItem) => {
-                      const widget = selectedTemplate.widgets.find(w => w.id === layoutItem.i)
-                      if (!widget) return null
-                      
-                      const widgetSettings = selectedTemplate.widgetSettings?.[widget.id] || DEFAULT_WIDGET_SETTINGS
-                      
-                      // Generate background colors
-                      const bgColor = hexToRgba(widgetSettings.backgroundColor, widgetSettings.backgroundOpacity)
-                      const cardBgColor = hexToRgba(widgetSettings.backgroundColor, widgetSettings.cardOpacity)
-                      const categoryBgColor = widgetSettings.categoryBackgroundColor || DEFAULT_WIDGET_SETTINGS.categoryBackgroundColor
-                      
-                      return (
-                        <div
-                          key={widget.id}
-                          className="rounded-lg shadow-md absolute"
-                          style={{
-                            left: `${(layoutItem.x / 12) * 100}%`,
-                            top: `${layoutItem.y * 25}px`,
-                            width: `${(layoutItem.w / 12) * 100}%`,
-                            height: `${layoutItem.h * 25}px`,
-                            backgroundColor: bgColor,
-                            borderColor: widgetSettings.borderColor,
-                            borderWidth: `${widgetSettings.borderWidth}px`,
-                            borderStyle: "solid",
-                            display: "flex",
-                            flexDirection: "column",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {/* Widget Header */}
-                          <div
-                            className="p-1 flex-shrink-0"
-                            style={{
-                              backgroundColor: categoryBgColor,
-                              height: `${Math.min(widgetSettings.categoryHeight, 20)}px`,
-                              borderBottom: widgetSettings.categoryBorderWidth > 0
-                                ? `${widgetSettings.categoryBorderWidth}px solid ${widgetSettings.categoryBorderColor}`
-                                : "none",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <div
-                              className="text-xs font-semibold text-center"
-                              style={{
-                                color: widgetSettings.categoryFontColor,
-                                fontFamily: widgetSettings.categoryFont,
-                                fontSize: `${Math.min(widgetSettings.categoryFontSize, 10)}px`,
-                                fontWeight: widgetSettings.categoryFontWeight,
-                              }}
-                            >
-                              {/* Empty title - just structure */}
-                            </div>
-                          </div>
-
-                          {/* Widget Content */}
-                          <div className="p-1 flex-grow flex flex-col overflow-hidden">
-                            <div className="space-y-1 flex-grow overflow-y-auto">
-                              {/* Render empty notice placeholders */}
-                              {Array.from({ length: 2 }).map((_, index) => (
-                                <div
-                                  key={index}
-                                  className="rounded shadow p-1"
-                                  style={{
-                                    backgroundColor: cardBgColor,
-                                    borderLeft: `2px solid ${widgetSettings.borderColor}`,
-                                    fontFamily: widgetSettings.fontFamily,
-                                    height: '15px', // Smaller height for preview
-                                  }}
-                                >
-                                  {/* Empty notice - just structure */}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Template stats */}
-              <div className="flex justify-between items-center text-sm text-gray-600 mb-4">
-                <span>{selectedTemplate.widgets.length} widgets</span>
-                <span>{selectedTemplate.layout.length} layout items</span>
-              </div>
-              
-              {/* Apply Template button */}
-              <button
-                onClick={() => {
-                  applyTemplate(selectedTemplate)
-                  setShowViewModal(false)
-                  setSelectedTemplate(null)
-                }}
-                disabled={isApplyingTemplate}
-                className={`w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium ${
-                  isApplyingTemplate ? 'opacity-75 cursor-not-allowed' : ''
-                }`}
-              >
-                {isApplyingTemplate ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Applying Template...
-                  </>
-                ) : (
-                  'Apply Template'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* View Template Modal moved to TemplatesPanel */}
     </div>
   )
 }
