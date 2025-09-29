@@ -320,33 +320,7 @@ SmartNoticeBoard implements a four-tier role system with automatic Super Admin a
 │
 ├── 📁 prisma/ # Database schema and migrations
 │ ├── 📁 migrations/ # Database migration files
-│ │ ├── 20250115000000_add_public_notice_templates/
-│ │ ├── 20250306074250_first_migration/
-│ │ ├── 20250306080922_connecting_tables/
-│ │ ├── 20250308093215_making_category_unique/
-│ │ ├── 20250308221303_dashboard_table_added/
-│ │ ├── 20250309092247_updated/
-│ │ ├── 20250312124754_added_created_at_field_in_dashboard/
-│ │ ├── 20250514123554_adding_template/
-│ │ ├── 20250514131025_template_add2/
-│ │ ├── 20250729063051_add_displayname_and_icon/
-│ │ ├── 20250729065435_add_icon_to_notice/
-│ │ ├── 20250729070714_add_edited_name_to_category/
-│ │ ├── 20250729151602_add_icon_and_edited_name_to_category/
-│ │ ├── 20250801062421_add_icon_to_notice/
-│ │ ├── 20250801124833_make_password_optional/
-│ │ ├── 20250801131002_add_nextauth_tables/
-│ │ ├── 20250802075430_add_image_tables/
-│ │ ├── 20250802105748_add_timestamps_to_category/
-│ │ ├── 20250802105907_h/
-│ │ ├── 20250804004534_add_pdf_fields_to_notice/
-│ │ ├── 20250804051750_add_image_fields_to_notice/
-│ │ ├── 20250804120902_add_notice_type_and_nullable_content/
-│ │ ├── 20250804182119_add_public_notice_settings/
-│ │ └── 20250804205658_add_pdf_support_to_image/
-│ ├── migration_lock.toml # Migration lock file
-│ └── schema.prisma # Database schema definition
-│
+│ │ 
 ├── 📁 public/ # Static files
 │ ├── file.svg # File icon
 │ ├── globe.svg # Globe icon
