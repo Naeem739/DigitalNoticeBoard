@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -110,9 +111,9 @@ export default function ViewDashboard() {
     return notices.find(notice => notice.id === noticeId)
   }
 
-  const getImageById = (imageId: string) => {
-    return images.find(image => image.id === imageId)
-  }
+  // const getImageById = (imageId: string) => {
+  //   return images.find(image => image.id === imageId)
+  // }
 
   // Helper function to reconstruct image URL from notice data
   const reconstructImageUrl = (notice: TNotice) => {
@@ -143,7 +144,7 @@ export default function ViewDashboard() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Dashboard Not Found</h2>
-          <p className="text-gray-600 mb-6">The dashboard you're looking for doesn't exist.</p>
+          <p className="text-gray-600 mb-6">The dashboard you&apos;re looking for doesn&apos;t exist.</p>
           <Link href="/dashboard/noticeInterfaces">
             <Button className="bg-blue-600 hover:bg-blue-700">
               <ArrowLeft className="w-4 h-4 mr-2" />

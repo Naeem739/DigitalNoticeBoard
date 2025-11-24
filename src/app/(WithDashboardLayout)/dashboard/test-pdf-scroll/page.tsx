@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useRef } from "react"
@@ -35,11 +36,10 @@ export default function TestPdfScrollPage() {
       const viewport = page.getViewport({ scale: 1.5 })
 
       const canvas = document.createElement("canvas")
-      const context = canvas.getContext("2d")
       canvas.width = viewport.width
       canvas.height = viewport.height
 
-      await page.render({ canvasContext: context!, viewport }).promise
+      await page.render({ canvas, viewport }).promise
       container.appendChild(canvas)
     }
 

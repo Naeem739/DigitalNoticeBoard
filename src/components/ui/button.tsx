@@ -45,6 +45,9 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, stateful = false, ...props }, ref) => {
+    // Call hooks at the top level so they are always executed in the same order
+    const [scope, animate] = useAnimate();
+
     // Fallback to standard button when using asChild or not stateful
     if (asChild || !stateful) {
       const Comp = asChild ? Slot : "button"
@@ -56,9 +59,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         />
       )
     }
-
-    // Move React Hooks to top-level to fix conditional hook call
-    const [scope, animate] = useAnimate();
 
     const animateLoading = async () => {
       await animate(

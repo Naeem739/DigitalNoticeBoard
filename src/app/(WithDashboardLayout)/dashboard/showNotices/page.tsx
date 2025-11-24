@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 import { NoticeBoardLoader } from "@/components/ui/loader";
 import { WidgetContainer } from "./components/edit-dashboard-demo-two";
@@ -25,11 +27,18 @@ const ShowNoticesPage = () => {
   }
 
   // WidgetContainer fetches and displays notices from the Notice model
-  return (
-    <div>
-      <WidgetContainer data={{}} />
-    </div>
-  );
+    const defaultDashboardData = {
+      aspectRatio: 16 / 9,
+      notices: [],
+      images: [],
+      containers: []
+    } as any;
+  
+    return (
+      <div>
+        <WidgetContainer data={defaultDashboardData} />
+      </div>
+    );
 };
 
 export default ShowNoticesPage;

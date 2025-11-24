@@ -3,7 +3,7 @@
 import Link from "next/link"
 import SignUpForm from "./signup-form"
 import { motion } from "framer-motion"
-import { UserPlus, Shield } from "lucide-react"
+import { UserPlus } from "lucide-react"
 import { useEffect, useState } from "react"
 
 export default function SignUpPage() {

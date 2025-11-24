@@ -374,7 +374,7 @@ export const deleteAllTempDashboards = async() => {
     try{
         // In some environments the Prisma client might be outdated and not include TempDashboard yet.
         // Gracefully handle that by short-circuiting when the model is missing.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const tempModel = (prisma as any).tempDashboard
         if (!tempModel) {
             console.warn("Prisma client has no tempDashboard model. Skipping deleteAllTempDashboards(). Did you run prisma generate?")
