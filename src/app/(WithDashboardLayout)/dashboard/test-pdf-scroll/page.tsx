@@ -36,10 +36,19 @@ export default function TestPdfScrollPage() {
       const viewport = page.getViewport({ scale: 1.5 })
 
       const canvas = document.createElement("canvas")
+      const context = canvas.getContext("2d")
+      
+      if (!context) continue
+
       canvas.width = viewport.width
       canvas.height = viewport.height
 
-      await page.render({ canvas, viewport }).promise
+      await page.render({ 
+        canvasContext: context, 
+        viewport,
+        canvas, // Add the missing 'canvas' property required by RenderParameters
+      }).promise
+
       container.appendChild(canvas)
     }
 
@@ -72,5 +81,3 @@ export default function TestPdfScrollPage() {
     </div>
   )
 }
-
-

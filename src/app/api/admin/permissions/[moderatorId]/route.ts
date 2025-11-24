@@ -3,10 +3,10 @@ import { prisma } from '@/db/prisma'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { moderatorId: string } }
+  { params }: { params: Promise<{ moderatorId: string }> }
 ) {
   try {
-    const { moderatorId } = params
+    const { moderatorId } = await params
     const permission = await prisma.moderatorPermission.findUnique({
       where: { moderatorId },
       select: { allowedRoutes: true }
@@ -22,10 +22,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { moderatorId: string } }
+  { params }: { params: Promise<{ moderatorId: string }> }
 ) {
   try {
-    const { moderatorId } = params
+    const { moderatorId } = await params
     const body = await request.json()
     const routes: string[] = Array.isArray(body?.allowedRoutes) ? body.allowedRoutes : []
     
@@ -45,5 +45,3 @@ export async function PUT(
     return NextResponse.json({ success: false, message: 'Failed to update permissions' }, { status: 500 })
   }
 }
-
-

@@ -89,26 +89,14 @@ export const getDashboards = async () => {
       }
     });
 
-    // Fetch images
-    const images = await prisma.image.findMany({
-      where: {
-        id: {
-          in: imageIds
-        }
-      },
-      include: {
-        container: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    // Note: Removed image fetching since Image model doesn't exist in schema
+    // If you need images, add the Image model to your Prisma schema first
 
     return {
       success: true,
       result: {
         notices,
-        images,
+        images: [], // Return empty array for now
         ...result[0]
       }
     }
@@ -251,13 +239,18 @@ export const getDashboardByIndex = async (index: number) => {
         const imageIds: string[] = [];
 
         // Extract notice and image IDs from containers
-        containers.forEach((container: any) => {
-            if (container.type === "image" && container.imageIds) {
-                imageIds.push(...container.imageIds);
-            } else if (container.noticeIds) {
-                noticeIds.push(...container.noticeIds);
-            }
-        });
+        if (Array.isArray(containers)) {
+            containers.forEach((container: any) => {
+                if (container && typeof container === "object") {
+                    if (container.type === "image" && Array.isArray(container.imageIds)) {
+                        imageIds.push(...container.imageIds);
+                    } 
+                    if (Array.isArray(container.noticeIds)) {
+                        noticeIds.push(...container.noticeIds);
+                    }
+                }
+            });
+        }
 
         // Fetch notices
         const notices = await prisma.notice.findMany({
@@ -275,14 +268,13 @@ export const getDashboardByIndex = async (index: number) => {
             }
         });
 
-        // Remove image fetching from prisma.image
-        // const images = await prisma.image.findMany({ ... });
+        // Image model doesn't exist, so we skip image fetching
 
         return {
             success: true,
             result: {
                 notices,
-                // images: [], // Optionally return an empty array if frontend expects it
+                images: [], // Return empty array
                 ...dashboard
             }
         }

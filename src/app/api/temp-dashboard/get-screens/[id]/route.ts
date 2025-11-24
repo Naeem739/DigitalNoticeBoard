@@ -3,10 +3,11 @@ import { getTempDashboardScreens } from "@/app/actions/dashboard.action"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  // { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const result = await getTempDashboardScreens(id)
 
     if (result.success) {

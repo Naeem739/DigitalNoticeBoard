@@ -31,7 +31,7 @@ export const createNotice = async(value: Omit<TNotice, "id">)=>{
         const result = await prisma.notice.create({
             data:{
                 title : value.title,
-                content: value.content,
+                content: value.content as string,
                 category : value.category,
                 categoryId: value.categoryId,
                 pdfUrl: value.pdfUrl,

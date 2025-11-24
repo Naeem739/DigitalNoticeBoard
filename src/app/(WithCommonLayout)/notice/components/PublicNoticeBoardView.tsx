@@ -3,7 +3,6 @@
 import { TDashboard } from '@/types/types';
 import React, { useState, useEffect } from 'react';
 import GridLayout from 'react-grid-layout';
-// import type { TDashboard } from '../types';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
@@ -25,7 +24,9 @@ const ClientOnlyGridLayout = ({ children, ...props }: any) => {
     );
   }
 
-  return <GridLayout {...props}>{children}</GridLayout>;
+  // Cast GridLayout to any to bypass type conflicts
+  const GridLayoutComponent = GridLayout as any;
+  return <GridLayoutComponent {...props}>{children}</GridLayoutComponent>;
 };
 
 export const Dashboard = ({ data }:{data:TDashboard | null}) => {
@@ -46,7 +47,6 @@ export const Dashboard = ({ data }:{data:TDashboard | null}) => {
         // Use the window width instead of container width for larger dimensions
         const viewportHeight = window.innerHeight - 50; // Reduced padding for more space
         const viewportWidth = window.innerWidth - 50 ; // Account for some minimal padding
-        // const scale = widthRatio/heightRatio;
   
         // Calculate dimensions that maintain aspect ratio and fit viewport
         const heightFromWidth = (viewportWidth * heightRatio) / widthRatio;
@@ -87,8 +87,6 @@ export const Dashboard = ({ data }:{data:TDashboard | null}) => {
   
     // Calculate row height based on available height and maximum grid height
     const maxGridHeight = layout? Math.max(...layout.map(item => item.h)): 100;
-    // const maxGridHeight = layout? Math.max(...layout.map(item => item.y + item.h)): 100;
-    // const maxGridHeight = 100;
     const rowHeight = dimensions.height / (maxGridHeight);
   
     if (!isClient) {
@@ -105,11 +103,6 @@ export const Dashboard = ({ data }:{data:TDashboard | null}) => {
       <div className="grid-container border  border-lime-500 w-full h-[90vh] ">
         <div 
           className="relative  bg-gray-100 rounded-lg shadow-lg overflow-hidden  h-full border border-red-600 mx-auto   "
-          // style={{
-          //   width: dimensions.width,
-          //   height: dimensions.height,
-          //   margin: '0 auto'
-          // }}
         >
           {dimensions.width > 0 && (
             <ClientOnlyGridLayout
@@ -118,33 +111,30 @@ export const Dashboard = ({ data }:{data:TDashboard | null}) => {
               cols={6}
               rowHeight={rowHeight}
               width={dimensions.width}
-              // rowHeight={rowHeight}
-              // width={dimensions.width}
-               margin={[20, 20]} // Increased margins
-             // containerPadding={[20, 20]} // Increased padding
+              margin={[20, 20]}
               style={{
                 height: dimensions.height
               }}
             >
-              {data?.containers.map((container) => (
-                <div
-                  key={container.id}
-                  style={{
-                    width: container.width,
-                    // height: container.height
-                  }}
-                  className="bg-white rounded-md shadow-md p-6 transition-all duration-200 hover:shadow-lg overflow-auto"
-                >
-                  {container.title && (
-                    <h3 className="text-xl font-semibold mb-3 truncate">
-                      {container.settings?.customCategoryName || container.title}
-                      <p> {container.width }</p><p>  {container.height}  </p> 
-                    </h3>
-                  )}
-                 
-                  
-                </div>
-              ))}
+              {data?.containers.map((container) => {
+                // Find the original container data to access settings
+                return (
+                  <div
+                    key={container.id}
+                    style={{
+                      width: container.width,
+                    }}
+                    className="bg-white rounded-md shadow-md p-6 transition-all duration-200 hover:shadow-lg overflow-auto"
+                  >
+                    {container.title && (
+                      <h3 className="text-xl font-semibold mb-3 truncate">
+                        {(container as any).settings?.customCategoryName || container.title}
+                        <p> {container.width }</p><p>  {container.height}  </p> 
+                      </h3>
+                    )}
+                  </div>
+                );
+              })}
             </ClientOnlyGridLayout>
           )}
         </div>

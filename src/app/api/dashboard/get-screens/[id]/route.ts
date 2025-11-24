@@ -3,10 +3,11 @@ import { prisma } from "@/db/prisma"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  // { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
 
     // First, get the dashboard with the provided ID to get its creation time
     const originalDashboard = await prisma.dashboard.findUnique({
