@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useState, useEffect } from "react"
@@ -21,22 +23,11 @@ import {
   Monitor,
   Globe,
   Phone,
-  User,
   Building,
   Palette as PaletteIcon,
-  Image,
-  Download,
   CheckCircle,
   AlertCircle,
-  Zap,
-  Bookmark,
-  Edit,
-  Trash2,
-  Plus,
-  Grid,
-  List,
-  Search,
-  Filter
+  Zap
 } from "lucide-react"
 import { motion } from "framer-motion"
 import TemplateManager from "./components/TemplateManager"

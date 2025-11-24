@@ -17,7 +17,6 @@ import { createNotice } from "@/app/actions/notice.action";
 import { getCategories } from "@/app/actions/category.action";
 import { toast } from "sonner";
 import { 
-  PenLine, 
   Type, 
   Bold, 
   Italic, 
@@ -28,13 +27,8 @@ import {
   FileText, 
   X, 
   Eye,
-  Download,
   Bell,
-  Calendar,
-  Tag,
   AlertCircle,
-  CheckCircle,
-  Clock
 } from "lucide-react";
 import { NoticeEditorLoader } from "@/components/ui/loader";
 

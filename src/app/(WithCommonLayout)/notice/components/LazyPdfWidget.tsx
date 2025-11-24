@@ -19,7 +19,6 @@ const LazyPdfWidget = memo(function LazyPdfWidget({
   autoScroll = true,
   className = "",
   showTitle = true,
-  containerId
 }: LazyPdfWidgetProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)

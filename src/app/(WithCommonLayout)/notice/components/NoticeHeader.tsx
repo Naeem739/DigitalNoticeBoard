@@ -10,6 +10,7 @@ interface NoticeHeaderProps {
     timeUntilNextPage?: number;
     onToggleAutoPagination?: () => void;
     // Dashboard navigation props
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dashboards?: any[];
     currentDashboardIndex?: number;
     onDashboardChange?: (index: number) => void;

@@ -9,7 +9,7 @@ interface PDFDebuggerProps {
   title?: string
 }
 
-export default function PDFDebugger({ pdfData, title }: PDFDebuggerProps) {
+export default function PDFDebugger({ pdfData }: PDFDebuggerProps) {
   const [showDebug, setShowDebug] = useState(false)
 
   if (process.env.NODE_ENV !== 'development') {

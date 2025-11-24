@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useRef, useEffect, useState } from "react"
@@ -96,8 +97,9 @@ export default function PdfDisplay({ pdfData, title, autoScroll = true, classNam
         context!.scale(outputScale, outputScale)
         
         await page.render({ 
-          canvasContext: context!, 
-          viewport
+          canvas: canvas,
+          canvasContext: context!,
+          viewport: viewport
         }).promise
         container.appendChild(canvas)
       }

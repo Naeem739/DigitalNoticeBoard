@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // PDF Cache Management Utility
 // Handles caching of PDF documents and rendered canvases to improve performance
 
@@ -99,7 +100,7 @@ class PDFCacheManager {
       return data.reduce((sum, item) => sum + this.calculateSize(item), 0)
     }
     if (typeof data === 'object' && data !== null) {
-      return Object.values(data).reduce((sum, value) => sum + this.calculateSize(value), 0)
+      return Object.values(data).reduce((sum: number, value: any) => sum + this.calculateSize(value), 0)
     }
     return 0
   }

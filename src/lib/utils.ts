@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -73,7 +74,7 @@ export const localStorageUtils = {
       let used = 0
       
       // Calculate used space
-      for (let key in localStorage) {
+      for (const key in localStorage) {
         if (localStorage.hasOwnProperty(key)) {
           const item = localStorage[key]
           used += item.length + key.length

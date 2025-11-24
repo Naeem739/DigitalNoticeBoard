@@ -78,6 +78,7 @@ if(token && url.pathname.startsWith('/dashboard')) {
         }
         let allowedRoutes: string[] = []
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const moderatorId = ((token as any).id as string) || (token.sub as string)
             const origin = request.nextUrl.origin
             const apiUrl = `${origin}/api/admin/permissions/${moderatorId}`
@@ -88,6 +89,7 @@ if(token && url.pathname.startsWith('/dashboard')) {
             } else {
                 allowedRoutes = ['/']
             }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
             allowedRoutes = ['/']
         }

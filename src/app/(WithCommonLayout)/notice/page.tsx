@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -7,11 +9,8 @@ import {
   Phone, 
   User, 
   Building, 
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
-  Play,
-  Pause
 } from 'lucide-react'
 import { NoticeQRCode } from '@/components/ui/qr-code'
 import LazyPdfWidget from './components/LazyPdfWidget'
@@ -314,7 +313,7 @@ export default function PublicNoticePage() {
         const noticesResponse = await fetch('/api/notice/get-all')
         const noticesData = await noticesResponse.json()
         if (noticesData.success) {
-          let allNotices = noticesData.result || []
+          const allNotices = noticesData.result || []
           
           // Filter notices from dashboard containers
           const dashboardNotices = noticeIds.length > 0 ? 
@@ -364,9 +363,9 @@ export default function PublicNoticePage() {
     return notices.find(notice => notice.id === noticeId)
   }
 
-  const getImageById = (imageId: string) => {
-    return images.find(image => image.id === imageId)
-  }
+  // const getImageById = (imageId: string) => {
+  //   return images.find(image => image.id === imageId)
+  // }
 
   const getPdfById = (pdfId: string) => {
     return pdfs.find(pdf => pdf.id === pdfId)
@@ -409,18 +408,18 @@ export default function PublicNoticePage() {
     }
   }
 
-  const toggleAutoPagination = () => {
-    setAutoPaginationEnabled(!autoPaginationEnabled)
-    if (!autoPaginationEnabled) {
-      setCountdown(300) // Reset countdown when enabling
-    }
-  }
+  // const toggleAutoPagination = () => {
+  //   setAutoPaginationEnabled(!autoPaginationEnabled)
+  //   if (!autoPaginationEnabled) {
+  //     setCountdown(300) // Reset countdown when enabling
+  //   }
+  // }
 
-  const formatCountdown = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
-  }
+  // const formatCountdown = (seconds: number) => {
+  //   const minutes = Math.floor(seconds / 60)
+  //   const remainingSeconds = seconds % 60
+  //   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  // }
 
   // Get background style based on settings
   const getBackgroundStyle = () => {

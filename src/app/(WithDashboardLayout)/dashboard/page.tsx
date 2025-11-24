@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,16 +10,9 @@ import {
   FileText, 
   Image, 
   Layout, 
-  TrendingUp, 
   Activity, 
-  Clock, 
   Plus,
   Eye,
-  Edit,
-  Trash2,
-  Calendar,
-  BarChart3,
-  Zap,
   Shield,
   Crown,
   X
@@ -27,7 +21,7 @@ import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { BellLoader, DashboardLoader, ContentSkeleton } from '@/components/ui/loader'
+import { DashboardLoader } from '@/components/ui/loader'
 
 type TDashboardStats = {
   totalNotices: number
@@ -531,7 +525,7 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {stats.recentNotices.map((notice, index) => {
+                    {stats.recentNotices.map((notice) => {
                       // Truncate content to 6 words to prevent overflow
                       const words = notice.content?.split(' ') || [];
                       let truncatedContent = words.length > 6 
@@ -611,7 +605,7 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {stats.recentImages.map((image, index) => (
+                    {stats.recentImages.map((image) => (
                       <div key={image.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                         <div className="flex items-center gap-3 flex-1">
                           <div 
@@ -679,7 +673,7 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {stats.recentPDFs.map((pdf, index) => (
+                    {stats.recentPDFs.map((pdf) => (
                       <div key={pdf.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                         <div className="flex items-center gap-3 flex-1">
                           <div 

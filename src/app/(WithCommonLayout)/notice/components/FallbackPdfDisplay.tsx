@@ -18,7 +18,7 @@ export default function FallbackPdfDisplay({
   className = "", 
   showTitle = true 
 }: FallbackPdfDisplayProps) {
-  const [useFallback, setUseFallback] = useState(false)
+  // const [useFallback, setUseFallback] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {

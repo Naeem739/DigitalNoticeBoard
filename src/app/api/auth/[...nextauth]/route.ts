@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import NextAuth from "next-auth"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
@@ -51,7 +52,7 @@ const handler = NextAuth({
         session.user.name = token.name;
         session.user.email = token.email;
         session.user.id = token.sub;
-        session.user.role = token.role;
+        session.user.role = token.role as string;
         // attach allowed routes for moderator to the client session to avoid hydration issues
         // keep it undefined for other roles
         if (Array.isArray((token as any).allowedRoutes)) {
@@ -89,6 +90,7 @@ const handler = NextAuth({
           // Remove to keep token small for other roles
           delete (token as any).allowedRoutes;
         }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
         // On any error, default to no extra routes
         if ((token as any).role === 'MODERATOR') {

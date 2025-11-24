@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useEffect, useState } from "react"
-import { toast } from "sonner"
 import { SpinningBellLoader } from "@/components/ui/loader"
 
 interface TempDashboardViewerProps {
@@ -124,7 +124,7 @@ export default function TempDashboardViewer({ dashboardId }: TempDashboardViewer
         <div className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center">
           <div>
             <span className="font-semibold">
-              {currentScreen.screenName || `Screen ${currentScreen.screenIndex + 1}`}
+              {currentScreen.screenName || `Screen ${(currentScreen.screenIndex !== undefined ? currentScreen.screenIndex + 1 : currentScreenIndex + 1)}`}
             </span>
             <span className="text-gray-300 ml-2">
               ({currentScreenIndex + 1} of {tempScreens.length})

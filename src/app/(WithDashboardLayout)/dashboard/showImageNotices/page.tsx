@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -5,7 +6,6 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Trash2, Image as ImageIcon, Download } from 'lucide-react'
 import { toast } from 'sonner'
-import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 
 type TImage = {
@@ -161,16 +161,16 @@ export default function ShowImageNotices() {
     }
   }
 
-  const formatDate = (date: Date | undefined) => {
-    if (!date) return 'N/A'
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+  // const formatDate = (date: Date | undefined) => {
+  //   if (!date) return 'N/A'
+  //   return new Date(date).toLocaleDateString('en-US', {
+  //     year: 'numeric',
+  //     month: 'short',
+  //     day: 'numeric',
+  //     hour: '2-digit',
+  //     minute: '2-digit'
+  //   })
+  // }
 
   if (loading) {
     return (

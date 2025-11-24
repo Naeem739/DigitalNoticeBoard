@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 import { TDashboard } from '@/types/types';
 import React, { useState, useEffect } from 'react';

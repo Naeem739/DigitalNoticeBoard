@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import type React from "react"
@@ -18,31 +20,28 @@ import {
   LayoutIcon,
   Upload,
   Image as ImageIcon,
-  Trash2,
   Edit,
   ArrowLeft,
-  AlertTriangle,
 } from "lucide-react"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import "./edit-dashboard.css"
 import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } from "@/types/template-types"
-import { getCategoriesWithNotices, getCategories, getDashboardCategory, getDashboardPdfCategory, getTextCategoriesWithNotices } from "@/app/actions/category.action"
-import { getAllTemplates, createTemplate, getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
-import { createDashboard, getAllDashboards, createTempDashboard, updateTempDashboard, deleteAllTempDashboards } from "@/app/actions/dashboard.action"
+import { getCategories, getDashboardCategory, getDashboardPdfCategory, getTextCategoriesWithNotices } from "@/app/actions/category.action"
+import {  getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
+import { createDashboard, createTempDashboard, deleteAllTempDashboards } from "@/app/actions/dashboard.action"
 import { createNotice } from "@/app/actions/notice.action"
 import { createCategory } from "@/app/actions/category.action"
 // import { createImage } from "@/app/actions/image.action"
 import { toast } from "sonner"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { SpinningBellLoader, WaveLoader } from "@/components/ui/loader"
+import { SpinningBellLoader } from "@/components/ui/loader"
 import { localStorageUtils } from "@/lib/utils"
 import { useSession } from "next-auth/react"
 import InlinePdfWidget from "./components/InlinePdfWidget"
 import ImageWidget from "./components/ImageWidget"
 import TemplatesPanel from "./components/TemplatesPanel"
-import WidgetSettingsPanel from "./components/WidgetSettingsPanel"
 import ScreenControls from "./components/ScreenControls"
 
 // Client-only wrapper for GridLayout to prevent hydration issues
@@ -61,7 +60,10 @@ const ClientOnlyGridLayout = ({ children, ...props }: any) => {
     );
   }
 
-  return <GridLayout {...props}>{children}</GridLayout>;
+  // Fix: Use GridLayout.default if available to support default React export
+  const GridLayoutComponent = (GridLayout as any).default ?? GridLayout;
+
+  return <GridLayoutComponent {...props}>{children}</GridLayoutComponent>;
 };
 
 // Client-only wrapper for the entire dashboard to prevent hydration issues
@@ -2447,7 +2449,10 @@ function EditDashboardDemo() {
 
         // Create the dashboard record
         console.log("Saving dashboard data:", dashboardData)
-        const result = await createDashboard(dashboardData)
+        const result = await createDashboard({
+          ...dashboardData,
+          aspectRatio: dashboardData.aspectRatio ?? "" // Ensure aspectRatio is always a string
+        })
         console.log("Save result:", result)
         dashboardResults.push(result)
         
@@ -3254,7 +3259,7 @@ function EditDashboardDemo() {
             <h2 className="text-lg font-semibold text-yellow-800">Editing Existing Dashboard</h2>
           </div>
           <p className="text-sm text-yellow-700 mt-1">
-            You are editing an existing dashboard. Make your changes and click "Update Dashboard" to save.
+            You are editing an existing dashboard. Make your changes and click &quot;Update Dashboard&quot; to save.
           </p>
           {isLoadingExistingDashboard && (
             <div className="mt-3 flex items-center gap-2 text-sm text-yellow-700">

@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
-import type React from "react"
+import React from "react"
 import { motion } from "framer-motion"
 import { Sidebar as UISidebar, SidebarBody, SidebarLink, useSidebar } from "@/components/ui/sidebar"
 import { 
@@ -160,7 +161,7 @@ export default function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen?
           <span className="flex items-center gap-3">
             <span className="w-6 flex items-center justify-center text-white">{icon}</span>
             <motion.span 
-              className="text-white"
+              className="text-white whitespace-nowrap overflow-hidden"
               animate={{
                 opacity: sidebar.open ? 1 : 0,
                 width: sidebar.open ? "auto" : 0,
@@ -169,7 +170,6 @@ export default function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen?
                 duration: 0.3,
                 ease: "easeInOut",
               }}
-              className="whitespace-nowrap overflow-hidden"
             >
               {title}
             </motion.span>
@@ -214,8 +214,11 @@ export default function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen?
             <div className="text-sm font-medium mb-2 px-2 py-1 border-b border-gray-600">{title}</div>
             <div className="flex flex-col gap-1">
               {React.Children.map(children, (child) => {
-                if (React.isValidElement(child) && child.type === SidebarLink) {
-                  const link = child.props.link;
+                if (
+                  React.isValidElement(child) &&
+                  child.type === SidebarLink
+                ) {
+                  const link = (child.props as { link: { href: string; icon: React.ReactNode; label: string } }).link;
                   return (
                     <a
                       href={link.href}
