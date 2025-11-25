@@ -1,6 +1,7 @@
+
+'use client'
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client"
 
 import { useEffect, useState } from 'react'
 import { usePublicNoticeSettings } from '@/hooks/usePublicNoticeSettings'
@@ -13,9 +14,10 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { NoticeQRCode } from '@/components/ui/qr-code'
-import LazyPdfWidget from './components/LazyPdfWidget'
-import ClientOnly from './components/ClientOnly'
-import PDFPerformanceMonitor from './components/PDFPerformanceMonitor'
+import LazyPdfWidget from './LazyPdfWidget'
+import ClientOnly from './ClientOnly'
+import PDFPerformanceMonitor from './PDFPerformanceMonitor'
+
 
 type TDashboard = {
   id: string
