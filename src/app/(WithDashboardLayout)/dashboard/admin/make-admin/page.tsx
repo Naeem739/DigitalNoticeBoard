@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Users, UserPlus, Eye, EyeOff, Shield, CheckCircle, AlertCircle, Zap, Crown } from 'lucide-react'
+import { UserPlus, Eye, EyeOff, Shield, CheckCircle, AlertCircle, Zap, Crown } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 

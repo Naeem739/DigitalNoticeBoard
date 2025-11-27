@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useRef } from "react"
@@ -36,10 +37,18 @@ export default function TestPdfScrollPage() {
 
       const canvas = document.createElement("canvas")
       const context = canvas.getContext("2d")
+      
+      if (!context) continue
+
       canvas.width = viewport.width
       canvas.height = viewport.height
 
-      await page.render({ canvasContext: context!, viewport }).promise
+      await page.render({ 
+        canvasContext: context, 
+        viewport,
+        canvas, // Add the missing 'canvas' property required by RenderParameters
+      }).promise
+
       container.appendChild(canvas)
     }
 
@@ -72,5 +81,3 @@ export default function TestPdfScrollPage() {
     </div>
   )
 }
-
-

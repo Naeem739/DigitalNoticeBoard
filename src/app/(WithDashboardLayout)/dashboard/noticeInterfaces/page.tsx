@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -134,24 +135,24 @@ export default function NoticeInterfaces() {
     return containers.length
   }
 
-  const getWidgetTypes = (containers: any[]) => {
-    if (!containers || !Array.isArray(containers)) return { notices: 0, images: 0 }
+  // const getWidgetTypes = (containers: any[]) => {
+  //   if (!containers || !Array.isArray(containers)) return { notices: 0, images: 0 }
     
-    const types = {
-      notices: 0,
-      images: 0
-    }
+  //   const types = {
+  //     notices: 0,
+  //     images: 0
+  //   }
     
-    containers.forEach(container => {
-      if (container.type === 'image') {
-        types.images++
-      } else if (container.type === 'notice') {
-        types.notices++
-      }
-    })
+  //   containers.forEach(container => {
+  //     if (container.type === 'image') {
+  //       types.images++
+  //     } else if (container.type === 'notice') {
+  //       types.notices++
+  //     }
+  //   })
     
-    return types
-  }
+  //   return types
+  // }
 
   if (loading) {
     return (
@@ -212,7 +213,7 @@ export default function NoticeInterfaces() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {currentDashboards.map((dashboard, index) => {
             const containerCount = getContainerCount(dashboard.containers)
-            const widgetTypes = getWidgetTypes(dashboard.containers)
+            // const widgetTypes = getWidgetTypes(dashboard.containers)
             return (
               <Card 
                 key={dashboard.id} 

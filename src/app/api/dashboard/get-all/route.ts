@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const skip = (page - 1) * limit;
 
     // Get total count for pagination
-    const totalCount = await prisma.dashboard.count();
+    // const totalCount = await prisma.dashboard.count();
     
     // Get all dashboards with proper ordering
     // First priority: createdAt DESC (latest first)

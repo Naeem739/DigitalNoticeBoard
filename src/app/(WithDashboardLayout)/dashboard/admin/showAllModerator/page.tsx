@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Users, UserCheck, Calendar, Mail, User, Trash2, Edit, Search, Shield, Activity, Filter } from 'lucide-react'
+import { Users, UserCheck, Calendar, Mail, User, Trash2, Search, Shield, Activity, Filter } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -33,28 +33,38 @@ export default function ShowAllModeratorPage() {
 
   useEffect(() => {
     // Filter and sort moderators
-    let filtered = moderators.filter(moderator => 
+    const filtered = moderators.filter(moderator => 
       moderator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       moderator.email.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
-    // Sort moderators
+    // Sort moderators - avoid type errors
     filtered.sort((a, b) => {
-      let aValue = a[sortBy]
-      let bValue = b[sortBy]
-      
-      if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
-        aValue = new Date(aValue).getTime()
-        bValue = new Date(bValue).getTime()
+      let aValue: string | number
+      let bValue: string | number
+
+      if (sortBy === 'createdAt') {
+        aValue = typeof a.createdAt === 'string' || a.createdAt instanceof Date ? new Date(a.createdAt).getTime() : 0
+        bValue = typeof b.createdAt === 'string' || b.createdAt instanceof Date ? new Date(b.createdAt).getTime() : 0
+      } else if (sortBy === 'name') {
+        aValue = String(a.name).toLowerCase()
+        bValue = String(b.name).toLowerCase()
+      } else if (sortBy === 'email') {
+        aValue = String(a.email).toLowerCase()
+        bValue = String(b.email).toLowerCase()
       } else {
-        aValue = aValue.toLowerCase()
-        bValue = bValue.toLowerCase()
+        aValue = ''
+        bValue = ''
       }
 
       if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1
+        if (aValue > bValue) return 1
+        if (aValue < bValue) return -1
+        return 0
       } else {
-        return aValue < bValue ? 1 : -1
+        if (aValue < bValue) return 1
+        if (aValue > bValue) return -1
+        return 0
       }
     })
 
@@ -378,7 +388,7 @@ export default function ShowAllModeratorPage() {
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
               <p className="text-sm text-gray-600">
-                To add new moderator users, use the "Make Moderator" page in the Admin section.
+                To add new moderator users, use the &quot;Make Moderator&quot; page in the Admin section.
               </p>
             </div>
           </CardContent>

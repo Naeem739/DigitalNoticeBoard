@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -221,7 +222,7 @@ const LoginPage = () => {
             className="mt-8 text-center"
           >
             <p className="text-sm text-gray-300">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link 
                 href="/signup" 
                 className="font-medium text-blue-400 hover:text-blue-300 transition-colors duration-200"

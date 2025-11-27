@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+// import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Shield, UserCheck, Save, ListChecks, CheckCircle2, Circle } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
-import { useSession } from 'next-auth/react'
+// import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 
 type TModerator = {
@@ -24,7 +26,7 @@ type TManageablePage = {
 }
 
 export default function SetPermissionPage() {
-  const { data: session } = useSession()
+  // const { data: session } = useSession()
   const [moderators, setModerators] = useState<TModerator[]>([])
   const [pages, setPages] = useState<TManageablePage[]>([])
   const [selectedModeratorId, setSelectedModeratorId] = useState<string>('')
@@ -319,7 +321,7 @@ export default function SetPermissionPage() {
               ) : (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {pages.map((p, idx) => {
+                    {pages.map((p) => {
                       const isDefault = p.route === '/' || p.route === '/dashboard'
                       const isChecked = isDefault || allowed.includes(p.route)
                       return (

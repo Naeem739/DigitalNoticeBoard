@@ -1,5 +1,4 @@
-import { Bell, Search, User, Menu, Shield, Crown } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Bell, User, Menu, Shield, Crown } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,

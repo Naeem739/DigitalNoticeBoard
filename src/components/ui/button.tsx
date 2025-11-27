@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -43,6 +45,9 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, stateful = false, ...props }, ref) => {
+    // Call hooks at the top level so they are always executed in the same order
+    const [scope, animate] = useAnimate();
+
     // Fallback to standard button when using asChild or not stateful
     if (asChild || !stateful) {
       const Comp = asChild ? Slot : "button"
@@ -54,8 +59,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         />
       )
     }
-
-    const [scope, animate] = useAnimate()
 
     const animateLoading = async () => {
       await animate(
@@ -91,8 +94,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const { onClick, ...rest } = props
 
     return (
-      <motion.button
-        layout
+      <button
         ref={scope as any}
         className={cn(buttonVariants({ variant, size, className }), "gap-2")}
         onClick={handleClick}
@@ -103,7 +105,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           <StatefulCheck />
           <motion.span layout>{props.children}</motion.span>
         </motion.span>
-      </motion.button>
+      </button>
     )
   }
 )

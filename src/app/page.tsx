@@ -2,88 +2,77 @@
 import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BellLoader } from '@/components/ui/loader';
 import { 
   Bell, 
   ChevronRight,  
-  Users, 
-  Share2, 
-  LayoutDashboard,
-  CheckCircle2,
   HelpCircle,
-  CreditCard,
   X,
   Zap,
   Lock,
   Clock,
   User,
-  LogOut,
-  Settings
+  LogOut
 } from 'lucide-react';
 
-import { useInView } from 'framer-motion';
-import { useRef } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
 import { TypewriterEffectSmooth } from '@/components/ui/typewriter-effect';
 
-const fadeInUp = {
-  hidden: { opacity: 0, y: 60 },
-  visible: { opacity: 1, y: 0 }
-};
+// const fadeInUp = {
+//   hidden: { opacity: 0, y: 60 },
+//   visible: { opacity: 1, y: 0 }
+// };
 
-const staggerChildren = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.3
-    }
-  }
-};
+// const staggerChildren = {
+//   hidden: { opacity: 0 },
+//   visible: {
+//     opacity: 1,
+//     transition: {
+//       staggerChildren: 0.3
+//     }
+//   }
+// };
 
 export default function Home() {
   const { data: session, status } = useSession();
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('monthly');
+  // const [activeTab, setActiveTab] = useState('monthly');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const displayName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User';
   
-  const pricingPlans = [
-    {
-      name: 'Starter',
-      price: { monthly: 19, yearly: 190 },
-      features: [
-        'Up to 5 team members',
-        'Basic notice board',
-        'Email support'
-      ],
-      recommended: false
-    },
-    {
-      name: 'Professional',
-      price: { monthly: 49, yearly: 490 },
-      features: [
-        'Up to 20 team members',
-        'Advanced notice board',
-        'Priority support',
-        'Custom branding'
-      ],
-      recommended: true
-    },
-    {
-      name: 'Enterprise',
-      price: { monthly: 99, yearly: 990 },
-      features: [
-        'Unlimited team members',
-        'Full feature set',
-        '24/7 dedicated support',
-        'Advanced analytics'
-      ],
-      recommended: false
-    }
-  ];
+  // const pricingPlans = [
+  //   {
+  //     name: 'Starter',
+  //     price: { monthly: 19, yearly: 190 },
+  //     features: [
+  //       'Up to 5 team members',
+  //       'Basic notice board',
+  //       'Email support'
+  //     ],
+  //     recommended: false
+  //   },
+  //   {
+  //     name: 'Professional',
+  //     price: { monthly: 49, yearly: 490 },
+  //     features: [
+  //       'Up to 20 team members',
+  //       'Advanced notice board',
+  //       'Priority support',
+  //       'Custom branding'
+  //     ],
+  //     recommended: true
+  //   },
+  //   {
+  //     name: 'Enterprise',
+  //     price: { monthly: 99, yearly: 990 },
+  //     features: [
+  //       'Unlimited team members',
+  //       'Full feature set',
+  //       '24/7 dedicated support',
+  //       'Advanced analytics'
+  //     ],
+  //     recommended: false
+  //   }
+  // ];
 
   const faqs = [
     {
@@ -387,7 +376,7 @@ export default function Home() {
           <h2 className="text-4xl font-bold mb-4">
             More Than Just a <span className="text-yellow-500">Notice Board</span>
           </h2>
-          <p className="text-gray-400 text-xl">Powerful features to supercharge your team's productivity</p>
+          <p className="text-gray-400 text-xl">Powerful features to supercharge your teams productivity</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">

@@ -1,28 +1,24 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { 
   Users, 
   Search, 
-  Edit, 
   Trash2, 
   Plus, 
-  Filter,
   Calendar,
   FileText,
-  ChevronDown,
-  FolderPlus,
   X,
   Tag,
-  CheckCircle,
-  AlertCircle
+  CheckCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-import Link from 'next/link'
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -84,7 +80,7 @@ export default function CategoryPage() {
 
   useEffect(() => {
     // Filter and sort categories
-    let filtered = categories.filter(category =>
+    const filtered = categories.filter(category =>
       category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       category.description?.toLowerCase().includes(searchTerm.toLowerCase())
     )
@@ -180,15 +176,15 @@ export default function CategoryPage() {
     }
   }
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+  // const formatDate = (date: Date) => {
+  //   return new Date(date).toLocaleDateString('en-US', {
+  //     month: 'short',
+  //     day: 'numeric',
+  //     year: 'numeric',
+  //     hour: '2-digit',
+  //     minute: '2-digit'
+  //   })
+  // }
 
   const getTimeAgo = (date: Date) => {
     if (typeof window === 'undefined') return 'Loading...';

@@ -1,8 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import NextAuth from "next-auth"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import CredentialsProvider from "next-auth/providers/credentials"
-// import prisma from "@/lib/prisma"
 import { compare } from "bcrypt"
 import { prisma } from "@/db/prisma"
 
@@ -16,7 +16,6 @@ const handler = NextAuth({
         password: {}
       },
       async authorize(credentials) {
-        // console.log(credentials);
         if (!credentials?.email || !credentials?.password) {
           return null
         }
@@ -45,23 +44,55 @@ const handler = NextAuth({
     strategy: "jwt",
     maxAge: 24 * 60 * 60
   },
+  // Configure cookies for production
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' 
+        ? '__Secure-next-auth.session-token' 
+        : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+    callbackUrl: {
+      name: process.env.NODE_ENV === 'production'
+        ? '__Secure-next-auth.callback-url'
+        : 'next-auth.callback-url',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+    csrfToken: {
+      name: process.env.NODE_ENV === 'production'
+        ? '__Host-next-auth.csrf-token'
+        : 'next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
   callbacks: {
     async session({ session, token }) {
       if (session?.user && token) {
         session.user.name = token.name;
         session.user.email = token.email;
         session.user.id = token.sub;
-        session.user.role = token.role;
+        session.user.role = token.role as string;
         // attach allowed routes for moderator to the client session to avoid hydration issues
         // keep it undefined for other roles
         if (Array.isArray((token as any).allowedRoutes)) {
           (session.user as any).allowedRoutes = (token as any).allowedRoutes as string[];
         }
       }
-
-      // console.log("From session_________________________");
-      // console.log("session", session);
-      // console.log(token);
       return session;
     },
     async jwt({token, user}){
@@ -89,6 +120,7 @@ const handler = NextAuth({
           // Remove to keep token small for other roles
           delete (token as any).allowedRoutes;
         }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
         // On any error, default to no extra routes
         if ((token as any).role === 'MODERATOR') {
@@ -101,8 +133,12 @@ const handler = NextAuth({
   pages: {
     signIn: "/login",
   },
-  secret: process.env.NEXTAUTH_SECRET
+  secret: process.env.NEXTAUTH_SECRET,
+  // Enable debug mode in development
+  debug: process.env.NODE_ENV === 'development',
+  // Use database sessions if needed (optional, but can help with cookie issues)
+  // Uncomment the line below if you want to use database sessions instead of JWT
+  // session: { strategy: "database" },
 })
 
 export { handler as GET, handler as POST }
-

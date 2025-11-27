@@ -3,6 +3,7 @@ import { prisma } from "@/db/prisma";
 
 export async function PUT(
   request: Request,
+  // { params }: { params: Promise<{ id: string }> }
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
