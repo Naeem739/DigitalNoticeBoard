@@ -27,7 +27,7 @@ import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import "./edit-dashboard.css"
 import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } from "@/types/template-types"
-import { getCategories, getDashboardCategory, getDashboardPdfCategory, getTextCategoriesWithNotices } from "@/app/actions/category.action"
+import { getCategories, getDefaultCategory, ensureDefaultCategories, getTextCategoriesWithNotices } from "@/app/actions/category.action"
 import {  getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
 import { createDashboard, createTempDashboard, deleteAllTempDashboards } from "@/app/actions/dashboard.action"
 import { createNotice } from "@/app/actions/notice.action"
@@ -529,35 +529,17 @@ function EditDashboardDemo() {
     if (savedState.newTemplateDescription !== undefined) setNewTemplateDescription(savedState.newTemplateDescription)
   }
 
-  // Ensure default Dashboard categories (IMAGE and PDF) exist
+  // Ensure default categories (TEXT, IMAGE, PDF) exist
   useEffect(() => {
-    const ensureDashboardCategories = async () => {
+    const ensureDefaults = async () => {
       try {
-        // Ensure Dashboard (IMAGE)
-        try {
-          const imgCat: any = await getDashboardCategory()
-          if (!imgCat?.success || !imgCat.result) {
-            await createCategory({ name: 'Dashboard', categoryType: 'IMAGE' } as any)
-          }
-        } catch (e) {
-          console.warn('Could not ensure Dashboard IMAGE category:', e)
-        }
-
-        // Ensure Dashboard (PDF)
-        try {
-          const pdfCat: any = await getDashboardPdfCategory()
-          if (!pdfCat?.success || !pdfCat.result) {
-            await createCategory({ name: 'Dashboard', categoryType: 'PDF' } as any)
-          }
-        } catch (e) {
-          console.warn('Could not ensure Dashboard PDF category:', e)
-        }
+        await ensureDefaultCategories()
       } catch (e) {
-        console.warn('Error ensuring default Dashboard categories:', e)
+        console.warn('Error ensuring default categories:', e)
       }
     }
 
-    ensureDashboardCategories()
+    ensureDefaults()
   }, [])
 
   // Function to auto-save current dashboard state to TemporaryDashboard
@@ -1044,7 +1026,7 @@ function EditDashboardDemo() {
               width: `${widgetWidth.toFixed(2)}%`,
               height: `${widgetHeight.toFixed(2)}%`,
               title: widget.content || widget.title || "Image Display",
-              category: "Dashboard Images",
+              category: "Default(Images)",
               type: "image",
               noticeIds: imageNoticeIds,
               settings: {
@@ -2156,25 +2138,25 @@ function EditDashboardDemo() {
             // For image displays, create notices for each image and collect their IDs
             const imageNoticeIds = []
             
-            // Use the Dashboard category with type IMAGE for dashboard images
+            // Use the Default(Images) category for dashboard images
             let imageCategoryId = ""
             try {
-              const dashboardCategory: any = await getDashboardCategory()
-              if (dashboardCategory.success && dashboardCategory.result) {
-                // Use the Dashboard category with type IMAGE
-                imageCategoryId = (dashboardCategory.result as any).id
+              const defaultImageCategory: any = await getDefaultCategory('IMAGE')
+              if (defaultImageCategory.success && defaultImageCategory.result) {
+                // Use the Default(Images) category
+                imageCategoryId = (defaultImageCategory.result as any).id
               } else {
-                // Fallback: try to find any IMAGE category if Dashboard category doesn't exist
+                // Fallback: try to find any IMAGE category if Default category doesn't exist
                 const categoriesResp: any = await getCategories()
                 const imageCategory = categoriesResp.result?.find((cat: any) => cat.categoryType === 'IMAGE')
                 if (imageCategory) {
                   imageCategoryId = (imageCategory as any).id
                 } else {
-                  console.error("No Dashboard category with type IMAGE found")
+                  console.error("No Default(Images) category with type IMAGE found")
                 }
               }
             } catch (error) {
-              console.error("Error handling Dashboard category:", error)
+              console.error("Error handling Default(Images) category:", error)
             }
             
             for (const image of widget.images) {
@@ -2183,7 +2165,7 @@ function EditDashboardDemo() {
                 const noticeData = {
                   title: image.title || "Dashboard Image",
                   content: `Dashboard Image: ${image.title}`,
-                  category: "Dashboard", // Use Dashboard category name
+                  category: "Default(Images)", // Use Default(Images) category name
                   categoryId: imageCategoryId,
                   imageUrl: image.url, // Store the full data URL for display (same as imagePreview in create-notice)
                   imageFileName: image.title,
@@ -2218,7 +2200,7 @@ function EditDashboardDemo() {
               width: `${widgetWidth.toFixed(2)}%`,
               height: `${widgetHeight.toFixed(2)}%`,
               title: widget.content || widget.title || "Dashboard Image Display",
-              category: "Dashboard", // Use Dashboard category name
+              category: "Default(Images)", // Use Default(Images) category name
               type: "image",
               noticeIds: imageNoticeIds, // Use the created notice IDs
               settings: {
@@ -2296,7 +2278,7 @@ function EditDashboardDemo() {
               }
             }
 
-            // Persist PDF as a Notice under the Dashboard (PDF) category
+            // Persist PDF as a Notice under the Default(Pdf) category
             try {
               // Store the full PDF data with data URL prefix for proper retrieval
               const fullPdfData = pdfData || ''
@@ -2307,32 +2289,31 @@ function EditDashboardDemo() {
                 : `data:application/pdf;base64,${fullPdfData}`
 
               if (pdfDataWithPrefix) {
-                // Find or create the Dashboard PDF category
-                let dashboardPdfCategoryId: string | null = null
+                // Find or create the Default(Pdf) category
+                let defaultPdfCategoryId: string | null = null
                 try {
-                  const dashPdfCat: any = await getDashboardPdfCategory()
-                  if (dashPdfCat?.success && dashPdfCat.result) {
-                    dashboardPdfCategoryId = (dashPdfCat.result as any).id
+                  const defaultPdfCat: any = await getDefaultCategory('PDF')
+                  if (defaultPdfCat?.success && defaultPdfCat.result) {
+                    defaultPdfCategoryId = (defaultPdfCat.result as any).id
                   } else {
-                    const created = await createCategory({ name: 'Dashboard', categoryType: 'PDF' } as any)
-                    if ((created as any)?.success) {
-                      const refreshed: any = await getDashboardPdfCategory()
-                      if (refreshed?.success && refreshed.result) {
-                        dashboardPdfCategoryId = (refreshed.result as any).id
-                      }
+                    // Ensure default categories exist
+                    await ensureDefaultCategories()
+                    const refreshed: any = await getDefaultCategory('PDF')
+                    if (refreshed?.success && refreshed.result) {
+                      defaultPdfCategoryId = (refreshed.result as any).id
                     }
                   }
                 } catch (e) {
-                  console.warn('Error ensuring Dashboard PDF category:', e)
+                  console.warn('Error ensuring Default(Pdf) category:', e)
                 }
 
-                if (dashboardPdfCategoryId) {
+                if (defaultPdfCategoryId) {
                   try {
                     await createNotice({
                       title: pdf.fileName || pdf.title || 'Dashboard PDF',
                       content: '',
-                      category: 'Dashboard',
-                      categoryId: dashboardPdfCategoryId,
+                      category: 'Default(Pdf)',
+                      categoryId: defaultPdfCategoryId,
                       pdfData: pdfDataWithPrefix, // Store with data URL prefix
                       pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
                       createdAt: new Date() as any,
@@ -2360,7 +2341,7 @@ function EditDashboardDemo() {
               width: `${widgetWidth.toFixed(2)}%`,
               height: `${widgetHeight.toFixed(2)}%`,
               title: widget.content || widget.title || "Dashboard PDF Widget",
-              category: "Dashboard",
+              category: "Default(Pdf)",
               type: "pdf",
               pdfData: pdfData || '',
               pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
@@ -3029,25 +3010,25 @@ function EditDashboardDemo() {
               // For image displays, create notices for each image and collect their IDs
               const imageNoticeIds = []
               
-              // Use the Dashboard category with type IMAGE for dashboard images
+              // Use the Default(Images) category for dashboard images
               let imageCategoryId = ""
               try {
-                const dashboardCategory: any = await getDashboardCategory()
-                if (dashboardCategory.success && dashboardCategory.result) {
-                  // Use the Dashboard category with type IMAGE
-                  imageCategoryId = (dashboardCategory.result as any).id
+                const defaultImageCategory: any = await getDefaultCategory('IMAGE')
+                if (defaultImageCategory.success && defaultImageCategory.result) {
+                  // Use the Default(Images) category
+                  imageCategoryId = (defaultImageCategory.result as any).id
                 } else {
-                  // Fallback: try to find any IMAGE category if Dashboard category doesn't exist
+                  // Fallback: try to find any IMAGE category if Default category doesn't exist
                   const categoriesResp: any = await getCategories()
                   const imageCategory = categoriesResp.result?.find((cat: any) => cat.categoryType === 'IMAGE')
                   if (imageCategory) {
                     imageCategoryId = (imageCategory as any).id
                   } else {
-                    console.error("No Dashboard category with type IMAGE found")
+                    console.error("No Default(Images) category with type IMAGE found")
                   }
                 }
               } catch (error) {
-                console.error("Error handling Dashboard category:", error)
+                console.error("Error handling Default(Images) category:", error)
               }
               
               for (const image of widget.images) {
@@ -3056,7 +3037,7 @@ function EditDashboardDemo() {
                   const noticeData = {
                     title: image.title || "Dashboard Image",
                     content: `Dashboard Image: ${image.title}`,
-                    category: "Dashboard", // Use Dashboard category name
+                    category: "Default(Images)", // Use Default(Images) category name
                     categoryId: imageCategoryId,
                     imageUrl: image.url, // Store the full data URL for display (same as imagePreview in create-notice)
                     imageFileName: image.title,
@@ -3091,7 +3072,7 @@ function EditDashboardDemo() {
                 width: `${widgetWidth.toFixed(2)}%`,
                 height: `${widgetHeight.toFixed(2)}%`,
                 title: widget.content || widget.title || "Dashboard Image Display",
-                category: "Dashboard", // Use Dashboard category name
+                category: "Default(Images)", // Use Default(Images) category name
                 type: "image",
                 noticeIds: imageNoticeIds, // Use the created notice IDs
                 settings: {
@@ -3324,40 +3305,24 @@ function EditDashboardDemo() {
         <button
           onClick={handleSave}
           disabled={!selectedRatio || screens.every(screen => screen.widgets.length === 0) || isSavingDashboard}
-          className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 ml-auto font-semibold relative overflow-hidden ${
-            selectedRatio && screens.some(screen => screen.widgets.length > 0) && !isSavingDashboard
-              ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 border border-emerald-500 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
-              : "bg-gradient-to-r from-rose-100 to-pink-100 text-rose-600 cursor-not-allowed border border-rose-300 shadow-md"
-          } ${isSavingDashboard ? 'animate-pulse' : ''}`}
+          className={`flex items-center gap-3 px-6 py-3 rounded-lg transition-opacity duration-200 ml-auto font-medium ${
+            !selectedRatio || screens.every(screen => screen.widgets.length === 0) || isSavingDashboard
+              ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+              : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
+          }`}
         >
           {isSavingDashboard ? (
             <>
-              {/* Professional Loading Animation */}
-              <div className="relative">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <div className="absolute inset-0 w-5 h-5 border-2 border-transparent border-t-emerald-300 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-              </div>
-              <span className="font-medium">Saving Dashboard...</span>
-              {/* Progress Dots */}
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              <span>Saving Interface...</span>
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-                <span>{isEditing ? 'Update Dashboard' : `Save Dashboard (${screens.length} screen${screens.length > 1 ? 's' : ''})`}</span>
-              </div>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              <span>{isEditing ? 'Update Dashboard' : `Save Interface (${screens.length} screen${screens.length > 1 ? 's' : ''})`}</span>
             </>
-          )}
-          {/* Shimmer Effect */}
-          {isSavingDashboard && (
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ animationDuration: '2s' }}></div>
           )}
         </button>
 
@@ -3392,7 +3357,7 @@ function EditDashboardDemo() {
         
           
         <div className="flex flex-wrap gap-2">
-            {categories.length === 0 ? (
+            {categories.filter(cat => cat.name.toLowerCase() !== "default(text)").length === 0 ? (
             <div className="w-full text-center py-4">
               <div className="inline-flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full mb-2">
                 <ListFilter className="w-4 h-4 text-gray-500" />
@@ -3401,7 +3366,7 @@ function EditDashboardDemo() {
               </div>
             ) : (
               <>
-                {categories.map((category) => (
+                {categories.filter(cat => cat.name.toLowerCase() !== "default(text)").map((category) => (
                 <div
                   key={category.id}
                   draggable
