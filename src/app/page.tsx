@@ -194,14 +194,14 @@ export default function Home() {
             </Link>
             {session && (
               <>
-                <a href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+                <Link href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Dashboard
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-                </a>
-                <a href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+                </Link>
+                <Link href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Notice
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-                </a>
+                </Link>
               </>
             )}
             <a href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
@@ -251,11 +251,11 @@ export default function Home() {
               ) : (
                 // Logged out state
                 <>
-                  <a href="/login" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200">
+                  <Link href="/login" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200">
                     <button className="bg-transparent border-2 border-blue-500 text-blue-600 px-5 py-2.5 rounded-lg hover:bg-blue-500 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all duration-200 font-semibold">
                       Login
                     </button>
-                  </a>
+                  </Link>
                 </>
               )}
             </div>
@@ -277,8 +277,8 @@ export default function Home() {
               <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Home</Link>
               {session && (
                 <>
-                  <a href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Dashboard</a>
-                  <a href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Notice</a>
+                  <Link href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Dashboard</Link>
+                  <Link href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Notice</Link>
                 </>
               )}
               <a href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Features</a>
@@ -290,11 +290,11 @@ export default function Home() {
                     <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
                       <p className="text-sm font-semibold text-gray-800">Welcome, {session.user?.name || session.user?.email?.split('@')[0] || 'User'}!</p>
                     </div>
-                    <a href="/dashboard" target="_blank">
+                    <Link href="/dashboard" target="_blank">
                       <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-3 rounded-lg transition-all duration-200 font-semibold shadow-lg shadow-blue-200">
                         Go to Dashboard
                       </button>
-                    </a>
+                    </Link>
                     <button 
                       onClick={handleLogout}
                       className="w-full bg-transparent border-2 border-red-500 text-red-600 px-4 py-3 rounded-lg hover:bg-red-500 hover:text-white transition-all duration-200 font-semibold"
@@ -304,11 +304,11 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <a href="/login">
+                    <Link href="/login">
                       <button className="w-full bg-transparent border-2 border-blue-500 text-blue-600 px-4 py-3 rounded-lg hover:bg-blue-500 hover:text-white transition-all duration-200 font-semibold">
                         Login
                       </button>
-                    </a>
+                    </Link>
                   </>
                 )}
               </div>
@@ -703,9 +703,9 @@ export default function Home() {
             <ul className="space-y-3">
               {['Public Notice Board', 'Role Management', 'Widget System', 'QR Code Access'].map((item) => (
                 <li key={item}>
-                  <a href="/notice" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
+                  <Link href="/notice" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
                     {item}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
