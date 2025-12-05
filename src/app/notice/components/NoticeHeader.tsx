@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePublicNoticeSettings } from '@/hooks/usePublicNoticeSettings';
 
 interface NoticeHeaderProps {
@@ -91,7 +92,7 @@ const NoticeHeader = ({
                 {/* Left side - Logo and Title */}
                 <div className="flex items-center space-x-4">
                     {/* Logo */}
-                    <a href="/" className="hover:opacity-80 transition-opacity cursor-pointer">
+                    <Link href="/" className="hover:opacity-80 transition-opacity cursor-pointer">
                         {settings?.logo ? (
                             <div className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md overflow-hidden">
                                 <img 
@@ -117,7 +118,7 @@ const NoticeHeader = ({
                                 </svg>
                             </div>
                         )}
-                    </a>
+                    </Link>
                     
                     {/* Title and Subtitle */}
                     <div>
