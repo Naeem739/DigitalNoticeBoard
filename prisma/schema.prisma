@@ -96,7 +96,7 @@ model PublicNoticeSettings {
   id                      String   @id @default(cuid())
   logo                    String?
   logoFileName            String?
-  title                   String   @default("Smart Notice Board")
+  title                   String   @default("Digital Notice Board")
   subtitle                String   @default("Information Technology Department")
   emergencyNumber         String   @default("01734528367")
   emergencyContact        String   @default("Md. Rashid Al Asif")
@@ -120,7 +120,7 @@ model PublicNoticeTemplate {
   description             String?
   logo                    String?
   logoFileName            String?
-  title                   String   @default("Smart Notice Board")
+  title                   String   @default("Digital Notice Board")
   subtitle                String   @default("Information Technology Department")
   emergencyNumber         String   @default("01734528367")
   emergencyContact        String   @default("Md. Rashid Al Asif")

@@ -75,7 +75,7 @@ const backgroundStyles: BackgroundStyle[] = [
 export default function ManagePublicNoticePage() {
   const { toast } = useToast()
   const [settings, setSettings] = useState<Partial<PublicNoticeSettings>>({
-    title: "Smart Notice Board",
+    title: "Digital Notice Board",
     subtitle: "Information Technology Department",
     emergencyNumber: "01734528367",
     emergencyContact: "Md. Rashid Al Asif",
@@ -464,7 +464,7 @@ export default function ManagePublicNoticePage() {
                           </div>
                         )}
                         <div>
-                          <h1 className="text-3xl font-bold">{settings.title || "Smart Notice Board"}</h1>
+                          <h1 className="text-3xl font-bold">{settings.title || "Digital Notice Board"}</h1>
                           <p className="text-lg opacity-90">{settings.subtitle || "Information Technology Department"}</p>
                         </div>
                       </div>
@@ -555,7 +555,7 @@ export default function ManagePublicNoticePage() {
                     style={{ backgroundColor: settings.footerBackgroundColor || "#1e293b", color: settings.fontColor || '#ffffff' }}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-sm">© 2024 Smart Notice Board. All rights reserved.</div>
+                      <div className="text-sm">© 2024 Digital Notice Board. All rights reserved.</div>
                       <div className="font-medium">{settings.departmentName || "Information Technology Department"}</div>
                       <div className="flex items-center space-x-2">
                         <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
@@ -612,7 +612,7 @@ export default function ManagePublicNoticePage() {
                         id="title"
                         value={settings.title || ""}
                         onChange={(e) => setSettings(prev => ({ ...prev, title: e.target.value }))}
-                        placeholder="Smart Notice Board"
+                        placeholder="Digital Notice Board"
                         className="mt-1"
                       />
                     </div>

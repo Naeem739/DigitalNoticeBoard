@@ -158,7 +158,7 @@ export async function GET(
         </div>
         
         <div class="footer">
-          <strong>Smart Notice Board</strong><br>
+          <strong>Digital Notice Board</strong><br>
           Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}<br>
           Notice ID: ${notice.id}
         </div>

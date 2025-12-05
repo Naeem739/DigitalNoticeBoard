@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils"
 
-// Bell Ringing Loader - Perfect for Smart Notice Board
+// Bell Ringing Loader - Perfect for Digital Notice Board
 export function BellLoader({ className, size = "default" }: { className?: string; size?: "sm" | "default" | "lg" }) {
   const sizeClasses = {
     sm: "w-6 h-6",

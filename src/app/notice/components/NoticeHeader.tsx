@@ -91,35 +91,37 @@ const NoticeHeader = ({
                 {/* Left side - Logo and Title */}
                 <div className="flex items-center space-x-4">
                     {/* Logo */}
-                    {settings?.logo ? (
-                        <div className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md overflow-hidden">
-                            <img 
-                                src={settings.logo} 
-                                alt="Logo" 
-                                className="w-full h-full object-contain"
-                            />
-                        </div>
-                    ) : (
-                        <div 
-                            className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md"
-                            style={{ 
-                                background: `linear-gradient(135deg, ${settings?.accentColor || '#3b82f6'} 0%, ${settings?.accentColor || '#3b82f6'}80 100%)`
-                            }}
-                        >
-                            <svg 
-                                className="w-7 h-7 text-white" 
-                                fill="currentColor" 
-                                viewBox="0 0 24 24"
+                    <a href="/" className="hover:opacity-80 transition-opacity cursor-pointer">
+                        {settings?.logo ? (
+                            <div className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md overflow-hidden">
+                                <img 
+                                    src={settings.logo} 
+                                    alt="Logo" 
+                                    className="w-full h-full object-contain"
+                                />
+                            </div>
+                        ) : (
+                            <div 
+                                className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md"
+                                style={{ 
+                                    background: `linear-gradient(135deg, ${settings?.accentColor || '#3b82f6'} 0%, ${settings?.accentColor || '#3b82f6'}80 100%)`
+                                }}
                             >
-                                <path d="M12 2C13.1 2 14 2.9 14 4V5.5C17.6 6.2 20.5 9.1 21.2 12.7C21.3 13.3 20.8 13.8 20.2 13.8H3.8C3.2 13.8 2.7 13.3 2.8 12.7C3.5 9.1 6.4 6.2 10 5.5V4C10 2.9 10.9 2 12 2Z"/>
-                                <path d="M9 15.5C9 16.9 10.1 18 11.5 18H12.5C13.9 18 15 16.9 15 15.5V14H9V15.5Z"/>
-                            </svg>
-                        </div>
-                    )}
+                                <svg 
+                                    className="w-7 h-7 text-white" 
+                                    fill="currentColor" 
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M12 2C13.1 2 14 2.9 14 4V5.5C17.6 6.2 20.5 9.1 21.2 12.7C21.3 13.3 20.8 13.8 20.2 13.8H3.8C3.2 13.8 2.7 13.3 2.8 12.7C3.5 9.1 6.4 6.2 10 5.5V4C10 2.9 10.9 2 12 2Z"/>
+                                    <path d="M9 15.5C9 16.9 10.1 18 11.5 18H12.5C13.9 18 15 16.9 15 15.5V14H9V15.5Z"/>
+                                </svg>
+                            </div>
+                        )}
+                    </a>
                     
                     {/* Title and Subtitle */}
                     <div>
-                        <h1 className="text-2xl font-bold text-white">{settings?.title || "Smart Notice Board"}</h1>
+                        <h1 className="text-2xl font-bold text-white">{settings?.title || "Digital Notice Board"}</h1>
                         <p className="text-sm text-gray-300">{settings?.subtitle || "Information Technology Department"}</p>
                     </div>
                 </div>
