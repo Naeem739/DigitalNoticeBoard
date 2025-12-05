@@ -193,7 +193,7 @@ export default function Home() {
                   Dashboard
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
                 </Link>
-                <Link href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+                <Link href="/notice"  className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Notice
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
                 </Link>
@@ -674,7 +674,7 @@ export default function Home() {
               </div>
               <span className="text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Digital Notice Board</span>
             </Link>
-            <p className="text-gray-300 font-medium leading-relaxed">Revolutionizing team communication and collaboration with cutting-edge technology.</p>
+            <p className="text-gray-300 font-medium leading-relaxed">Empowering organizations with efficient notice management, real-time updates, and seamless information sharing.</p>
           </div>
           
           <div>
