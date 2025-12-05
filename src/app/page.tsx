@@ -1,8 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import Link from 'next/link';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, 
@@ -11,7 +9,7 @@ import {
   X,
   Layout,
   FileText,
-  Image as ImageIcon,
+  Image,
   File,
   LayoutTemplate,
   Users,
@@ -124,7 +122,7 @@ export default function Home() {
       description: 'Save and reuse dashboard layouts as templates. Speed up workflow and maintain consistency across notice boards.'
     },
     {
-      icon: ImageIcon,
+      icon: Image,
       title: 'Multi-Format Support',
       description: 'Upload images and PDF documents. Support for multiple image formats with customizable fit options and PDF display.'
     },
@@ -174,34 +172,32 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-blue-50/30 text-gray-900 overflow-x-hidden font-sans" style={{ fontFamily: 'Inter, sans-serif' }}>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b-2 border-blue-100 px-6 py-4 shadow-lg shadow-blue-100/50">
         <div className="container mx-auto flex justify-between items-center">
-          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
+          <a href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
             <div className="relative">
-              <Image 
+              <img 
                 src="/images/logo.png" 
                 alt="Digital Notice Board Logo" 
-                width={40}
-                height={40}
-                className="object-contain drop-shadow-lg"
+                className="w-10 h-10 object-contain drop-shadow-lg"
               />
             </div>
             <span className="text-2xl font-extrabold text-black tracking-tight">Digital Notice Board</span>
-          </Link>
+          </a>
           
           <div className="hidden md:flex space-x-6 items-center">
-            <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+            <a href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               Home
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-            </Link>
+            </a>
             {session && (
               <>
-                <Link href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+                <a href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Dashboard
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-                </Link>
-                <Link href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+                </a>
+                <a href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Notice
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-                </Link>
+                </a>
               </>
             )}
             <a href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
@@ -251,11 +247,11 @@ export default function Home() {
               ) : (
                 // Logged out state
                 <>
-                  <Link href="/login" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200">
+                  <a href="/login" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200">
                     <button className="bg-transparent border-2 border-blue-500 text-blue-600 px-5 py-2.5 rounded-lg hover:bg-blue-500 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all duration-200 font-semibold">
                       Login
                     </button>
-                  </Link>
+                  </a>
                 </>
               )}
             </div>
@@ -274,11 +270,11 @@ export default function Home() {
         {mobileMenuOpen && (
           <div className="md:hidden absolute left-0 right-0 bg-white border-b-2 border-blue-200 py-4 shadow-xl">
             <div className="container mx-auto px-6 space-y-4">
-              <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Home</Link>
+              <a href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Home</a>
               {session && (
                 <>
-                  <Link href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Dashboard</Link>
-                  <Link href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Notice</Link>
+                  <a href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Dashboard</a>
+                  <a href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Notice</a>
                 </>
               )}
               <a href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Features</a>
@@ -290,11 +286,11 @@ export default function Home() {
                     <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
                       <p className="text-sm font-semibold text-gray-800">Welcome, {session.user?.name || session.user?.email?.split('@')[0] || 'User'}!</p>
                     </div>
-                    <Link href="/dashboard" target="_blank">
+                    <a href="/dashboard" target="_blank">
                       <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-3 rounded-lg transition-all duration-200 font-semibold shadow-lg shadow-blue-200">
                         Go to Dashboard
                       </button>
-                    </Link>
+                    </a>
                     <button 
                       onClick={handleLogout}
                       className="w-full bg-transparent border-2 border-red-500 text-red-600 px-4 py-3 rounded-lg hover:bg-red-500 hover:text-white transition-all duration-200 font-semibold"
@@ -304,11 +300,11 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <Link href="/login">
+                    <a href="/login">
                       <button className="w-full bg-transparent border-2 border-blue-500 text-blue-600 px-4 py-3 rounded-lg hover:bg-blue-500 hover:text-white transition-all duration-200 font-semibold">
                         Login
                       </button>
-                    </Link>
+                    </a>
                   </>
                 )}
               </div>
@@ -595,11 +591,9 @@ export default function Home() {
             className="hidden md:block"
           >
             <div className="relative w-full">
-              <Image 
+              <img 
                 src="/images/faq-illustration.png" 
                 alt="FAQ Illustration - People interacting with technology and FAQ information" 
-                width={800}
-                height={600}
                 className="w-full h-auto object-contain"
                 style={{ mixBlendMode: 'normal' }}
               />
@@ -670,18 +664,16 @@ export default function Home() {
         
         <div className="container mx-auto px-6 grid md:grid-cols-4 gap-10 relative z-10">
           <div className="md:col-span-1">
-            <Link href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
+            <a href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
               <div className="relative">
-                <Image 
+                <img 
                   src="/images/logo.png" 
                   alt="Digital Notice Board Logo" 
-                  width={48}
-                  height={48}
-                  className="object-contain drop-shadow-lg"
+                  className="w-12 h-12 object-contain drop-shadow-lg"
                 />
               </div>
               <span className="text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Digital Notice Board</span>
-            </Link>
+            </a>
             <p className="text-gray-300 font-medium leading-relaxed">Revolutionizing team communication and collaboration with cutting-edge technology.</p>
           </div>
           
@@ -703,9 +695,9 @@ export default function Home() {
             <ul className="space-y-3">
               {['Public Notice Board', 'Role Management', 'Widget System', 'QR Code Access'].map((item) => (
                 <li key={item}>
-                  <Link href="/notice" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
+                  <a href="/notice" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
                     {item}
-                  </Link>
+                  </a>
                 </li>
               ))}
             </ul>
