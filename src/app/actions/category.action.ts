@@ -171,3 +171,75 @@ export const getTextCategoriesWithNotices = async() =>{
         return {success:false, result:error};
     }
 }
+
+export const getDefaultCategory = async(categoryType: 'TEXT' | 'IMAGE' | 'PDF') => {
+    try{
+        const categoryName = categoryType === 'TEXT' ? 'Default(text)' : 
+                             categoryType === 'IMAGE' ? 'Default(Images)' : 
+                             'Default(Pdf)';
+        
+        const result = await prisma.category.findFirst({
+            where: {
+                AND: [
+                    {
+                        name: {
+                            equals: categoryName,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        categoryType: categoryType
+                    }
+                ]
+            }
+        });
+
+        return {success: true, result}
+    }
+    catch(error){
+        return {success: false, result: error};
+    }
+}
+
+export const ensureDefaultCategories = async() => {
+    try{
+        const defaultCategories = [
+            { name: 'Default(text)', categoryType: 'TEXT' as const },
+            { name: 'Default(Images)', categoryType: 'IMAGE' as const },
+            { name: 'Default(Pdf)', categoryType: 'PDF' as const }
+        ];
+
+        for (const category of defaultCategories) {
+            const existing = await prisma.category.findFirst({
+                where: {
+                    AND: [
+                        {
+                            name: {
+                                equals: category.name,
+                                mode: 'insensitive'
+                            }
+                        },
+                        {
+                            categoryType: category.categoryType
+                        }
+                    ]
+                }
+            });
+
+            if (!existing) {
+                await prisma.category.create({
+                    data: {
+                        name: category.name,
+                        categoryType: category.categoryType
+                    }
+                });
+            }
+        }
+
+        return {success: true, message: 'Default categories ensured'}
+    }
+    catch(error){
+        console.error('Error ensuring default categories:', error);
+        return {success: false, result: error};
+    }
+}

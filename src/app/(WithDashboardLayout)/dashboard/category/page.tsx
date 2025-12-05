@@ -30,7 +30,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { createCategory } from "@/app/actions/category.action"
+import { createCategory, ensureDefaultCategories } from "@/app/actions/category.action"
 import { BellLoader } from "@/components/ui/loader"
 
 type TCategory = {
@@ -75,6 +75,14 @@ export default function CategoryPage() {
   })
 
   useEffect(() => {
+    const initializeDefaults = async () => {
+      try {
+        await ensureDefaultCategories()
+      } catch (error) {
+        console.warn('Error ensuring default categories:', error)
+      }
+    }
+    initializeDefaults()
     fetchCategories()
   }, [])
 

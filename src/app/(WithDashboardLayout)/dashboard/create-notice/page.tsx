@@ -86,10 +86,11 @@ export default function NoticeEditor() {
     };
     
     const targetType = categoryTypeMap[mode];
-    // Filter by category type AND exclude the "Dashboard" category
+    // Filter by category type AND exclude the "Dashboard" and "Default" categories
     const filtered = categories.filter(category => 
       category.categoryType === targetType && 
-      category.name.toLowerCase() !== 'dashboard'
+      category.name.toLowerCase() !== 'dashboard' &&
+      !category.name.toLowerCase().startsWith('default')
     );
     setFilteredCategories(filtered);
     
