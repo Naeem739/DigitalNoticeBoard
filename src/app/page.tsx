@@ -365,6 +365,7 @@ export default function Home() {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     if (typeof window !== 'undefined') {
+
                       window.open('/notice', '_blank')
                     }
                   }}
@@ -719,7 +720,7 @@ export default function Home() {
               </li>
               <li className="text-gray-300 font-medium flex items-start">
                 <span className="text-blue-400 mr-2">📞</span>
-                <span>+8801623094662</span>
+                <span>+8801722432449</span>
               </li>
             </ul> 
 
