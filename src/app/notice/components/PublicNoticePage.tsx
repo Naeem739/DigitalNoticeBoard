@@ -550,7 +550,7 @@ export default function PublicNoticePage() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
                 >
-                  {settings?.title || "Smart Notice Board"}
+                  {settings?.title || "Digital Notice Board"}
                 </motion.h1>
                 <motion.p 
                   className="text-xs opacity-90 truncate"
@@ -1355,7 +1355,7 @@ export default function PublicNoticePage() {
           <div className="flex items-center justify-center text-white text-xs sm:text-xs md:text-sm">
             <div className="flex items-center space-x-2 md:space-x-4">
               <span>
-                © {new Date().getFullYear()} {settings?.title || "Smart Notice Board"}
+                © {new Date().getFullYear()} {settings?.title || "Digital Notice Board"}
               </span>
               <span className="text-white/60">•</span>
               <span className="text-white/80">

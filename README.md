@@ -1,18 +1,13 @@
 A modern, responsive digital notice board system built with **Next.js 15**, featuring real-time updates, drag-and-drop layouts, and comprehensive content management.
 
-![Next.js](https://img.shields.io/badge/Next.js-15.1.3-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7.3-blue?style=for-the-badge&logo=typescript)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-blue?style=for-the-badge&logo=postgresql)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4.1-38B2AC?style=for-the-badge&logo=tailwind-css)
-
----
+#deleted from here,,,, 
 
 ## ✨ Features
 
 # Role-Based Access Control (RBAC) System
 
 ## Overview
-SmartNoticeBoard implements a four-tier role system with automatic Super Admin assignment for the first user. Each role has specific permissions and route access restrictions.
+DigitalNoticeBoard implements a four-tier role system with automatic Super Admin assignment for the first user. Each role has specific permissions and route access restrictions.
 
 ## Role Hierarchy
 
@@ -72,7 +67,7 @@ SmartNoticeBoard implements a four-tier role system with automatic Super Admin a
 - **Category Management**: Organize notices with custom categories and icons
 - **Image Upload**: Preview-supported image upload with multiple formats
 - **PDF Support**: Upload and display PDF documents
-- **Content Truncation**: Prevent layout overflow with smart text truncation
+- **Content Truncation**: Prevent layout overflow with digital text truncation
 - **File Management**: Base64 encoding for secure file storage
 
 ### 🔐 Authentication & Security
@@ -141,7 +136,7 @@ SmartNoticeBoard implements a four-tier role system with automatic Super Admin a
 ---
 
 ## 📁 Detailed Project Structure
- ```SmartNoticeBoard/
+ ```DigitalNoticeBoard/
 ├── 📁 src/
 │ ├── 📁 app/ # Next.js App Router
 │ │ ├── 📁 (WithCommonLayout)/ # Public-facing pages
@@ -422,7 +417,7 @@ model PublicNoticeSettings {
   id                String   @id @default(cuid())
   logo              String?  // Base64 encoded logo
   logoFileName      String?  // Original logo filename
-  title             String   @default("Smart Notice Board")
+  title             String   @default("Digital Notice Board")
   subtitle          String   @default("Information Technology Department")
   emergencyNumber   String   @default("01734528367")
   emergencyContact  String   @default("Md. Rashid Al Asif")
@@ -456,8 +451,8 @@ model PublicNoticeSettings {
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/SmartNoticeBoard.git
-   cd SmartNoticeBoard
+   git clone https://github.com/yourusername/DigitalNoticeBoard.git
+   cd DigitalNoticeBoard
    ```
 
 2. **Install dependencies**
@@ -472,7 +467,7 @@ model PublicNoticeSettings {
    
    Configure your environment variables:
    ```env
-   DATABASE_URL="postgresql://username:password@localhost:5432/smartnoticeboard"
+   DATABASE_URL="postgresql://username:password@localhost:5432/digitalnoticeboard"
    NEXTAUTH_SECRET="your-secret-key"
    NEXTAUTH_URL="http://localhost:3000"
    ```
@@ -670,4 +665,4 @@ If you have any questions or need help, please:
 
 ---
 
-**Made with ❤️ by the SmartNoticeBoard Team**
+**Made with ❤️ by the DigitalNoticeBoard Team**

@@ -26,7 +26,7 @@ export default function SignUpPage() {
                 Create Account
               </h2>
               <p className="text-gray-300">
-                Join Smart Notice Board today
+                Join Digital Notice Board today
               </p>
             </div>
             
@@ -105,7 +105,7 @@ export default function SignUpPage() {
               className="text-gray-300"
               suppressHydrationWarning={true}
             >
-              Join Smart Notice Board today
+              Join Digital Notice Board today
             </motion.p>
           </motion.div>
           

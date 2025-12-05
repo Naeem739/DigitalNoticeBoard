@@ -223,10 +223,10 @@ export default function DashboardPage() {
             </h1>
             <p className="text-gray-600 mt-1">
               {session?.user?.role === 'USER' 
-                ? 'Here are the latest notices and updates from your Smart Notice Board'
+                ? 'Here are the latest notices and updates from your Digital Notice Board'
                 : session?.user?.role === 'MODERATOR'
-                ? 'Here\'s what\'s happening with your Smart Notice Board (Limited Access)'
-                : 'Here\'s what\'s happening with your Smart Notice Board'
+                ? 'Here\'s what\'s happening with your Digital Notice Board (Limited Access)'
+                : 'Here\'s what\'s happening with your Digital Notice Board'
               }
             </p>
           </div>

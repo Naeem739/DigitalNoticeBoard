@@ -10,6 +10,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { signOut, useSession } from 'next-auth/react'
+import Link from 'next/link'
+import Image from 'next/image'
 
 const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   const { data: session } = useSession()
@@ -45,9 +47,16 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
         <Button variant="ghost" size="icon" className="md:hidden mr-2 z-50" onClick={toggleSidebar}>
           <Menu className="h-5 w-5" />
         </Button>
-        <div className="relative">
-          
-        </div>
+        <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity cursor-pointer">
+          <Image 
+            src="/images/logo.png" 
+            alt="Digital Notice Board Logo" 
+            width={32}
+            height={32}
+            className="object-contain"
+          />
+          <span className="text-lg font-bold text-gray-900 hidden sm:inline">Digital Notice Board</span>
+        </Link>
       </div>
       <div className="flex items-center space-x-4">
         {getRoleBadge()}
@@ -67,7 +76,7 @@ const Header = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
                   {session?.user?.name || 'Administrator'}
                 </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {session?.user?.email || 'admin@smartnoticeboard.com'}
+                  {session?.user?.email || 'admin@digitalnoticeboard.com'}
                 </p>
                 <p className="text-xs leading-none text-blue-600 font-medium">
                   {session?.user?.role || 'ADMIN'}

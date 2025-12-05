@@ -12,7 +12,7 @@ export async function getPublicNoticeSettings(): Promise<PublicNoticeSettings | 
     if (!settings) {
       console.log("No settings found, creating default settings...")
       return await createPublicNoticeSettings({
-        title: "Smart Notice Board",
+        title: "Digital Notice Board",
         subtitle: "Information Technology Department",
         emergencyNumber: "01734528367",
         emergencyContact: "Md. Rashid Al Asif",
@@ -48,7 +48,7 @@ export async function createPublicNoticeSettings(data: Partial<PublicNoticeSetti
     console.log("Creating new public notice settings with data:", JSON.stringify(data, null, 2))
     
     const createData = {
-        title: data.title || "Smart Notice Board",
+        title: data.title || "Digital Notice Board",
         subtitle: data.subtitle || "Information Technology Department",
         emergencyNumber: data.emergencyNumber || "01734528367",
         emergencyContact: data.emergencyContact || "Md. Rashid Al Asif",

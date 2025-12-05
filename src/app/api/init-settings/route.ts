@@ -6,7 +6,7 @@ export async function POST() {
     console.log("Initializing default public notice settings...")
     
     const defaultSettings = await createPublicNoticeSettings({
-      title: "Smart Notice Board",
+      title: "Digital Notice Board",
       subtitle: "Information Technology Department",
       emergencyNumber: "01734528367",
       emergencyContact: "Md. Rashid Al Asif",

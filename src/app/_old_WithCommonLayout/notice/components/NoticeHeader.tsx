@@ -119,7 +119,7 @@ const NoticeHeader = ({
                     
                     {/* Title and Subtitle */}
                     <div>
-                        <h1 className="text-2xl font-bold text-white">{settings?.title || "Smart Notice Board"}</h1>
+                        <h1 className="text-2xl font-bold text-white">{settings?.title || "Digital Notice Board"}</h1>
                         <p className="text-sm text-gray-300">{settings?.subtitle || "Information Technology Department"}</p>
                     </div>
                 </div>

@@ -41,7 +41,7 @@ const NoticeFooter = () => {
                 <div className="flex items-center justify-between text-sm">
                     {/* Left side - Copyright */}
                     <div className="opacity-90">
-                        © {mounted ? currentYear : '----'} {settings?.title || "Smart Notice Board"}. All rights reserved.
+                        © {mounted ? currentYear : '----'} {settings?.title || "Digital Notice Board"}. All rights reserved.
                     </div>
                     
                     {/* Center - Department info */}

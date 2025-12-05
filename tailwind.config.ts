@@ -20,6 +20,9 @@ export default {
 		  backgroundImage: {
 			'custom-gradient': 'linear-gradient(to right, rgba(0, 255, 144, 0.8), rgba(0, 216, 255, 0.8))',
 		  },
+		  fontFamily: {
+			  sans: ['Inter', 'sans-serif'],
+		  },
   	}
   },
   // eslint-disable-next-line @typescript-eslint/no-require-imports
