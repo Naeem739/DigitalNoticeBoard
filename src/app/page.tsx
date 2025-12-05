@@ -719,7 +719,13 @@ export default function Home() {
                 <span className="text-blue-400 mr-2">📞</span>
                 <span>+8801623094662</span>
               </li>
-            </ul>
+              <li className="text-gray-300 font-medium flex items-start">
+                <span className="text-blue-400 mr-2">📞</span>
+                <span>+8801623094662</span>
+              </li>
+            </ul> 
+
+
           </div>
         </div>
         <div className="container mx-auto px-6 mt-12 text-center border-t-2 border-gray-800 pt-8 relative z-10">
