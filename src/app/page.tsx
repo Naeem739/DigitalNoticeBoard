@@ -1,6 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, 
@@ -172,7 +173,7 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-blue-50/30 text-gray-900 overflow-x-hidden font-sans" style={{ fontFamily: 'Inter, sans-serif' }}>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b-2 border-blue-100 px-6 py-4 shadow-lg shadow-blue-100/50">
         <div className="container mx-auto flex justify-between items-center">
-          <a href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
+          < Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
             <div className="relative">
               <img 
                 src="/images/logo.png" 
@@ -181,33 +182,33 @@ export default function Home() {
               />
             </div>
             <span className="text-2xl font-extrabold text-black tracking-tight">Digital Notice Board</span>
-          </a>
+          </Link>
           
           <div className="hidden md:flex space-x-6 items-center">
-            <a href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+            <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               Home
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-            </a>
+            </Link>
             {session && (
               <>
-                <a href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+                <Link href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Dashboard
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-                </a>
-                <a href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+                </Link>
+                <Link href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Notice
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-                </a>
+                </Link>
               </>
             )}
-            <a href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+            <Link href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               Features
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-            </a>
-            <a href="#faq" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+            </Link>
+            <Link href="#faq" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               FAQ
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-            </a>
+            </Link>
             
             <div className="flex space-x-4">
               {session ? (
@@ -247,11 +248,11 @@ export default function Home() {
               ) : (
                 // Logged out state
                 <>
-                  <a href="/login" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200">
+                  <Link href="/login" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200">
                     <button className="bg-transparent border-2 border-blue-500 text-blue-600 px-5 py-2.5 rounded-lg hover:bg-blue-500 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all duration-200 font-semibold">
                       Login
                     </button>
-                  </a>
+                  </Link>
                 </>
               )}
             </div>
@@ -270,15 +271,15 @@ export default function Home() {
         {mobileMenuOpen && (
           <div className="md:hidden absolute left-0 right-0 bg-white border-b-2 border-blue-200 py-4 shadow-xl">
             <div className="container mx-auto px-6 space-y-4">
-              <a href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Home</a>
+              <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Home</Link>
               {session && (
                 <>
-                  <a href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Dashboard</a>
-                  <a href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Notice</a>
+                  <Link href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Dashboard</Link>
+                  <Link href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Notice</Link>
                 </>
               )}
-              <a href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Features</a>
-              <a href="#faq" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">FAQ</a>
+              <Link href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Features</Link>
+              <Link href="#faq" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">FAQ</Link>
               
               <div className="flex flex-col space-y-4 pt-4">
                 {session ? (
@@ -286,11 +287,11 @@ export default function Home() {
                     <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
                       <p className="text-sm font-semibold text-gray-800">Welcome, {session.user?.name || session.user?.email?.split('@')[0] || 'User'}!</p>
                     </div>
-                    <a href="/dashboard" target="_blank">
+                    <Link href="/dashboard" target="_blank">
                       <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-3 rounded-lg transition-all duration-200 font-semibold shadow-lg shadow-blue-200">
                         Go to Dashboard
                       </button>
-                    </a>
+                    </Link>
                     <button 
                       onClick={handleLogout}
                       className="w-full bg-transparent border-2 border-red-500 text-red-600 px-4 py-3 rounded-lg hover:bg-red-500 hover:text-white transition-all duration-200 font-semibold"
@@ -300,11 +301,11 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <a href="/login">
+                    <Link href="/login">
                       <button className="w-full bg-transparent border-2 border-blue-500 text-blue-600 px-4 py-3 rounded-lg hover:bg-blue-500 hover:text-white transition-all duration-200 font-semibold">
                         Login
                       </button>
-                    </a>
+                    </Link>
                   </>
                 )}
               </div>
@@ -664,7 +665,7 @@ export default function Home() {
         
         <div className="container mx-auto px-6 grid md:grid-cols-4 gap-10 relative z-10">
           <div className="md:col-span-1">
-            <a href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
+            < Link href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
               <div className="relative">
                 <img 
                   src="/images/logo.png" 
@@ -673,7 +674,7 @@ export default function Home() {
                 />
               </div>
               <span className="text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Digital Notice Board</span>
-            </a>
+            </Link>
             <p className="text-gray-300 font-medium leading-relaxed">Revolutionizing team communication and collaboration with cutting-edge technology.</p>
           </div>
           
@@ -682,9 +683,9 @@ export default function Home() {
             <ul className="space-y-3">
               {['Dashboard Layout', 'Rich Text Editor', 'Template System', 'Category Management'].map((item) => (
                 <li key={item}>
-                  <a href="#features" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
+                  <Link href="#features" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
                     {item}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -695,9 +696,9 @@ export default function Home() {
             <ul className="space-y-3">
               {['Public Notice Board', 'Role Management', 'Widget System', 'QR Code Access'].map((item) => (
                 <li key={item}>
-                  <a href="/notice" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
+                  <Link href="/notice" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
                     {item}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -708,11 +709,11 @@ export default function Home() {
             <ul className="space-y-3">
               <li className="text-gray-300 font-medium flex items-start">
                 <span className="text-blue-400 mr-2">✉</span>
-                <a href="mailto:naeem.cse7.bu@gmail.com" className="hover:text-blue-400 transition-colors duration-200 cursor-pointer">naeem.cse7.bu@gmail.com</a>
+                <Link href="mailto:naeem.cse7.bu@gmail.com" className="hover:text-blue-400 transition-colors duration-200 cursor-pointer">naeem.cse7.bu@gmail.com</Link>
               </li>
               <li className="text-gray-300 font-medium flex items-start">
                 <span className="text-blue-400 mr-2">✉</span>
-                <a href="mailto:ashik.cse7.bu@gmail.com" className="hover:text-blue-400 transition-colors duration-200 cursor-pointer">ashik.cse7.bu@gmail.com</a>
+                <Link href="mailto:ashik.cse7.bu@gmail.com" className="hover:text-blue-400 transition-colors duration-200 cursor-pointer">ashik.cse7.bu@gmail.com</Link>
               </li>
               <li className="text-gray-300 font-medium flex items-start">
                 <span className="text-blue-400 mr-2">📞</span>
