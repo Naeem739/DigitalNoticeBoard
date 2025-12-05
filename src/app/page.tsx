@@ -1,6 +1,8 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, 
@@ -9,7 +11,7 @@ import {
   X,
   Layout,
   FileText,
-  Image,
+  Image as ImageIcon,
   File,
   LayoutTemplate,
   Users,
@@ -122,7 +124,7 @@ export default function Home() {
       description: 'Save and reuse dashboard layouts as templates. Speed up workflow and maintain consistency across notice boards.'
     },
     {
-      icon: Image,
+      icon: ImageIcon,
       title: 'Multi-Format Support',
       description: 'Upload images and PDF documents. Support for multiple image formats with customizable fit options and PDF display.'
     },
@@ -172,22 +174,24 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-blue-50/30 text-gray-900 overflow-x-hidden font-sans" style={{ fontFamily: 'Inter, sans-serif' }}>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b-2 border-blue-100 px-6 py-4 shadow-lg shadow-blue-100/50">
         <div className="container mx-auto flex justify-between items-center">
-          <a href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
+          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
             <div className="relative">
-              <img 
+              <Image 
                 src="/images/logo.png" 
                 alt="Digital Notice Board Logo" 
-                className="w-10 h-10 object-contain drop-shadow-lg"
+                width={40}
+                height={40}
+                className="object-contain drop-shadow-lg"
               />
             </div>
             <span className="text-2xl font-extrabold text-black tracking-tight">Digital Notice Board</span>
-          </a>
+          </Link>
           
           <div className="hidden md:flex space-x-6 items-center">
-            <a href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+            <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               Home
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-            </a>
+            </Link>
             {session && (
               <>
                 <a href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
@@ -270,7 +274,7 @@ export default function Home() {
         {mobileMenuOpen && (
           <div className="md:hidden absolute left-0 right-0 bg-white border-b-2 border-blue-200 py-4 shadow-xl">
             <div className="container mx-auto px-6 space-y-4">
-              <a href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Home</a>
+              <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Home</Link>
               {session && (
                 <>
                   <a href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Dashboard</a>
@@ -591,9 +595,11 @@ export default function Home() {
             className="hidden md:block"
           >
             <div className="relative w-full">
-              <img 
+              <Image 
                 src="/images/faq-illustration.png" 
                 alt="FAQ Illustration - People interacting with technology and FAQ information" 
+                width={800}
+                height={600}
                 className="w-full h-auto object-contain"
                 style={{ mixBlendMode: 'normal' }}
               />
@@ -664,16 +670,18 @@ export default function Home() {
         
         <div className="container mx-auto px-6 grid md:grid-cols-4 gap-10 relative z-10">
           <div className="md:col-span-1">
-            <a href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
+            <Link href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
               <div className="relative">
-                <img 
+                <Image 
                   src="/images/logo.png" 
                   alt="Digital Notice Board Logo" 
-                  className="w-12 h-12 object-contain drop-shadow-lg"
+                  width={48}
+                  height={48}
+                  className="object-contain drop-shadow-lg"
                 />
               </div>
               <span className="text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Digital Notice Board</span>
-            </a>
+            </Link>
             <p className="text-gray-300 font-medium leading-relaxed">Revolutionizing team communication and collaboration with cutting-edge technology.</p>
           </div>
           
