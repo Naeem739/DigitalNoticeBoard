@@ -11,10 +11,8 @@ import {
   Layout,
   FileText,
   Image,
-  File,
   LayoutTemplate,
   Users,
-  Shield,
   User,
   LogOut,
   Move,
@@ -173,7 +171,7 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-blue-50/30 text-gray-900 overflow-x-hidden font-sans" style={{ fontFamily: 'Inter, sans-serif' }}>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b-2 border-blue-100 px-6 py-4 shadow-lg shadow-blue-100/50">
         <div className="container mx-auto flex justify-between items-center">
-          < Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
+          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
             <div className="relative">
               <img 
                 src="/images/logo.png" 
@@ -665,7 +663,7 @@ export default function Home() {
         
         <div className="container mx-auto px-6 grid md:grid-cols-4 gap-10 relative z-10">
           <div className="md:col-span-1">
-            < Link href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
+            <Link href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
               <div className="relative">
                 <img 
                   src="/images/logo.png" 
