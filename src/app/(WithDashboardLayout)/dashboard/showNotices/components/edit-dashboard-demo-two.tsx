@@ -771,8 +771,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
   }
 
   return (
-          <div className="w-full bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg transition-all duration-300 pb-20">
-      <div className="p-6">
+          <div className="w-full bg-gradient-to-b from-gray-50 to-white rounded-xl shadow-lg transition-all duration-300 pb-20 sm:pb-20">
+      <div className="p-3 sm:p-4 md:p-6">
       {/* Toast configuration for top middle */}
       <Toaster
         position="top-center"
@@ -800,12 +800,12 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
         }}
       />
       
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4 md:mb-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 sm:mb-6 md:mb-8 gap-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
           Notice Management
         </h1>
         
-        <div className="flex flex-col md:flex-row w-full md:w-auto space-y-2 md:space-y-0 md:space-x-2">
+        <div className="flex flex-col w-full md:w-auto space-y-2 md:space-y-0 md:space-x-2">
           {/* Category filter dropdown */}
           <div className="relative w-full md:w-40">
             <div 
@@ -822,7 +822,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             </div>
             
             {showDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-48 overflow-auto">
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-48 overflow-auto left-0">
                 {categoryOptions.map((category) => {
                   const isSelected = selectedCategory === category;
                   return (
@@ -863,7 +863,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             </div>
             
             {showCategoryTypeDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-48 overflow-auto">
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl py-1 max-h-48 overflow-auto left-0">
                 {categoryTypeOptions.map((categoryType) => {
                   const isSelected = selectedCategoryType === categoryType;
                   return (
@@ -958,14 +958,14 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
       
 
       {notices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-10 border border-gray-200">
-          <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-gray-600 text-lg font-medium">No notices found in the database</p>
+        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-6 sm:p-8 md:p-10 border border-gray-200">
+          <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-gray-400 mb-3 sm:mb-4" />
+          <p className="text-gray-600 text-sm sm:text-base md:text-lg font-medium text-center px-4">No notices found in the database</p>
         </div>
       ) : filteredNotices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-10 border border-gray-200">
-          <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-                                  <p className="text-gray-600 text-lg font-medium">
+        <div className="flex flex-col items-center justify-center bg-white rounded-lg p-6 sm:p-8 md:p-10 border border-gray-200">
+          <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-gray-400 mb-3 sm:mb-4" />
+                                  <p className="text-gray-600 text-sm sm:text-base md:text-lg font-medium text-center px-4">
               {searchTerm
                 ? "No notices match your search"
                 : selectedCategory === "all" && selectedCategoryType === "all"
@@ -979,7 +979,134 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-xl shadow-md border border-gray-200 bg-white">
+          {/* Mobile Card View */}
+          <div className="block md:hidden space-y-4">
+            {currentNotices.map((notice, index) => (
+              <div 
+                key={notice.id || index} 
+                className="bg-white rounded-lg shadow-md border border-gray-200 p-4 space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold text-gray-800 break-words">
+                      {(() => {
+                        const isDashboardImage = typeof notice.title === 'string' && notice.title.startsWith('Dashboard Image');
+                        if (isDashboardImage) {
+                          const num = dashboardImageOrderMap[notice.id];
+                          return `Dashboard Image - ${num ?? ''}`;
+                        }
+                        return notice.title;
+                      })()}
+                    </h3>
+                  </div>
+                  {userRole !== 'USER' && (
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button 
+                        onClick={() => handleEdit(notice)}
+                        disabled={isLoading !== null}
+                        className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full transition-colors duration-150 disabled:opacity-50"
+                        title="Edit Notice"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button 
+                        onClick={() => confirmDelete(notice.id, notice.title)}
+                        disabled={isLoading !== null}
+                        className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-full transition-colors duration-150 disabled:opacity-50"
+                        title="Delete Notice"
+                      >
+                        {isLoading?.id === notice.id && isLoading?.operation === 'delete' ? (
+                          <span className="h-4 w-4 block rounded-full border-2 border-t-transparent border-red-600 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Content for all roles */}
+                <div>
+                  {notice.content && !notice.imageData && !notice.pdfData ? (
+                    <button
+                      onClick={() => openContentModal(notice)}
+                      className="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition-colors duration-150 flex items-center gap-1"
+                    >
+                      <span>See more</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  ) : notice.content ? (
+                    <span className="text-gray-500 text-xs sm:text-sm italic">Content available (view in edit mode)</span>
+                  ) : !notice.imageData && !notice.pdfData ? (
+                    <span className="text-gray-500 text-xs sm:text-sm italic">No content available</span>
+                  ) : null}
+                </div>
+                
+                {/* Image controls */}
+                {notice.imageData && (
+                  <div className="p-2 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs sm:text-sm font-medium text-gray-700">Image Attachment</span>
+                      <span className="text-xs text-gray-500 truncate ml-2">{notice.imageFileName || 'Image'}</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        onClick={() => openImageModal(notice)}
+                        className="flex items-center justify-center px-2 sm:px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-md text-xs sm:text-sm hover:bg-yellow-200 transition-colors font-medium"
+                      >
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Show Preview
+                      </button>
+                      <button
+                        onClick={() => handleDownload(notice)}
+                        className="flex items-center justify-center px-2 sm:px-3 py-1.5 bg-purple-100 text-purple-700 rounded-md text-xs sm:text-sm hover:bg-purple-200 transition-colors font-medium"
+                      >
+                        <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5" />
+                        Download
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* PDF controls */}
+                {notice.pdfData && (
+                  <div className="p-2 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs sm:text-sm font-medium text-gray-700">PDF Attachment</span>
+                      <span className="text-xs text-gray-500 truncate ml-2">{notice.pdfFileName || 'PDF'}</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        onClick={() => openPdfModal(notice)}
+                        className="flex items-center justify-center px-2 sm:px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-md text-xs sm:text-sm hover:bg-yellow-200 transition-colors font-medium"
+                      >
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Show Preview
+                      </button>
+                      <button
+                        onClick={() => handlePdfDownload(notice)}
+                        className="flex items-center justify-center px-2 sm:px-3 py-1.5 bg-purple-100 text-purple-700 rounded-md text-xs sm:text-sm hover:bg-purple-200 transition-colors font-medium"
+                      >
+                        <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5" />
+                        Download
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-hidden rounded-xl shadow-md border border-gray-200 bg-white">
             <div className="overflow-x-auto">
               <table className="min-w-full bg-white">
                                  <thead>
@@ -1127,31 +1254,37 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
       {/* Professional Pagination Footer */}
       {totalPages > 1 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
-          <div className="flex justify-center items-center py-6 px-6">
-            <div className="flex items-center space-x-4">
+          <div className="flex justify-center items-center py-3 sm:py-4 md:py-6 px-3 sm:px-4 md:px-6">
+            <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 flex-wrap justify-center gap-2">
               {/* Previous Button */}
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+                className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
                 title="Previous page"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
               
               {/* Page Numbers */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap justify-center">
                 {[...Array(totalPages)].map((_, index) => {
                   const pageNumber = index + 1;
                   const isActive = currentPage === pageNumber;
+                  
+                  // Show first, last, current, and adjacent pages on mobile
+                  const showOnMobile = totalPages <= 5 || 
+                    pageNumber === 1 || 
+                    pageNumber === totalPages || 
+                    Math.abs(pageNumber - currentPage) <= 1;
                   
                   return (
                     <button
                       key={pageNumber}
                       onClick={() => handlePageChange(pageNumber)}
-                      className={`flex items-center justify-center w-10 h-10 rounded-full font-medium text-sm transition-all duration-200 ${
+                      className={`${showOnMobile ? 'flex' : 'hidden sm:flex'} items-center justify-center w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full font-medium text-xs sm:text-sm transition-all duration-200 ${
                         isActive
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 transform scale-105'
                           : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md'
@@ -1167,23 +1300,23 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+                className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
                 title="Next page"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
               
               {/* Page Information */}
               {filteredNotices.length > 0 && (
-                <div className="ml-8 flex items-center space-x-2 text-sm text-gray-600">
-                  <div className="w-px h-6 bg-gray-300"></div>
-                  <span className="font-medium">
+                <div className="hidden sm:flex items-center space-x-2 text-xs sm:text-sm text-gray-600 ml-2 sm:ml-4 md:ml-8">
+                  <div className="w-px h-4 sm:h-6 bg-gray-300"></div>
+                  <span className="font-medium whitespace-nowrap">
                     Page {currentPage} of {totalPages}
                   </span>
                   <span className="text-gray-400">•</span>
-                  <span>
+                  <span className="whitespace-nowrap">
                     {filteredNotices.length} total
                   </span>
                 </div>
@@ -1195,11 +1328,11 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
       {/* Edit Notice Modal */}
       {editModalOpen && editingNotice && userRole !== 'USER' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col my-4 sm:my-0">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
-              <h3 className="text-xl font-semibold">Edit Notice</h3>
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
+              <h3 className="text-lg sm:text-xl font-semibold">Edit Notice</h3>
               <button 
                 onClick={handleCancelEdit}
                 className="p-1 hover:bg-indigo-700 rounded-full transition-colors duration-150"
@@ -1209,8 +1342,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             </div>
             
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-grow">
-              <div className="space-y-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-grow">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Category */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1414,24 +1547,24 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             </div>
             
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3 bg-gray-50 rounded-b-xl">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 bg-gray-50 rounded-b-xl">
               <button
                 onClick={handleCancelEdit}
                 disabled={isLoading?.id === editingNotice.id}
-                className="px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors duration-150 flex items-center gap-2"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors duration-150 flex items-center justify-center gap-2 text-sm sm:text-base"
               >
-                <XCircle className="h-5 w-5" />
+                <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
                 disabled={isLoading?.id === editingNotice.id || !editingNotice.title.trim()}
-                className={`px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150 flex items-center gap-2 ${!editingNotice.title.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150 flex items-center justify-center gap-2 text-sm sm:text-base ${!editingNotice.title.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isLoading?.id === editingNotice.id && isLoading?.operation === 'edit' ? (
-                  <span className="h-5 w-5 block rounded-full border-2 border-t-transparent border-white animate-spin mr-2" />
+                  <span className="h-4 w-4 sm:h-5 sm:w-5 block rounded-full border-2 border-t-transparent border-white animate-spin" />
                 ) : (
-                  <Save className="h-5 w-5" />
+                  <Save className="h-4 w-4 sm:h-5 sm:w-5" />
                 )}
                 Save Changes
               </button>
@@ -1442,31 +1575,31 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
       {/* Content Modal for All Roles */}
       {contentModalOpen && selectedContent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col my-4 sm:my-0">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg flex-shrink-0">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold">{selectedContent.title}</h3>
-                  <p className="text-sm text-indigo-100">Category: {selectedContent.category}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold truncate">{selectedContent.title}</h3>
+                  <p className="text-xs sm:text-sm text-indigo-100 truncate">Category: {selectedContent.category}</p>
                 </div>
               </div>
               <button 
                 onClick={closeContentModal}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors duration-150"
+                className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors duration-150 flex-shrink-0 ml-2"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
             </div>
             
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-grow">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-grow">
               <div className="prose prose-lg max-w-none">
                 <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                   <div 
@@ -1483,10 +1616,10 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             </div>
             
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
               <button
                 onClick={closeContentModal}
-                className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150"
+                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150 text-sm sm:text-base"
               >
                 Close
               </button>
@@ -1497,31 +1630,31 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
       {/* Image Modal for All Roles */}
       {imageModalOpen && selectedImageContent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col my-4 sm:my-0">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg flex-shrink-0">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold">{selectedImageContent.title}</h3>
-                  <p className="text-sm text-indigo-100">File: {selectedImageContent.fileName}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold truncate">{selectedImageContent.title}</h3>
+                  <p className="text-xs sm:text-sm text-indigo-100 truncate">File: {selectedImageContent.fileName}</p>
                 </div>
               </div>
               <button 
                 onClick={closeImageModal}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors duration-150"
+                className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors duration-150 flex-shrink-0 ml-2"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
             </div>
             
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-grow flex items-center justify-center">
+            <div className="p-3 sm:p-4 md:p-6 overflow-y-auto flex-grow flex items-center justify-center">
               <div className="max-w-full max-h-full">
                 <img
                   src={`data:image/jpeg;base64,${selectedImageContent.imageData}`}
@@ -1532,10 +1665,10 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             </div>
             
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
               <button
                 onClick={closeImageModal}
-                className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150"
+                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150 text-sm sm:text-base"
               >
                 Close
               </button>
@@ -1546,45 +1679,45 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
       {/* PDF Modal for All Roles */}
       {pdfModalOpen && selectedPdfContent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] sm:max-h-[90vh] flex flex-col my-4 sm:my-0">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-t-xl">
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg flex-shrink-0">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold">{selectedPdfContent.title}</h3>
-                  <p className="text-sm text-indigo-100">File: {selectedPdfContent.fileName}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold truncate">{selectedPdfContent.title}</h3>
+                  <p className="text-xs sm:text-sm text-indigo-100 truncate">File: {selectedPdfContent.fileName}</p>
                 </div>
               </div>
               <button 
                 onClick={closePdfModal}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors duration-150"
+                className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors duration-150 flex-shrink-0 ml-2"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
             </div>
             
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-grow">
+            <div className="p-3 sm:p-4 md:p-6 overflow-y-auto flex-grow">
               <div className="w-full h-full">
                 <iframe
                   src={`data:application/pdf;base64,${selectedPdfContent.pdfData}`}
-                  className="w-full h-full min-h-[600px] border border-gray-200 rounded-lg"
+                  className="w-full h-full min-h-[300px] sm:min-h-[400px] md:min-h-[600px] border border-gray-200 rounded-lg"
                   title="PDF Preview"
                 />
               </div>
             </div>
             
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-xl">
               <button
                 onClick={closePdfModal}
-                className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150"
+                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-150 text-sm sm:text-base"
               >
                 Close
               </button>

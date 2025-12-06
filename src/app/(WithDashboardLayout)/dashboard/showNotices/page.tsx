@@ -35,7 +35,7 @@ const ShowNoticesPage = () => {
     } as any;
   
     return (
-      <div>
+      <div className="w-full min-h-screen">
         <WidgetContainer data={defaultDashboardData} />
       </div>
     );

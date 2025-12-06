@@ -237,29 +237,30 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
   return (
     <>
       <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-3 text-lg font-semibold text-gray-800">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
-              <Bookmark className="w-5 h-5 text-white" />
+        <CardHeader className="pb-2 p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 sm:gap-3 text-base sm:text-lg font-semibold text-gray-800">
+            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex-shrink-0">
+              <Bookmark className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div className="flex items-center gap-2">
-              <span>Templates</span>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="truncate">Templates</span>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs flex-shrink-0">
                 {templates.length}
               </Badge>
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1" />
-            <Button onClick={handleQuickSaveTemplate} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleQuickSaveTemplate} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2">
               {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5 sm:mr-2" />
               ) : (
-                <Save className="w-4 h-4 mr-2" />
+                <Save className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               )}
-              Save as Template
+              <span className="hidden sm:inline">Save as Template</span>
+              <span className="sm:hidden">Save</span>
             </Button>
           </div>
           <div className="relative">
@@ -267,19 +268,19 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
               placeholder="Search templates..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-3"
+              className="pl-3 text-sm sm:text-base"
             />
           </div>
 
           <div className="space-y-2">
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+              <div className="flex items-center justify-center py-6 sm:py-8">
+                <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-4 border-blue-500 border-t-transparent"></div>
               </div>
             ) : filteredTemplates.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Bookmark className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-sm font-medium">No templates found</p>
+              <div className="text-center py-6 sm:py-8 text-gray-500">
+                <Bookmark className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-gray-300" />
+                <p className="text-xs sm:text-sm font-medium">No templates found</p>
               </div>
             ) : (
               <AnimatePresence>
@@ -289,25 +290,25 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className={`group border border-gray-200 rounded-lg p-3 bg-white hover:border-blue-300 transition-all ${
+                    className={`group border border-gray-200 rounded-lg p-2.5 sm:p-3 bg-white hover:border-blue-300 transition-all ${
                       appliedTemplateId === template.id ? 'ring-2 ring-green-500 ring-opacity-50 bg-green-50' : ''
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-12 h-12 rounded-md shadow-inner border border-gray-100" style={getBackgroundPreview(template)} />
-                        <div className="truncate">
-                          <h4 className="font-medium text-gray-900 truncate">{template.name}</h4>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md shadow-inner border border-gray-100 flex-shrink-0" style={getBackgroundPreview(template)} />
+                        <div className="truncate min-w-0 flex-1">
+                          <h4 className="font-medium text-gray-900 truncate text-sm sm:text-base">{template.name}</h4>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => handleApplyTemplate(template)} disabled={loading} className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100">
+                      <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                        <Button size="sm" variant="outline" onClick={() => handleApplyTemplate(template)} disabled={loading} className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 text-xs sm:text-sm px-2 sm:px-3 flex-1 sm:flex-initial">
                           <Download className="w-3 h-3 mr-1" />
                           Apply
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleDeleteTemplate(template.id, template.name)} disabled={loading} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                        <Button size="sm" variant="ghost" onClick={() => handleDeleteTemplate(template.id, template.name)} disabled={loading} className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs sm:text-sm px-2 sm:px-3">
                           <Trash2 className="w-3 h-3" />
-                          Delete
+                          <span className="hidden sm:inline ml-1">Delete</span>
                         </Button>
                       </div>
                     </div>
@@ -318,17 +319,17 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
           </div>
 
           {filteredTemplates.length > 0 && (
-            <div className="flex items-center justify-between pt-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 gap-2 sm:gap-0">
               <div className="text-xs text-gray-600">
                 Showing {filteredTemplates.length === 0 ? 0 : pageStartIndex + 1}-{Math.min(pageStartIndex + pageSize, filteredTemplates.length)} of {filteredTemplates.length}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center sm:justify-end">
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(1)}
-                  className="px-2"
+                  className="px-1.5 sm:px-2 text-xs"
                 >
                   «
                 </Button>
@@ -337,28 +338,30 @@ export default function TemplateManager({ currentSettings, onSettingsChange }: T
                   size="sm"
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className="px-2"
+                  className="px-2 sm:px-3 text-xs"
                 >
-                  Prev
+                  <span className="hidden sm:inline">Prev</span>
+                  <span className="sm:hidden">‹</span>
                 </Button>
-                <span className="text-xs text-gray-700 px-1">
-                  Page {currentPage} of {totalPages}
+                <span className="text-xs text-gray-700 px-1 sm:px-2">
+                  {currentPage}/{totalPages}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  className="px-2"
+                  className="px-2 sm:px-3 text-xs"
                 >
-                  Next
+                  <span className="hidden sm:inline">Next</span>
+                  <span className="sm:hidden">›</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage(totalPages)}
-                  className="px-2"
+                  className="px-1.5 sm:px-2 text-xs"
                 >
                   »
                 </Button>
