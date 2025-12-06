@@ -111,6 +111,14 @@ export const DesktopSidebar = ({
 export const MobileSidebar = ({
   className,
   children,
+  onDrag,
+  onDragEnd,
+  onDragEnter,
+  onDragExit,
+  onDragLeave,
+  onDragOver,
+  onDragStart,
+  onDrop,
   ...props
 }: React.ComponentProps<"div">) => {
   const { open, setOpen } = useSidebar();
