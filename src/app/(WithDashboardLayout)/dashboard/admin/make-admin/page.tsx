@@ -113,25 +113,25 @@ export default function MakeAdminPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-3"
       >
         <div className="relative">
-          <Crown className="w-8 h-8 text-yellow-500" />
-          <Shield className="w-4 h-4 text-blue-600 absolute -top-1 -right-1" />
+          <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" />
+          <Shield className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 absolute -top-1 -right-1" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Make Admin
           </h1>
-          <p className="text-gray-600 mt-1">Grant administrative privileges to trusted users</p>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Grant administrative privileges to trusted users</p>
         </div>
       </motion.div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -326,66 +326,66 @@ export default function MakeAdminPage() {
           className="space-y-4"
         >
           <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-800">
-                <Shield className="w-5 h-5" />
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-blue-800 text-base sm:text-lg">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
                 Admin Privileges
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span>Full system access</span>
+            <CardContent className="space-y-3 p-4 sm:p-6">
+              <div className="flex items-center gap-2 text-sm sm:text-base">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+                <span className="break-words">Full system access</span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span>User management</span>
+              <div className="flex items-center gap-2 text-sm sm:text-base">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+                <span className="break-words">User management</span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span>Dashboard creation</span>
+              <div className="flex items-center gap-2 text-sm sm:text-base">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+                <span className="break-words">Dashboard creation</span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span>System settings</span>
+              <div className="flex items-center gap-2 text-sm sm:text-base">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+                <span className="break-words">System settings</span>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-yellow-800">
-                <AlertCircle className="w-5 h-5" />
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-yellow-800 text-base sm:text-lg">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                 Security Notes
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-start gap-2 text-sm">
-                <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
-                <span>Admin users have full system control</span>
+            <CardContent className="space-y-3 p-4 sm:p-6">
+              <div className="flex items-start gap-2 text-sm sm:text-base">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <span className="break-words">Admin users have full system control</span>
               </div>
-              <div className="flex items-start gap-2 text-sm">
-                <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
-                <span>Choose strong, unique passwords</span>
+              <div className="flex items-start gap-2 text-sm sm:text-base">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <span className="break-words">Choose strong, unique passwords</span>
               </div>
-              <div className="flex items-start gap-2 text-sm">
-                <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
-                <span>Monitor admin activities regularly</span>
+              <div className="flex items-start gap-2 text-sm sm:text-base">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <span className="break-words">Monitor admin activities regularly</span>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-800">
-                <Zap className="w-5 h-5" />
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-green-800 text-base sm:text-lg">
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
                 Quick Stats
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">∞</div>
-                <div className="text-sm text-green-700">Unlimited Access</div>
+                <div className="text-2xl sm:text-3xl font-bold text-green-600">∞</div>
+                <div className="text-sm sm:text-base text-green-700 mt-1">Unlimited Access</div>
               </div>
             </CardContent>
           </Card>
