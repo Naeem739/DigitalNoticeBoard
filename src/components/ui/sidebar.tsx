@@ -116,20 +116,20 @@ export const MobileSidebar = ({
   const { open, setOpen } = useSidebar();
   return (
     <>
-      <div
-        className={cn(
-          "h-10 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-black w-full text-white"
-        )}
-        {...props}
-      >
-        <div className="flex justify-end z-20 w-full">
-          <IconMenu2
-            className="text-white"
-            onClick={() => setOpen(!open)}
-          />
-        </div>
-        <AnimatePresence>
-          {open && (
+      {/* Removed black menu bar - using Header's hamburger menu instead */}
+      <AnimatePresence>
+        {open && (
+          <>
+            {/* Overlay to close sidebar when clicking outside */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black bg-opacity-50 z-[90] md:hidden"
+              onClick={() => setOpen(false)}
+            />
+            {/* Sidebar content */}
             <motion.div
               initial={{ x: "-100%", opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -139,21 +139,24 @@ export const MobileSidebar = ({
                 ease: "easeInOut",
               }}
               className={cn(
-                "fixed h-full w-full inset-0 bg-black text-white p-10 z-[100] flex flex-col justify-between",
+                "fixed h-full w-full inset-0 bg-black text-white p-4 sm:p-6 z-[100] flex flex-col overflow-y-auto md:hidden",
                 className
               )}
+              {...props}
             >
               <div
-                className="absolute right-10 top-10 z-50 text-white"
+                className="absolute right-4 top-4 sm:right-6 sm:top-6 z-50 text-white cursor-pointer"
                 onClick={() => setOpen(!open)}
               >
-                <IconX />
+                <IconX className="w-6 h-6" />
               </div>
-              {children}
+              <div className="mt-8 sm:mt-10 flex flex-col gap-2">
+                {children}
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 };
