@@ -169,17 +169,17 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-blue-50/30 text-gray-900 overflow-x-hidden font-sans" style={{ fontFamily: 'Inter, sans-serif' }}>
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b-2 border-blue-100 px-6 py-4 shadow-lg shadow-blue-100/50">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b-2 border-blue-100 px-3 sm:px-6 py-3 sm:py-4 shadow-lg shadow-blue-100/50">
         <div className="container mx-auto flex justify-between items-center">
-          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
+          <Link href="/" className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity cursor-pointer" onClick={() => setMobileMenuOpen(false)}>
             <div className="relative">
               <img 
                 src="/images/logo.png" 
                 alt="Digital Notice Board Logo" 
-                className="w-10 h-10 object-contain drop-shadow-lg"
+                className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-lg"
               />
             </div>
-            <span className="text-2xl font-extrabold text-black tracking-tight">Digital Notice Board</span>
+            <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-black tracking-tight">Digital Notice Board</span>
           </Link>
           
           <div className="hidden md:flex space-x-6 items-center">
@@ -267,40 +267,43 @@ export default function Home() {
         </div>
         
         {mobileMenuOpen && (
-          <div className="md:hidden absolute left-0 right-0 bg-white border-b-2 border-blue-200 py-4 shadow-xl">
-            <div className="container mx-auto px-6 space-y-4">
-              <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Home</Link>
+          <div className="md:hidden absolute left-0 right-0 bg-white border-b-2 border-blue-200 py-4 shadow-xl max-h-[calc(100vh-80px)] overflow-y-auto">
+            <div className="container mx-auto px-4 sm:px-6 space-y-3">
+              <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Home</Link>
               {session && (
                 <>
-                  <Link href="/dashboard" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Dashboard</Link>
-                  <Link href="/notice" target='_blank' className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Notice</Link>
+                  <Link href="/dashboard" target='_blank' onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Dashboard</Link>
+                  <Link href="/notice" target='_blank' onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Notice</Link>
                 </>
               )}
-              <Link href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">Features</Link>
-              <Link href="#faq" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100">FAQ</Link>
+              <Link href="#features" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Features</Link>
+              <Link href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">FAQ</Link>
               
-              <div className="flex flex-col space-y-4 pt-4">
+              <div className="flex flex-col space-y-3 pt-4">
                 {session ? (
                   <>
-                    <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
-                      <p className="text-sm font-semibold text-gray-800">Welcome, {session.user?.name || session.user?.email?.split('@')[0] || 'User'}!</p>
+                    <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
+                      <p className="text-xs sm:text-sm font-semibold text-gray-800">Welcome, {session.user?.name || session.user?.email?.split('@')[0] || 'User'}!</p>
                     </div>
-                    <Link href="/dashboard" target="_blank">
-                      <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-3 rounded-lg transition-all duration-200 font-semibold shadow-lg shadow-blue-200">
+                    <Link href="/dashboard" target="_blank" onClick={() => setMobileMenuOpen(false)}>
+                      <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2.5 sm:py-3 rounded-lg transition-all duration-200 font-semibold text-sm sm:text-base shadow-lg shadow-blue-200">
                         Go to Dashboard
                       </button>
                     </Link>
                     <button 
-                      onClick={handleLogout}
-                      className="w-full bg-transparent border-2 border-red-500 text-red-600 px-4 py-3 rounded-lg hover:bg-red-500 hover:text-white transition-all duration-200 font-semibold"
+                      onClick={() => {
+                        handleLogout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full bg-transparent border-2 border-red-500 text-red-600 px-4 py-2.5 sm:py-3 rounded-lg hover:bg-red-500 hover:text-white transition-all duration-200 font-semibold text-sm sm:text-base"
                     >
                       Sign Out
                     </button>
                   </>
                 ) : (
                   <>
-                    <Link href="/login">
-                      <button className="w-full bg-transparent border-2 border-blue-500 text-blue-600 px-4 py-3 rounded-lg hover:bg-blue-500 hover:text-white transition-all duration-200 font-semibold">
+                    <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                      <button className="w-full bg-transparent border-2 border-blue-500 text-blue-600 px-4 py-2.5 sm:py-3 rounded-lg hover:bg-blue-500 hover:text-white transition-all duration-200 font-semibold text-sm sm:text-base">
                         Login
                       </button>
                     </Link>
@@ -312,29 +315,29 @@ export default function Home() {
         )}
       </nav>
 
-      <main className="container mx-auto px-6 py-20 grid md:grid-cols-2 gap-16 items-center relative mt-20">
+      <main className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 grid md:grid-cols-2 gap-8 sm:gap-12 md:gap-16 items-center relative mt-16 sm:mt-20">
         {/* Decorative background elements */}
-        <div className="absolute top-0 left-0 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl -z-10 animate-pulse"></div>
+        <div className="absolute top-0 left-0 w-48 h-48 sm:w-72 sm:h-72 bg-purple-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
+        <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-blue-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 sm:w-96 sm:h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl -z-10 animate-pulse"></div>
         
         <div className="relative z-10">
           {status === 'loading' ? null : session ? (
             <TypewriterEffectSmooth
               words={[
-                { text: 'Welcome back,', className: 'text-gray-900 font-extrabold tracking-tight' },
-                { text: ` ${displayName}!`, className: 'text-blue-600 font-extrabold tracking-tight' },
+                { text: 'Welcome back,', className: 'text-gray-900 font-extrabold tracking-tight text-2xl sm:text-3xl md:text-4xl' },
+                { text: ` ${displayName}!`, className: 'text-blue-600 font-extrabold tracking-tight text-2xl sm:text-3xl md:text-4xl' },
               ]}
-              className="mb-6"
+              className="mb-4 sm:mb-6"
             />
           ) : (
-            <h1 className="text-5xl md:text-6xl font-extrabold mb-6 text-gray-900 leading-tight tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-4 sm:mb-6 text-gray-900 leading-tight tracking-tight">
               <> 
                 Transform Your <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Digital Notice Board</span>
               </>
             </h1>
           )}
-          <p className="text-xl md:text-2xl text-gray-700 mb-10 font-medium leading-relaxed">
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-700 mb-6 sm:mb-8 md:mb-10 font-medium leading-relaxed">
             {session ? (
               <span style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}>
                 Ready to manage your notices? Access your dashboard to create, organize, and share important information with your team.
@@ -345,7 +348,7 @@ export default function Home() {
               </span>
             )}
           </p>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
             {session ? (
               <>
                 <motion.button
@@ -356,7 +359,7 @@ export default function Home() {
                       window.open('/dashboard', '_blank')
                     }
                   }}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-lg transition-all duration-200 font-bold text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300"
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg transition-all duration-200 font-bold text-base sm:text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300"
                 >
                   Go to Dashboard
                 </motion.button>
@@ -365,11 +368,10 @@ export default function Home() {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     if (typeof window !== 'undefined') {
-
                       window.open('/notice', '_blank')
                     }
                   }}
-                  className="bg-transparent border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all duration-200 font-bold text-lg"
+                  className="w-full sm:w-auto bg-transparent border-2 border-blue-600 text-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all duration-200 font-bold text-base sm:text-lg"
                 >
                   View Notice Board
                 </motion.button>
@@ -380,7 +382,7 @@ export default function Home() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleGetStarted}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-lg transition-all duration-200 font-bold text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300"
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg transition-all duration-200 font-bold text-base sm:text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300"
                 >
                   Get Started
                 </motion.button>
@@ -393,7 +395,7 @@ export default function Home() {
                       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
                   }}
-                  className="bg-transparent border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all duration-200 font-bold text-lg"
+                  className="w-full sm:w-auto bg-transparent border-2 border-blue-600 text-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-200 transition-all duration-200 font-bold text-base sm:text-lg"
                 >
                   Learn More
                 </motion.button>
@@ -431,39 +433,39 @@ export default function Home() {
 
 
 
-      <section id="features" className="container mx-auto px-6 py-20 bg-gradient-to-b from-white via-blue-50/30 to-white relative overflow-hidden">
+      <section id="features" className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 bg-gradient-to-b from-white via-blue-50/30 to-white relative overflow-hidden">
         {/* Decorative elements */}
-        <div className="absolute top-0 left-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-0 left-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
         
-        <div className="text-center mb-16 relative z-10">
-          <div className="inline-block mb-4 px-4 py-2 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full">
-            <span className="bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent font-bold text-sm uppercase tracking-wider">Features</span>
+        <div className="text-center mb-10 sm:mb-12 md:mb-16 relative z-10">
+          <div className="inline-block mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full">
+            <span className="bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent font-bold text-xs sm:text-sm uppercase tracking-wider">Features</span>
           </div>
-          <h2 className="text-4xl md:text-5xl font-extrabold mb-6 text-gray-900 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4 sm:mb-6 text-gray-900 tracking-tight px-2">
             More Than Just a <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Notice Board</span>
           </h2>
-          <p className="text-gray-700 text-xl md:text-2xl font-semibold max-w-2xl mx-auto">Comprehensive features for creating and managing digital notice boards</p>
+          <p className="text-gray-700 text-base sm:text-lg md:text-xl lg:text-2xl font-semibold max-w-2xl mx-auto px-2">Comprehensive features for creating and managing digital notice boards</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 relative z-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 relative z-10">
           {additionalFeatures.map((feature, index) => (
             <motion.div
               key={feature.title}
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.2 }}
-              className="bg-white border-2 border-blue-100 p-8 rounded-2xl text-center hover:scale-105 hover:border-blue-300 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-blue-200/50 group relative overflow-hidden"
+              className="bg-white border-2 border-blue-100 p-5 sm:p-6 md:p-8 rounded-2xl text-center hover:scale-105 hover:border-blue-300 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-blue-200/50 group relative overflow-hidden"
             >
               {/* Background gradient on hover */}
               <div className="absolute inset-0 bg-gradient-to-br from-blue-50/0 to-purple-50/0 group-hover:from-blue-50 group-hover:to-purple-50/50 transition-all duration-300 -z-10"></div>
               
               <div className="relative z-10">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  <feature.icon className="text-white w-8 h-8" />
+                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 sm:mb-5 md:mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                  <feature.icon className="text-white w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
                 </div>
-                <h3 className="text-2xl font-extrabold mb-4 text-gray-900 tracking-tight">{feature.title}</h3>
-                <p className="text-gray-700 font-medium leading-relaxed">{feature.description}</p>
+                <h3 className="text-lg sm:text-xl md:text-2xl font-extrabold mb-3 sm:mb-4 text-gray-900 tracking-tight">{feature.title}</h3>
+                <p className="text-gray-700 font-medium leading-relaxed text-sm sm:text-base">{feature.description}</p>
               </div>
               
               {/* Decorative corner */}
@@ -473,24 +475,24 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="how-it-works" className="container mx-auto px-6 py-20 bg-gray-50 relative overflow-hidden">
+      <section id="how-it-works" className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 bg-gray-50 relative overflow-hidden">
         {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-blue-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 sm:w-96 sm:h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
         
-        <div className="text-center mb-16 relative z-10">
-          <h2 className="text-4xl md:text-5xl font-extrabold mb-6 text-gray-900 tracking-tight">
+        <div className="text-center mb-10 sm:mb-12 md:mb-16 relative z-10">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4 sm:mb-6 text-gray-900 tracking-tight px-2">
             How <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Admin</span> Creates a Notice
           </h2>
-          <p className="text-gray-600 text-xl font-semibold max-w-2xl mx-auto">Create professional notices in minutes with our intuitive drag-and-drop interface</p>
+          <p className="text-gray-600 text-base sm:text-lg md:text-xl font-semibold max-w-2xl mx-auto px-2">Create professional notices in minutes with our intuitive drag-and-drop interface</p>
         </div>
 
-        <div className="max-w-4xl mx-auto relative z-10">
+        <div className="max-w-4xl mx-auto relative z-10 px-2 sm:px-0">
           {/* Vertical Timeline Line */}
-          <div className="absolute left-8 md:left-12 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 via-blue-500 to-purple-500 rounded-full"></div>
+          <div className="absolute left-4 sm:left-6 md:left-8 lg:left-12 top-0 bottom-0 w-0.5 sm:w-1 bg-gradient-to-b from-blue-500 via-blue-500 to-purple-500 rounded-full"></div>
           
           {/* Timeline Steps */}
-          <div className="space-y-12">
+          <div className="space-y-8 sm:space-y-10 md:space-y-12">
             {[
               {
                 number: 1,
@@ -529,33 +531,33 @@ export default function Home() {
                 whileInView={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.15 }}
                 viewport={{ once: true }}
-                className="relative flex items-start gap-6"
+                className="relative flex items-start gap-3 sm:gap-4 md:gap-6"
               >
                 {/* Timeline Circle */}
                 <div className="relative z-10 flex-shrink-0">
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg border-4 border-white">
-                    <span className="text-white font-extrabold text-xl md:text-2xl">{step.number}</span>
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg border-2 sm:border-3 md:border-4 border-white">
+                    <span className="text-white font-extrabold text-base sm:text-lg md:text-xl lg:text-2xl">{step.number}</span>
                   </div>
                   {/* Dotted connector line - only show if not last item */}
                   {index < 4 && (
-                    <div className="absolute left-1/2 top-full w-0.5 h-12 border-l-2 border-dashed border-blue-300 transform translate-x-[-50%] hidden md:block"></div>
+                    <div className="absolute left-1/2 top-full w-0.5 h-8 sm:h-10 md:h-12 border-l-2 border-dashed border-blue-300 transform translate-x-[-50%]"></div>
                   )}
                 </div>
                 
                 {/* Content Card */}
-                <div className="flex-1 bg-white rounded-xl p-6 md:p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-blue-100 hover:border-blue-300 group">
-                  <div className="flex items-start gap-4">
+                <div className="flex-1 bg-white rounded-xl p-4 sm:p-5 md:p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-blue-100 hover:border-blue-300 group ml-2 sm:ml-0">
+                  <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                     {/* Icon */}
-                    <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                      <step.icon className="w-7 h-7 text-white" />
+                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                      <step.icon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-white" />
                     </div>
                     
                     {/* Text Content */}
                     <div className="flex-1">
-                      <h3 className="text-2xl font-extrabold text-gray-900 mb-2 tracking-tight">
+                      <h3 className="text-lg sm:text-xl md:text-2xl font-extrabold text-gray-900 mb-1 sm:mb-2 tracking-tight">
                         {step.title}
                       </h3>
-                      <p className="text-gray-600 font-medium leading-relaxed text-lg">
+                      <p className="text-gray-600 font-medium leading-relaxed text-sm sm:text-base md:text-lg">
                         {step.description}
                       </p>
                     </div>
@@ -567,21 +569,21 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="faq" className="container mx-auto px-6 py-20 bg-gradient-to-b from-white to-blue-50/20 relative overflow-hidden">
+      <section id="faq" className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 bg-gradient-to-b from-white to-blue-50/20 relative overflow-hidden">
         {/* Decorative background */}
-        <div className="absolute top-1/4 right-0 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/4 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
         
-        <div className="text-center mb-16 relative z-10">
-          <div className="inline-block mb-4 px-4 py-2 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full">
-            <span className="bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent font-bold text-sm uppercase tracking-wider">FAQ</span>
+        <div className="text-center mb-10 sm:mb-12 md:mb-16 relative z-10">
+          <div className="inline-block mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full">
+            <span className="bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent font-bold text-xs sm:text-sm uppercase tracking-wider">FAQ</span>
           </div>
-          <h2 className="text-4xl md:text-5xl font-extrabold mb-6 text-gray-900 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4 sm:mb-6 text-gray-900 tracking-tight px-2">
             Frequently <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Asked Questions</span>
           </h2>
-          <p className="text-gray-700 text-xl md:text-2xl font-semibold">Get quick answers to common queries</p>
+          <p className="text-gray-700 text-base sm:text-lg md:text-xl lg:text-2xl font-semibold px-2">Get quick answers to common queries</p>
         </div>
 
-        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center relative z-10">
+        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center relative z-10">
           {/* FAQ Image on Left */}
           <motion.div
             initial={{ opacity: 0, x: -50 }}
@@ -601,7 +603,7 @@ export default function Home() {
           </motion.div>
 
           {/* FAQ Content on Right */}
-          <div className="space-y-5">
+          <div className="space-y-3 sm:space-y-4 md:space-y-5">
           {faqs.map((faq, index) => (
             <motion.div
               key={index}
@@ -609,26 +611,26 @@ export default function Home() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="bg-white border-2 border-blue-100 p-6 rounded-xl shadow-lg hover:shadow-xl hover:border-blue-300 transition-all duration-300 group"
+                className="bg-white border-2 border-blue-100 p-4 sm:p-5 md:p-6 rounded-xl shadow-lg hover:shadow-xl hover:border-blue-300 transition-all duration-300 group"
             >
               <div 
-                className="flex justify-between items-center cursor-pointer"
+                className="flex justify-between items-start sm:items-center cursor-pointer gap-2 sm:gap-4"
                 onClick={() => setActiveModal(activeModal === faq.question ? null : faq.question)}
               >
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
-                      <HelpCircle className="text-white w-5 h-5" />
+                  <div className="flex items-start sm:items-center space-x-2 sm:space-x-3 md:space-x-4 flex-1 min-w-0">
+                    <div className="flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
+                      <HelpCircle className="text-white w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5" />
                     </div>
-                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">{faq.question}</h3>
+                    <h3 className="text-sm sm:text-base md:text-lg lg:text-xl font-extrabold text-gray-900 tracking-tight flex-1">{faq.question}</h3>
                   </div>
-                  <div className="flex-shrink-0 ml-4">
+                  <div className="flex-shrink-0 ml-2 sm:ml-4">
                     {activeModal === faq.question ? (
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <X className="text-blue-600 w-5 h-5" />
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <X className="text-blue-600 w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                     ) : (
-                      <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                        <ChevronRight className="text-blue-600 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-50 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                        <ChevronRight className="text-blue-600 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                       </div>
                     )}
                 </div>
@@ -641,8 +643,8 @@ export default function Home() {
                     exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                   >
-                      <div className="mt-5 pt-5 border-t-2 border-blue-100">
-                        <p className="text-gray-700 font-medium leading-relaxed text-lg">
+                      <div className="mt-3 sm:mt-4 md:mt-5 pt-3 sm:pt-4 md:pt-5 border-t-2 border-blue-100">
+                        <p className="text-gray-700 font-medium leading-relaxed text-sm sm:text-base md:text-lg">
                     {faq.answer}
                         </p>
                       </div>
@@ -655,34 +657,34 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="bg-gray-900 border-t-4 border-blue-500 py-16 relative overflow-hidden">
+      <footer className="bg-gray-900 border-t-4 border-blue-500 py-10 sm:py-12 md:py-16 relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-full h-full opacity-5">
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl"></div>
+          <div className="absolute top-1/4 left-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-purple-500/20 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-blue-500/20 rounded-full blur-3xl"></div>
         </div>
         
-        <div className="container mx-auto px-6 grid md:grid-cols-4 gap-10 relative z-10">
-          <div className="md:col-span-1">
-            <Link href="/" className="flex items-center space-x-3 mb-6 hover:opacity-80 transition-opacity cursor-pointer">
+        <div className="container mx-auto px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 md:gap-10 relative z-10">
+          <div className="sm:col-span-2 md:col-span-1">
+            <Link href="/" className="flex items-center space-x-2 sm:space-x-3 mb-4 sm:mb-6 hover:opacity-80 transition-opacity cursor-pointer">
               <div className="relative">
                 <img 
                   src="/images/logo.png" 
                   alt="Digital Notice Board Logo" 
-                  className="w-12 h-12 object-contain drop-shadow-lg"
+                  className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-lg"
                 />
               </div>
-              <span className="text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Digital Notice Board</span>
+              <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Digital Notice Board</span>
             </Link>
-            <p className="text-gray-300 font-medium leading-relaxed">Empowering organizations with efficient notice management, real-time updates, and seamless information sharing.</p>
+            <p className="text-gray-300 font-medium leading-relaxed text-sm sm:text-base">Empowering organizations with efficient notice management, real-time updates, and seamless information sharing.</p>
           </div>
           
           <div>
-            <h4 className="text-xl font-extrabold mb-6 text-white tracking-tight uppercase text-sm">Features</h4>
-            <ul className="space-y-3">
+            <h4 className="text-base sm:text-lg md:text-xl font-extrabold mb-4 sm:mb-6 text-white tracking-tight uppercase text-xs sm:text-sm">Features</h4>
+            <ul className="space-y-2 sm:space-y-3">
               {['Dashboard Layout', 'Rich Text Editor', 'Template System', 'Category Management'].map((item) => (
                 <li key={item}>
-                  <Link href="#features" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
+                  <Link href="#features" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block text-sm sm:text-base">
                     {item}
                   </Link>
                 </li>
@@ -691,11 +693,11 @@ export default function Home() {
           </div>
           
           <div>
-            <h4 className="text-xl font-extrabold mb-6 text-white tracking-tight uppercase text-sm">Resources</h4>
-            <ul className="space-y-3">
+            <h4 className="text-base sm:text-lg md:text-xl font-extrabold mb-4 sm:mb-6 text-white tracking-tight uppercase text-xs sm:text-sm">Resources</h4>
+            <ul className="space-y-2 sm:space-y-3">
               {['Public Notice Board', 'Role Management', 'Widget System', 'QR Code Access'].map((item) => (
                 <li key={item}>
-                  <Link href="/notice" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block">
+                  <Link href="/notice" className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block text-sm sm:text-base">
                     {item}
                   </Link>
                 </li>
@@ -704,31 +706,31 @@ export default function Home() {
           </div>
           
           <div>
-            <h4 className="text-xl font-extrabold mb-6 text-white tracking-tight uppercase text-sm">Contact</h4>
-            <ul className="space-y-3">
-              <li className="text-gray-300 font-medium flex items-start">
-                <span className="text-blue-400 mr-2">✉</span>
-                <Link href="mailto:naeem.cse7.bu@gmail.com" className="hover:text-blue-400 transition-colors duration-200 cursor-pointer">naeem.cse7.bu@gmail.com</Link>
+            <h4 className="text-base sm:text-lg md:text-xl font-extrabold mb-4 sm:mb-6 text-white tracking-tight uppercase text-xs sm:text-sm">Contact</h4>
+            <ul className="space-y-2 sm:space-y-3">
+              <li className="text-gray-300 font-medium flex items-start text-sm sm:text-base">
+                <span className="text-blue-400 mr-2 flex-shrink-0">✉</span>
+                <Link href="mailto:naeem.cse7.bu@gmail.com" className="hover:text-blue-400 transition-colors duration-200 cursor-pointer break-all">naeem.cse7.bu@gmail.com</Link>
               </li>
-              <li className="text-gray-300 font-medium flex items-start">
-                <span className="text-blue-400 mr-2">✉</span>
-                <Link href="mailto:ashik.cse7.bu@gmail.com" className="hover:text-blue-400 transition-colors duration-200 cursor-pointer">ashik.cse7.bu@gmail.com</Link>
+              <li className="text-gray-300 font-medium flex items-start text-sm sm:text-base">
+                <span className="text-blue-400 mr-2 flex-shrink-0">✉</span>
+                <Link href="mailto:ashik.cse7.bu@gmail.com" className="hover:text-blue-400 transition-colors duration-200 cursor-pointer break-all">ashik.cse7.bu@gmail.com</Link>
               </li>
-              <li className="text-gray-300 font-medium flex items-start">
-                <span className="text-blue-400 mr-2">📞</span>
-                <span>+8801623094662</span>
+              <li className="text-gray-300 font-medium flex items-start text-sm sm:text-base">
+                <span className="text-blue-400 mr-2 flex-shrink-0">📞</span>
+                <span className="break-all">+8801623094662</span>
               </li>
-              <li className="text-gray-300 font-medium flex items-start">
-                <span className="text-blue-400 mr-2">📞</span>
-                <span>+8801722432449</span>
+              <li className="text-gray-300 font-medium flex items-start text-sm sm:text-base">
+                <span className="text-blue-400 mr-2 flex-shrink-0">📞</span>
+                <span className="break-all">+8801722432449</span>
               </li>
             </ul> 
 
 
           </div>
         </div>
-        <div className="container mx-auto px-6 mt-12 text-center border-t-2 border-gray-800 pt-8 relative z-10">
-          <p className="text-gray-400 font-semibold">
+        <div className="container mx-auto px-4 sm:px-6 mt-8 sm:mt-10 md:mt-12 text-center border-t-2 border-gray-800 pt-6 sm:pt-8 relative z-10">
+          <p className="text-gray-400 font-semibold text-xs sm:text-sm md:text-base">
             © 2024 Digital Notice Board. All rights reserved.
           </p>
         </div>
