@@ -702,6 +702,16 @@ export default function Home() {
                   </Link>
                 </li>
               ))}
+              <li>
+                <a 
+                  href="/Apk/Notice Board.apk" 
+                  download="Notice Board.apk"
+                  className="text-gray-300 font-semibold hover:text-blue-400 transition-all duration-200 hover:translate-x-1 inline-block text-sm sm:text-base flex items-center gap-2"
+                >
+                  <span className="text-blue-400">📱</span>
+                  Download Our App
+                </a>
+              </li>
             </ul>
           </div>
           
