@@ -119,6 +119,9 @@ export const MobileSidebar = ({
   onDragOver,
   onDragStart,
   onDrop,
+  onAnimationStart,
+  onAnimationEnd,
+  onAnimationIteration,
   ...props
 }: React.ComponentProps<"div">) => {
   const { open, setOpen } = useSidebar();
