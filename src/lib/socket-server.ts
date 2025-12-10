@@ -3,7 +3,7 @@ import { Server as SocketIOServer } from 'socket.io';
 // Get Socket.IO instance from global (set by server.js)
 export function getSocketIO(): SocketIOServer | null {
   if (typeof global !== 'undefined' && (global as typeof globalThis & { io?: SocketIOServer }).io) {
-    return (global as typeof globalThis & { io?: SocketIOServer }).io;
+    return (global as typeof globalThis & { io?: SocketIOServer }).io!;
   }
   return null;
 }
