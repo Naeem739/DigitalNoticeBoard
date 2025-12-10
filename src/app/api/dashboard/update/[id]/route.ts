@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
+import { emitDashboardUpdate } from "@/lib/socket-server";
 
 export async function PUT(
   request: Request,
@@ -21,6 +22,9 @@ export async function PUT(
         containers
       }
     });
+
+    // Emit Socket.io event for real-time update
+    emitDashboardUpdate(updatedDashboard);
 
     return NextResponse.json({
       success: true,

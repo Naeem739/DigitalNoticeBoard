@@ -24,13 +24,23 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
   // Configure worker once on mount (client-side only)
   useEffect(() => {
     if (typeof window !== "undefined") {
-      ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
-        "pdfjs-dist/build/pdf.worker.min.mjs",
-        import.meta.url
-      ).toString()
+      // Fix for Next.js - use CDN with specific version
+      try {
+        // Use unpkg CDN with the installed version (5.4.54)
+        ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.54/build/pdf.worker.min.mjs`
+        console.log('PDF.js worker configured:', (pdfjsLib as any).GlobalWorkerOptions.workerSrc)
+      } catch (error) {
+        console.error('Failed to configure PDF.js worker:', error)
+        // Fallback to alternative CDN
+        try {
+          ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.54/pdf.worker.min.mjs`
+        } catch (fallbackError) {
+          console.error('Failed to configure PDF.js worker fallback:', fallbackError)
+        }
+      }
     }
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      stopAutoScroll()
     }
   }, [])
 
@@ -153,7 +163,10 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
       }
     }, 2000) // Check every 2 seconds
     
-    return () => clearInterval(intervalId)
+    return () => {
+      clearInterval(intervalId)
+      stopAutoScroll()
+    }
   }, [widgetId, currentPdfData])
 
   // Auto-save to TemporaryDashboard whenever PDF data changes
@@ -216,6 +229,7 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
   // Auto-save dashboard state when component unmounts
   useEffect(() => {
     return () => {
+      stopAutoScroll()
       if (currentPdfData) {
         autoSaveDashboardToTemp()
       }
@@ -225,23 +239,65 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
   const startAutoScroll = () => {
     const container = containerRef.current
     if (!container) return
+    
+    // Stop any existing scroll animation
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+    
     // Reset to the top before starting
     container.scrollTop = 0
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    const step = () => {
-      container.scrollBy(0, 0.5)
-      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1
-      if (atBottom) {
-        container.scrollTop = 0
+    
+      // Wait a moment before starting scroll for better UX
+      setTimeout(() => {
+        const scrollSpeed = 0.3 // Pixels per frame (slower for better readability)
+        const isScrolling = true
+      
+      const step = () => {
+        if (!container || !isScrolling) return
+        
+        const currentScroll = container.scrollTop
+        const maxScroll = container.scrollHeight - container.clientHeight
+        
+        // Check if we've reached the bottom (with small threshold for smooth looping)
+        if (currentScroll >= maxScroll - 2) {
+          // Smoothly reset to top for continuous loop
+          container.scrollTop = 0
+        } else {
+          // Continue scrolling down
+          container.scrollTop += scrollSpeed
+        }
+        
+        // Continue the animation loop
+        rafRef.current = requestAnimationFrame(step)
       }
+      
+      // Start the animation
       rafRef.current = requestAnimationFrame(step)
+      
+      // Store scroll state for cleanup
+      ;(container as any).__autoScrollActive = true
+    }, 500) // Small delay before starting
+  }
+  
+  const stopAutoScroll = () => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
     }
-    rafRef.current = requestAnimationFrame(step)
+    const container = containerRef.current
+    if (container) {
+      ;(container as any).__autoScrollActive = false
+    }
   }
 
   const renderPdfFromData = async (pdfData: string) => {
     const container = containerRef.current
-    if (!container) return
+    if (!container) {
+      console.error('Container ref not available')
+      return
+    }
     
     try {
       // Clear container and show loading state
@@ -272,8 +328,53 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
       `
       container.appendChild(loadingDiv)
 
-      // Load PDF document
-      const pdf = await (pdfjsLib as any).getDocument(pdfData).promise
+      // Check if PDF.js worker is configured
+      if (!(pdfjsLib as any).GlobalWorkerOptions.workerSrc) {
+        console.warn('PDF.js worker not configured, attempting to configure...')
+        try {
+          ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.54/build/pdf.worker.min.mjs`
+        } catch (workerError) {
+          console.error('Failed to configure PDF.js worker:', workerError)
+        }
+      }
+
+      // Load PDF document with error handling
+      let pdf
+      try {
+        // Ensure PDF data is properly formatted
+        let pdfSource = pdfData
+        if (!pdfSource.startsWith('data:')) {
+          pdfSource = `data:application/pdf;base64,${pdfSource}`
+        }
+        
+        // Extract base64 data from data URL
+        const base64Data = pdfSource.includes(',') ? pdfSource.split(',')[1] : pdfSource.replace(/^data:application\/pdf;base64,/, '')
+        
+        // Convert base64 to Uint8Array for PDF.js
+        const binaryString = atob(base64Data)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+        
+        // Load PDF using Uint8Array
+        pdf = await (pdfjsLib as any).getDocument({
+          data: bytes,
+          verbosity: 0
+        }).promise
+        
+        console.log('PDF loaded successfully, pages:', pdf.numPages)
+      } catch (loadError: any) {
+        console.error('PDF.js load error details:', {
+          error: loadError,
+          message: loadError?.message,
+          name: loadError?.name,
+          stack: loadError?.stack?.substring(0, 500)
+        })
+        // Clear loading indicator
+        container.innerHTML = ""
+        throw new Error(`Failed to load PDF: ${loadError?.message || 'Unknown error'}`)
+      }
       
       // Clear loading indicator
       container.innerHTML = ""
@@ -285,13 +386,22 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
           // Fit page width to container to avoid horizontal scroll
           const containerWidth = container.clientWidth || 600
           const baseViewport = page.getViewport({ scale: 1 })
-          const fitScale = containerWidth / baseViewport.width
-          const viewport = page.getViewport({ scale: fitScale })
           
-          // Render at higher pixel density for crisp text
-          const outputScale = typeof window !== "undefined" ? Math.max(2, window.devicePixelRatio || 1) : 2
+          // Increase scale for better readability (larger text)
+          const baseFitScale = containerWidth / baseViewport.width
+          const readabilityScale = baseFitScale * 1.2 // 20% larger for better readability
+          const viewport = page.getViewport({ scale: readabilityScale })
+          
+          // Render at much higher pixel density for crisp, clear text
+          // Use higher DPI for better text clarity
+          const devicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1
+          const outputScale = Math.max(3, devicePixelRatio * 2) // Higher DPI for sharper text
+          
           const canvas = document.createElement("canvas")
-          const context = canvas.getContext("2d")
+          const context = canvas.getContext("2d", {
+            alpha: false, // Better performance
+            desynchronized: true // Better performance
+          })
           
           if (!context) {
             throw new Error('Failed to get canvas context')
@@ -304,14 +414,22 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
           // Set CSS size to display size (no blur) - this ensures it fits the widget
           canvas.style.width = "100%"
           canvas.style.height = "auto"
+          canvas.style.imageRendering = "crisp-edges" // Better text rendering
+          
+          // Improve text rendering quality
+          context.imageSmoothingEnabled = true
+          context.imageSmoothingQuality = "high"
           
           // Scale context for high DPI rendering
           context.scale(outputScale, outputScale)
           
+          // Render with better quality settings
           await page.render({ 
             canvasContext: context, 
             viewport,
-            canvas
+            canvas,
+            intent: "display", // Optimize for display
+            renderInteractiveForms: false // Better performance
           }).promise
           container.appendChild(canvas)
         } catch (pageError) {
@@ -490,15 +608,30 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
       return
     }
 
+    // Reset input to allow re-uploading the same file
+    e.target.value = ''
+
     try {
       setIsUploading(true)
       const loadingToast = toast.loading('Uploading PDF...')
 
       // Convert file to base64
       const reader = new FileReader()
+      
+      reader.onerror = (error) => {
+        console.error("FileReader error:", error)
+        toast.dismiss(loadingToast)
+        toast.error("Failed to read PDF file")
+        setIsUploading(false)
+      }
+      
       reader.onload = async (event) => {
         try {
           const pdfData = event.target?.result as string
+          if (!pdfData) {
+            throw new Error('No PDF data received from file')
+          }
+          
           setCurrentPdfData(pdfData)
           
           // Render the uploaded PDF
@@ -518,7 +651,9 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
         } catch (error) {
           console.error("Error processing PDF:", error)
           toast.dismiss(loadingToast)
-          toast.error("Failed to process PDF")
+          toast.error(error instanceof Error ? error.message : "Failed to process PDF")
+        } finally {
+          setIsUploading(false)
         }
       }
       
@@ -526,7 +661,6 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
     } catch (error) {
       console.error("Error uploading PDF:", error)
       toast.error("Failed to upload PDF")
-    } finally {
       setIsUploading(false)
     }
   }
