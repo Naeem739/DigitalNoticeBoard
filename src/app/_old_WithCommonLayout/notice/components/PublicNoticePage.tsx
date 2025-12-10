@@ -83,14 +83,14 @@ export default function PublicNoticePage() {
     return () => {}
   }, [])
 
-  // Auto-refresh every 10 minutes
+  // Auto-refresh every 5 minutes
   useEffect(() => {
     if (!mounted) return
 
     const interval = setInterval(() => {
       refreshSettings()
       fetchDashboards()
-    }, 600000) // 10 minutes (10 * 60 * 1000 ms)
+    }, 300000) // 5 minutes (5 * 60 * 1000 ms)
 
     return () => clearInterval(interval)
   }, [mounted, refreshSettings])

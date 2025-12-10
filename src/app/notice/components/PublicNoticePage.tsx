@@ -7,16 +7,12 @@ import { useEffect, useState } from 'react'
 import { usePublicNoticeSettings } from '@/hooks/usePublicNoticeSettings'
 import { motion } from 'framer-motion'
 import { 
-  Phone, 
-  User, 
-  Building, 
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
 import { NoticeQRCode } from '@/components/ui/qr-code'
 import LazyPdfWidget from './LazyPdfWidget'
 import ClientOnly from './ClientOnly'
-import PDFPerformanceMonitor from './PDFPerformanceMonitor'
 
 
 type TDashboard = {
@@ -83,14 +79,14 @@ export default function PublicNoticePage() {
     return () => {}
   }, [])
 
-  // Auto-refresh every 10 minutes
+  // Auto-refresh every 5 minutes
   useEffect(() => {
     if (!mounted) return
 
     const interval = setInterval(() => {
       refreshSettings()
       fetchDashboards()
-    }, 600000) // 10 minutes (10 * 60 * 1000 ms)
+    }, 300000) // 5 minutes (5 * 60 * 1000 ms)
 
     return () => clearInterval(interval)
   }, [mounted, refreshSettings])
@@ -453,12 +449,12 @@ export default function PublicNoticePage() {
 
   // Format time
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
+    const timeString = date.toLocaleTimeString('en-US', {
       hour12: true,
       hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
+      minute: '2-digit'
     })
+    return `Time: ${timeString} BST`
   }
 
   // Format date
@@ -510,7 +506,10 @@ export default function PublicNoticePage() {
   return (
     <div 
       className="h-screen flex flex-col overflow-hidden notice-page-container"
-      style={getBackgroundStyle()}
+      style={{
+        ...getBackgroundStyle(),
+        fontFamily: "'Tiro Bangla', 'Inter', sans-serif"
+      }}
     >
       {/* Header */}
       <motion.header 
@@ -527,78 +526,54 @@ export default function PublicNoticePage() {
         <div className="w-full px-2 sm:px-3 py-1 sm:py-2">
           {/* Main Header Row */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-            {/* Left side - Logo and Title */}
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              {settings?.logo && (
-                <motion.div 
-                  className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shadow-md overflow-hidden bg-white/10 backdrop-blur-sm"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <img 
-                    src={settings.logo} 
-                    alt="Logo" 
-                    className="w-full h-full object-contain"
-                  />
-                </motion.div>
-              )}
-              <div className="min-w-0 flex-1">
-                <motion.h1 
-                  className="text-sm sm:text-lg font-bold truncate"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {settings?.title || "Digital Notice Board"}
-                </motion.h1>
-                <motion.p 
-                  className="text-xs opacity-90 truncate"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  {settings?.subtitle || "Information Technology Department"}
-                </motion.p>
-              </div>
-            </div>
+            {/* Left side - Empty space for balance */}
+            <div className="flex-1"></div>
 
-            {/* Center - Emergency Contact Info, Current Screen, and Pagination */}
-            <motion.div 
-              className="flex flex-col sm:flex-row items-center justify-center sm:justify-start space-y-1 sm:space-y-0 sm:space-x-2 lg:space-x-4 text-xs sm:text-xs"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-
-              
-              {/* Emergency Contact Info - Responsive Layout */}
-              <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-                {settings?.emergencyNumber && (
-                  <div className="flex items-center space-x-1">
-                    <Phone className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-red-400 flex-shrink-0" />
-                    <span className="text-xs font-semibold hidden xs:inline">Emergency:</span>
-                    <span className="text-xs font-semibold">{settings.emergencyNumber}</span>
-                  </div>
+            {/* Center - Logo, Title and Department Name */}
+            <div className="flex flex-col items-center justify-center text-center flex-1">
+              <div className="flex items-center space-x-2 sm:space-x-3 justify-center">
+                {settings?.logo && (
+                  <motion.div 
+                    className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shadow-md overflow-hidden bg-white/10 backdrop-blur-sm"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <img 
+                      src={settings.logo} 
+                      alt="Logo" 
+                      className="w-full h-full object-contain"
+                    />
+                  </motion.div>
                 )}
-                {settings?.emergencyContact && (
-                  <div className="flex items-center space-x-1">
-                    <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-blue-400 flex-shrink-0" />
-                    <span className="text-xs font-semibold hidden xs:inline">Contact:</span>
-                    <span className="text-xs font-semibold">{settings.emergencyContact}</span>
-                  </div>
-                )}
-                {settings?.departmentName && (
-                  <div className="flex items-center space-x-1">
-                    <Building className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-400 flex-shrink-0" />
-                    <span className="text-xs font-semibold hidden sm:inline">{settings.departmentName}</span>
-                  </div>
-                )}
+                <div className="min-w-0">
+                  <motion.h1 
+                    className="text-sm sm:text-lg font-bold"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    {settings?.title || "Digital Notice Board"}
+                  </motion.h1>
+                  <motion.p 
+                    className="text-xs opacity-90"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    {settings?.departmentName || settings?.subtitle || "Information Technology Department"}
+                  </motion.p>
+                </div>
               </div>
 
-              {/* Dashboard Navigation - Integrated into header */}
+              {/* Dashboard Navigation - Below title */}
               {dashboards.length > 1 && (
-                <div className="flex items-center space-x-1 sm:space-x-2 sm:ml-2 lg:ml-4 sm:pl-2 lg:pl-4 sm:border-l sm:border-white/20">
+                <motion.div 
+                  className="flex items-center space-x-1 sm:space-x-2 mt-1 sm:mt-2"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                >
                   <button
                     onClick={goToPrevDashboard}
                     disabled={currentDashboardIndex === 0}
@@ -628,12 +603,12 @@ export default function PublicNoticePage() {
                   >
                     <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                   </button>
-                </div>
+                </motion.div>
               )}
-            </motion.div>
+            </div>
 
             {/* Right side - Time and Date */}
-            <div className="text-center sm:text-right">
+            <div className="text-center sm:text-right flex-1">
               <motion.div 
                 className="text-sm sm:text-lg font-bold font-mono"
                 initial={{ opacity: 0, x: 20 }}
@@ -753,7 +728,7 @@ export default function PublicNoticePage() {
                               className="text-xs sm:text-sm md:text-lg font-bold text-left truncate px-1 sm:px-2 md:px-4 py-0.5 sm:py-1 md:py-2 rounded-xl relative overflow-hidden"
                             style={{
                               color: settings.categoryFontColor || '#1e293b',
-                              fontFamily: settings.categoryFont || 'Inter',
+                              fontFamily: settings.categoryFont || "'Tiro Bangla', 'Inter', sans-serif",
                               fontSize: `clamp(10px, ${settings.categoryFontSize || 16}px, 18px)`,
                               fontWeight: settings.categoryFontWeight || 'bold',
                               textShadow: '0 2px 4px rgba(0,0,0,0.15)',
@@ -857,7 +832,7 @@ export default function PublicNoticePage() {
                                           color: settings.fontColor || '#1e293b',
                                           fontSize: `${getResponsiveTitleFontSize()}px`,
                                           fontWeight: settings.fontWeight || 'semibold',
-                                          fontFamily: settings.fontFamily || 'Inter',
+                                          fontFamily: settings.fontFamily || "'Tiro Bangla', 'Inter', sans-serif",
                                           lineHeight: '1.3',
                                           wordBreak: 'break-word',
                                           overflowWrap: 'break-word'
@@ -947,7 +922,7 @@ export default function PublicNoticePage() {
                                             className="text-xs leading-tight opacity-75 line-clamp-2 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
-                                              fontFamily: settings.fontFamily || 'Inter',
+                                              fontFamily: settings.fontFamily || "'Tiro Bangla', 'Inter', sans-serif",
                                               lineHeight: '1.3',
                                               fontSize: '10px',
                                               wordBreak: 'break-word',
@@ -1351,23 +1326,18 @@ export default function PublicNoticePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.9 }}
       >
-        <div className="w-full px-2 sm:px-3 md:px-6 py-1 sm:py-2 md:py-4">
-          <div className="flex items-center justify-center text-white text-xs sm:text-xs md:text-sm">
-            <div className="flex items-center space-x-2 md:space-x-4">
-              <span>
-                © {new Date().getFullYear()} {settings?.title || "Digital Notice Board"}
-              </span>
-              <span className="text-white/60">•</span>
-              <span className="text-white/80">
-                {settings?.departmentName || "Information Technology Department"}
-              </span>
-            </div>
+        <div className="w-full px-2 sm:px-3 md:px-6 py-1 sm:py-2">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-white/60 text-xs sm:text-sm">
+            <span>
+              Project Advisor: Md. Rashid Al Asif
+            </span>
+            <span className="hidden sm:inline">•</span>
+            <span>
+              Developers: Naeem (20CSE008), Ashik (20CSE032)
+            </span>
           </div>
         </div>
       </motion.footer>
-      
-      {/* Performance Monitor - Only in development */}
-      <PDFPerformanceMonitor />
       
     </div>
   )
