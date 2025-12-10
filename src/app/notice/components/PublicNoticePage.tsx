@@ -13,6 +13,7 @@ import {
 import { NoticeQRCode } from '@/components/ui/qr-code'
 import LazyPdfWidget from './LazyPdfWidget'
 import ClientOnly from './ClientOnly'
+import { getSocket, disconnectSocket } from '@/lib/socket'
 
 
 type TDashboard = {
@@ -69,7 +70,7 @@ export default function PublicNoticePage() {
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [pagination, setPagination] = useState<TPagination | null>(null)
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
-  const [countdown, setCountdown] = useState(300) // 5 minutes = 300 seconds
+  const [countdown, setCountdown] = useState(240) // 4 minutes = 240 seconds
   const [viewportWidth, setViewportWidth] = useState(0)
   const isMobile = viewportWidth > 0 && viewportWidth <= 480
 
@@ -253,7 +254,7 @@ export default function PublicNoticePage() {
     return '10.5em'                // ~168px up to 480px
   }
 
-  // Auto-pagination every 5 minutes
+  // Auto-pagination every 4 minutes
   useEffect(() => {
     if (!mounted || !autoPaginationEnabled || dashboards.length <= 1) return
 
@@ -262,7 +263,7 @@ export default function PublicNoticePage() {
         const nextIndex = (prevIndex + 1) % dashboards.length
         return nextIndex
       })
-    }, 300000) // 5 minutes (5 * 60 * 1000 ms)
+    }, 240000) // 4 minutes (4 * 60 * 1000 ms)
 
     return () => clearInterval(interval)
   }, [mounted, autoPaginationEnabled, dashboards.length])
@@ -319,14 +320,14 @@ export default function PublicNoticePage() {
   // Countdown timer for auto-pagination
   useEffect(() => {
     if (!mounted || !autoPaginationEnabled || dashboards.length <= 1) {
-      setCountdown(300)
+      setCountdown(240)
       return
     }
 
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          return 300 // Reset to 5 minutes
+          return 240 // Reset to 4 minutes
         }
         return prev - 1
       })
@@ -334,6 +335,46 @@ export default function PublicNoticePage() {
 
     return () => clearInterval(timer)
   }, [mounted, autoPaginationEnabled, dashboards.length])
+
+  // Socket.io connection for real-time updates
+  useEffect(() => {
+    if (!mounted) return
+
+    const socket = getSocket()
+    if (!socket) return
+
+    // Join dashboard room
+    socket.emit('join-dashboard-room')
+
+    // Listen for dashboard updates
+    socket.on('dashboard-updated', () => {
+      console.log('Dashboard update received via Socket.io, refreshing...')
+      fetchDashboards()
+    })
+
+    // Handle connection events
+    socket.on('connect', () => {
+      console.log('Socket.io connected')
+      socket.emit('join-dashboard-room')
+    })
+
+    socket.on('disconnect', () => {
+      console.log('Socket.io disconnected')
+    })
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket.io connection error:', error)
+    })
+
+    // Cleanup on unmount
+    return () => {
+      socket.off('dashboard-updated')
+      socket.off('connect')
+      socket.off('disconnect')
+      socket.off('connect_error')
+      socket.emit('leave-dashboard-room')
+    }
+  }, [mounted])
 
   // Fetch all dashboards
   useEffect(() => {
@@ -480,21 +521,21 @@ export default function PublicNoticePage() {
   const goToNextDashboard = () => {
     if (currentDashboardIndex < dashboards.length - 1) {
       setCurrentDashboardIndex(currentDashboardIndex + 1)
-      setCountdown(300) // Reset countdown when manually changing
+      setCountdown(240) // Reset countdown when manually changing
     }
   }
 
   const goToPrevDashboard = () => {
     if (currentDashboardIndex > 0) {
       setCurrentDashboardIndex(currentDashboardIndex - 1)
-      setCountdown(300) // Reset countdown when manually changing
+      setCountdown(240) // Reset countdown when manually changing
     }
   }
 
   const goToDashboard = (index: number) => {
     if (index >= 0 && index < dashboards.length) {
       setCurrentDashboardIndex(index)
-      setCountdown(300) // Reset countdown when manually changing
+      setCountdown(240) // Reset countdown when manually changing
     }
   }
 

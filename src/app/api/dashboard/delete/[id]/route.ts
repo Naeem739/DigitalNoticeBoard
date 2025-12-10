@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/db/prisma"
+import { emitDashboardUpdate } from "@/lib/socket-server"
 
 export async function DELETE(
   request: NextRequest,
@@ -13,6 +14,9 @@ export async function DELETE(
     const result = await prisma.dashboard.delete({
       where: { id }
     })
+
+    // Emit Socket.io event for real-time update
+    emitDashboardUpdate({ deleted: true, id });
 
     return NextResponse.json({
       success: true,
