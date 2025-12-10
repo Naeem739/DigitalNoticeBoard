@@ -115,7 +115,7 @@ export default function PublicNoticePage() {
     return () => window.removeEventListener('resize', updateViewportWidth)
   }, [mounted])
 
-  // Responsive font-size mapping for notice titles
+  // Responsive font-size mapping for notice titles - Optimized for 75" 4K display
   const getResponsiveTitleFontSize = () => {
     const w = viewportWidth
     if (!w) return 14 // default until measured
@@ -124,21 +124,25 @@ export default function PublicNoticePage() {
     if (w < 480) return 14 // ~6.4"-6.7" narrow
     if (w < 640) return 15 // Larger mobiles / small tablets
     if (w < 1700) return 20 // Typical laptops (13–15.6")
-    if (w < 3400) return 24 // Medium monitors (32–44")
-    return 30 // Large displays (60"+)
+    if (w < 2560) return 28 // 2K displays
+    if (w < 3400) return 36 // Medium monitors (32–44")
+    if (w < 3840) return 42 // Large 4K displays (60-70")
+    return 48 // 75" 4K display (3840px+)
   }
 
-  // Responsive notice card height (in em)
+  // Responsive notice card height (in em) - Optimized for 75" 4K display
   const getResponsiveNoticeHeight = () => {
     const w = viewportWidth
-    if (!w) return '8.125em' // 130px equivalent at 16px base
+    if (!w) return '8.125em' // default until measured
     if (w < 360) return '7.25em' // ~116px
     if (w < 400) return '7.5em' // ~120px
     if (w < 480) return '7.75em' // ~124px
     if (w <= 640) return '8.125em' // 130px equivalent
     if (w <= 1366) return '9.0625em' // 145px equivalent
-    if (w <= 2560) return '9.0625em' // 145px equivalent
-    return '9.0625em' // 145px equivalent
+    if (w <= 2560) return '10em' // 160px equivalent
+    if (w <= 3400) return '11em' // 176px equivalent
+    if (w < 3840) return '12em' // 192px equivalent
+    return '13em' // 208px equivalent for 75" 4K
   }
 
   // Limit number of notices per widget based on viewport for readability
@@ -149,7 +153,95 @@ export default function PublicNoticePage() {
     if (w < 400) return 3
     if (w < 480) return 4
     if (w <= 640) return 4
-    return 5
+    if (w <= 2560) return 5
+    if (w <= 3840) return 6
+    return 7 // More notices for 75" display
+  }
+
+  // Get responsive QR code size - Optimized for 75" 4K display
+  const getResponsiveQRSize = () => {
+    const w = viewportWidth
+    if (!w) return 80
+    if (w <= 360) return 48
+    if (w <= 400) return 54
+    if (w <= 640) return 60
+    if (w <= 1366) return 80
+    if (w <= 2560) return 100
+    if (w <= 3400) return 120
+    if (w < 3840) return 140
+    return 160 // Large QR codes for 75" 4K display
+  }
+
+  // Get responsive QR code container size (includes padding)
+  const getResponsiveQRContainerSize = () => {
+    const qrSize = getResponsiveQRSize()
+    return qrSize + 16 // Add padding
+  }
+
+  // Get responsive header font size
+  const getResponsiveHeaderFontSize = () => {
+    const w = viewportWidth
+    if (!w) return 'text-sm sm:text-lg'
+    if (w < 640) return 'text-sm'
+    if (w < 1700) return 'text-lg'
+    if (w < 2560) return 'text-xl'
+    if (w < 3840) return 'text-2xl'
+    return 'text-3xl' // Large header for 75" display
+  }
+
+  // Get responsive subtitle font size
+  const getResponsiveSubtitleFontSize = () => {
+    const w = viewportWidth
+    if (!w) return 'text-xs'
+    if (w < 640) return 'text-xs'
+    if (w < 1700) return 'text-sm'
+    if (w < 2560) return 'text-base'
+    if (w < 3840) return 'text-lg'
+    return 'text-xl' // Large subtitle for 75" display
+  }
+
+  // Get responsive time font size
+  const getResponsiveTimeFontSize = () => {
+    const w = viewportWidth
+    if (!w) return 'text-sm sm:text-lg'
+    if (w < 640) return 'text-sm'
+    if (w < 1700) return 'text-lg'
+    if (w < 2560) return 'text-xl'
+    if (w < 3840) return 'text-2xl'
+    return 'text-3xl' // Large time for 75" display
+  }
+
+  // Get responsive padding
+  const getResponsivePadding = () => {
+    const w = viewportWidth
+    if (!w) return 'px-2 sm:px-3 py-1 sm:py-2'
+    if (w < 640) return 'px-2 sm:px-3 py-1 sm:py-2'
+    if (w < 1700) return 'px-4 py-2'
+    if (w < 2560) return 'px-6 py-3'
+    if (w < 3840) return 'px-8 py-4'
+    return 'px-10 py-5' // Large padding for 75" display
+  }
+
+  // Get responsive grid gap
+  const getResponsiveGridGap = () => {
+    const w = viewportWidth
+    if (!w) return 'gap-1 sm:gap-2 md:gap-4'
+    if (w < 640) return 'gap-1 sm:gap-2'
+    if (w < 1700) return 'gap-2 md:gap-4'
+    if (w < 2560) return 'gap-4 lg:gap-6'
+    if (w < 3840) return 'gap-6 lg:gap-8'
+    return 'gap-8 lg:gap-10' // Large gaps for 75" display
+  }
+
+  // Get responsive content padding
+  const getResponsiveContentPadding = () => {
+    const w = viewportWidth
+    if (!w) return 'p-1 sm:p-2 md:p-3'
+    if (w < 640) return 'p-1 sm:p-2'
+    if (w < 1700) return 'p-2 md:p-3'
+    if (w < 2560) return 'p-3 md:p-4'
+    if (w < 3840) return 'p-4 lg:p-6'
+    return 'p-6 lg:p-8' // Large padding for 75" display
   }
 
   // Ensure QR code fits comfortably on mobile by raising min height
@@ -523,7 +615,7 @@ export default function PublicNoticePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="w-full px-2 sm:px-3 py-1 sm:py-2">
+        <div className={`w-full ${getResponsivePadding()}`}>
           {/* Main Header Row */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
             {/* Left side - Empty space for balance */}
@@ -534,7 +626,12 @@ export default function PublicNoticePage() {
               <div className="flex items-center space-x-2 sm:space-x-3 justify-center">
                 {settings?.logo && (
                   <motion.div 
-                    className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shadow-md overflow-hidden bg-white/10 backdrop-blur-sm"
+                    className={`rounded-lg flex items-center justify-center shadow-md overflow-hidden bg-white/10 backdrop-blur-sm ${
+                      viewportWidth < 640 ? 'w-6 h-6 sm:w-8 sm:h-8' :
+                      viewportWidth < 1700 ? 'w-10 h-10' :
+                      viewportWidth < 2560 ? 'w-12 h-12' :
+                      viewportWidth < 3840 ? 'w-14 h-14' : 'w-16 h-16'
+                    }`}
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.2 }}
@@ -548,7 +645,7 @@ export default function PublicNoticePage() {
                 )}
                 <div className="min-w-0">
                   <motion.h1 
-                    className="text-sm sm:text-lg font-bold"
+                    className={`${getResponsiveHeaderFontSize()} font-bold`}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
@@ -556,7 +653,7 @@ export default function PublicNoticePage() {
                     {settings?.title || "Digital Notice Board"}
                   </motion.h1>
                   <motion.p 
-                    className="text-xs opacity-90"
+                    className={`${getResponsiveSubtitleFontSize()} opacity-90`}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
@@ -610,7 +707,7 @@ export default function PublicNoticePage() {
             {/* Right side - Time and Date */}
             <div className="text-center sm:text-right flex-1">
               <motion.div 
-                className="text-sm sm:text-lg font-bold font-mono"
+                className={`${getResponsiveTimeFontSize()} font-bold font-mono`}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 }}
@@ -619,7 +716,7 @@ export default function PublicNoticePage() {
                 {formatTime(currentTime)}
               </motion.div>
               <motion.div 
-                className="text-xs opacity-90"
+                className={`${getResponsiveSubtitleFontSize()} opacity-90`}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.4 }}
@@ -652,7 +749,7 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className="w-full h-full rounded-lg shadow-lg p-1 sm:p-2 md:p-3"
+              className={`w-full h-full rounded-lg shadow-lg ${getResponsiveContentPadding()}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
@@ -664,7 +761,7 @@ export default function PublicNoticePage() {
                 }}
               >
                 {/* Grid Layout for Widgets */}
-                <div className="grid gap-1 sm:gap-2 md:gap-4 p-1 sm:p-2 md:p-4 notice-grid-container" style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)' }}>
+                <div className={`grid ${getResponsiveGridGap()} ${getResponsiveContentPadding()} notice-grid-container`} style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)' }}>
                   {currentDashboard.containers.map((container, index) => {
                     const settings = container.settings || {}
                     const bgColor = settings.backgroundColor || '#ffffff'
@@ -819,7 +916,7 @@ export default function PublicNoticePage() {
                                          notice={notice}
                                          imageData={notice.imageData}
                                          imageTitle={notice.imageFileName || notice.title}
-                                         size={viewportWidth <= 360 ? 48 : viewportWidth <= 400 ? 54 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80}
+                                         size={getResponsiveQRSize()}
                                          className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
                                        />
                                      </div>
@@ -1044,15 +1141,15 @@ export default function PublicNoticePage() {
                                     <div className="absolute bottom-3 right-3">
                                       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2"
                                         style={{
-                                          width: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80,
-                                          height: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80
+                                          width: getResponsiveQRContainerSize(),
+                                          height: getResponsiveQRContainerSize()
                                         }}
                                       >
                                         <NoticeQRCode 
                                           notice={notice}
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
-                                          size={viewportWidth <= 360 ? 46 : viewportWidth <= 400 ? 50 : viewportWidth <= 640 ? 50 : viewportWidth <= 1366 ? 60 : 70}
+                                          size={getResponsiveQRSize()}
                                           className="w-full h-full"
                                         />
                                       </div>
@@ -1155,7 +1252,7 @@ export default function PublicNoticePage() {
                                              pdfData: pdf.pdfData,
                                              pdfFileName: pdf.fileName || pdf.title
                                            }}
-                                           size={viewportWidth <= 360 ? 46 : viewportWidth <= 400 ? 50 : viewportWidth <= 640 ? 50 : viewportWidth <= 1366 ? 60 : 70}
+                                           size={getResponsiveQRSize()}
                                            className="w-full h-full"
                                          />
                                        </div>
@@ -1250,7 +1347,7 @@ export default function PublicNoticePage() {
                                              pdfData: container.pdfData,
                                              pdfFileName: container.pdfFileName
                                            }}
-                                           size={viewportWidth <= 360 ? 46 : viewportWidth <= 400 ? 50 : viewportWidth <= 640 ? 50 : viewportWidth <= 1366 ? 60 : 70}
+                                           size={getResponsiveQRSize()}
                                            className="w-full h-full"
                                          />
                                        </div>
@@ -1326,8 +1423,8 @@ export default function PublicNoticePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.9 }}
       >
-        <div className="w-full px-2 sm:px-3 md:px-6 py-1 sm:py-2">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-white/60 text-xs sm:text-sm">
+        <div className={`w-full ${getResponsivePadding()}`}>
+          <div className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-white/60 ${getResponsiveSubtitleFontSize()}`}>
             <span>
               Project Advisor: Md. Rashid Al Asif
             </span>
