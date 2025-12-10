@@ -252,7 +252,7 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
       // Wait a moment before starting scroll for better UX
       setTimeout(() => {
         const scrollSpeed = 0.3 // Pixels per frame (slower for better readability)
-        let isScrolling = true
+        const isScrolling = true
       
       const step = () => {
         if (!container || !isScrolling) return
