@@ -1,6 +1,7 @@
 'use server'
 import { prisma } from "@/db/prisma"
 import { TNotice } from "@/types/types"
+import { emitNoticeUpdate, emitDashboardUpdate } from "@/lib/pusher-server"
 
 export const createNotice = async(value: Omit<TNotice, "id">)=>{
     try{
@@ -44,6 +45,16 @@ export const createNotice = async(value: Omit<TNotice, "id">)=>{
         })
         
         console.log("Notice created successfully:", result);
+
+        // Emit Pusher events for real-time updates
+        try {
+            await emitNoticeUpdate(result);
+            await emitDashboardUpdate({ type: 'notice-created', notice: result });
+        } catch (pusherError) {
+            console.warn('Failed to emit Pusher events:', pusherError);
+            // Continue even if Pusher fails
+        }
+
         return {success:true, message:result};
 
     }

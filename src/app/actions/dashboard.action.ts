@@ -22,13 +22,13 @@ export const createDashboard = async (values: Prisma.DashboardCreateInput) => {
       data: values
     });
     if (result.id) {
-      // Emit Socket.io event for real-time update
+      // Emit Pusher event for real-time update
       try {
-        const { emitDashboardUpdate } = await import('@/lib/socket-server');
-        emitDashboardUpdate(result);
-      } catch (socketError) {
-        console.warn('Failed to emit Socket.io event:', socketError);
-        // Continue even if Socket.io fails
+        const { emitDashboardUpdate } = await import('@/lib/pusher-server');
+        await emitDashboardUpdate(result);
+      } catch (pusherError) {
+        console.warn('Failed to emit Pusher event:', pusherError);
+        // Continue even if Pusher fails
       }
       return { success: true, result };
     } else {

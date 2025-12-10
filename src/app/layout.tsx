@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import ClientLayout from './client-layout';
+import { Inter } from 'next/font/google';
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Digital Notice Board',
@@ -36,8 +39,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <ClientLayout>{children}</ClientLayout>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
+        <ClientLayout>{children}</ClientLayout>
+      </body>
     </html>
   );
 }

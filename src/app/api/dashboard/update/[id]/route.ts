@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
-import { emitDashboardUpdate } from "@/lib/socket-server";
+import { emitDashboardUpdate } from "@/lib/pusher-server";
 
 export async function PUT(
   request: Request,
@@ -23,8 +23,8 @@ export async function PUT(
       }
     });
 
-    // Emit Socket.io event for real-time update
-    emitDashboardUpdate(updatedDashboard);
+    // Emit Pusher event for real-time update
+    await emitDashboardUpdate(updatedDashboard);
 
     return NextResponse.json({
       success: true,

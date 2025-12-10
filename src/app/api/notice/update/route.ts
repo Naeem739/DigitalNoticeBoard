@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
+import { emitNoticeUpdate, emitDashboardUpdate } from "@/lib/pusher-server";
 
 export async function PUT(request: Request) {
     try {
@@ -40,6 +41,10 @@ export async function PUT(request: Request) {
             },
             data: updateData
         });
+
+        // Emit Pusher events for real-time updates
+        await emitNoticeUpdate(updatedNotice);
+        await emitDashboardUpdate({ type: 'notice-updated', notice: updatedNotice });
 
         return NextResponse.json({
             success: true,

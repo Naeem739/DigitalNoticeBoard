@@ -13,7 +13,7 @@ import {
 import { NoticeQRCode } from '@/components/ui/qr-code'
 import LazyPdfWidget from './LazyPdfWidget'
 import ClientOnly from './ClientOnly'
-import { getSocket, disconnectSocket } from '@/lib/socket'
+import { useDashboardUpdates } from '@/hooks/usePusher'
 
 
 type TDashboard = {
@@ -336,45 +336,11 @@ export default function PublicNoticePage() {
     return () => clearInterval(timer)
   }, [mounted, autoPaginationEnabled, dashboards.length])
 
-  // Socket.io connection for real-time updates
-  useEffect(() => {
-    if (!mounted) return
-
-    const socket = getSocket()
-    if (!socket) return
-
-    // Join dashboard room
-    socket.emit('join-dashboard-room')
-
-    // Listen for dashboard updates
-    socket.on('dashboard-updated', () => {
-      console.log('Dashboard update received via Socket.io, refreshing...')
-      fetchDashboards()
-    })
-
-    // Handle connection events
-    socket.on('connect', () => {
-      console.log('Socket.io connected')
-      socket.emit('join-dashboard-room')
-    })
-
-    socket.on('disconnect', () => {
-      console.log('Socket.io disconnected')
-    })
-
-    socket.on('connect_error', (error) => {
-      console.error('Socket.io connection error:', error)
-    })
-
-    // Cleanup on unmount
-    return () => {
-      socket.off('dashboard-updated')
-      socket.off('connect')
-      socket.off('disconnect')
-      socket.off('connect_error')
-      socket.emit('leave-dashboard-room')
-    }
-  }, [mounted])
+  // Pusher connection for real-time updates
+  useDashboardUpdates(() => {
+    console.log('Dashboard update received via Pusher, refreshing...')
+    fetchDashboards()
+  }, mounted)
 
   // Fetch all dashboards
   useEffect(() => {

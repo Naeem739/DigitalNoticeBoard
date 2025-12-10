@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
+import { emitNoticeUpdate, emitDashboardUpdate } from "@/lib/pusher-server";
 
 export async function DELETE(request: Request) {
     try {
@@ -19,6 +20,10 @@ export async function DELETE(request: Request) {
                 id: id
             }
         });
+
+        // Emit Pusher events for real-time updates
+        await emitNoticeUpdate({ type: 'deleted', notice: deletedNotice });
+        await emitDashboardUpdate({ type: 'notice-deleted', noticeId: id });
 
         return NextResponse.json({
             success: true,

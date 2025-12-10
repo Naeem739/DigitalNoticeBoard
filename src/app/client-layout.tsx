@@ -1,11 +1,8 @@
 'use client'
 
-import { Inter } from 'next/font/google'
 import "./globals.css"
 import Providers from '@/lib/providers'
 import { Toaster } from 'sonner'
-
-const inter = Inter({ subsets: ["latin"] })
 
 export default function ClientLayout({
   children,
@@ -13,7 +10,7 @@ export default function ClientLayout({
   children: React.ReactNode
 }) {
   return (
-    <body className={inter.className}>
+    <>
       <Providers>
         {children}
         <Toaster 
@@ -23,7 +20,7 @@ export default function ClientLayout({
           closeButton
         />
       </Providers>
-    </body>
+    </>
   )
 }
 

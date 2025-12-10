@@ -22,6 +22,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { DashboardLoader } from '@/components/ui/loader'
+import { useDashboardUpdates } from '@/hooks/usePusher'
 
 type TDashboardStats = {
   totalNotices: number
@@ -96,16 +97,16 @@ export default function DashboardPage() {
     loadPerms()
   }, [session?.user?.id, session?.user?.role])
 
+  // Load initial data
   useEffect(() => {
     fetchDashboardStats()
-    
-    // Set up real-time updates every 30 seconds
-    const interval = setInterval(() => {
-      fetchDashboardStats()
-    }, 30000)
-
-    return () => clearInterval(interval)
   }, [session, router])
+
+  // Set up real-time updates with Pusher
+  useDashboardUpdates(() => {
+    console.log('Dashboard stats update received via Pusher, refreshing...')
+    fetchDashboardStats()
+  }, !!session)
 
   const fetchDashboardStats = async () => {
     try {

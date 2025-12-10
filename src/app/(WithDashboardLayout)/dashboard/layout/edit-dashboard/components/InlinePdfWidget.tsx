@@ -11,6 +11,7 @@ import { toast } from "sonner"
 function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfStored: (pdfId: string, pdfData: string, fileName: string) => void }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number | null>(null)
+  const isScrollingRef = useRef<boolean>(false)
   const [isUploading, setIsUploading] = useState(false)
   const [currentPdfData, setCurrentPdfData] = useState<string | null>(null)
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false)
@@ -241,32 +242,46 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
     if (!container) return
     
     // Stop any existing scroll animation
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
+    stopAutoScroll()
+    
+    // Enable scrolling
+    isScrollingRef.current = true
     
     // Reset to the top before starting
     container.scrollTop = 0
     
-      // Wait a moment before starting scroll for better UX
-      setTimeout(() => {
-        const scrollSpeed = 0.3 // Pixels per frame (slower for better readability)
-        const isScrolling = true
+    // Wait a moment before starting scroll for better UX
+    setTimeout(() => {
+      const scrollSpeed = 1.2 // Increased speed for better visibility
+      let direction = 1 // 1 for down, -1 for up during smooth transitions
+      let pauseCounter = 0
+      const pauseDuration = 60 // Frames to pause at top/bottom (1 second at 60fps)
       
       const step = () => {
-        if (!container || !isScrolling) return
+        if (!container || !isScrollingRef.current) return
         
         const currentScroll = container.scrollTop
         const maxScroll = container.scrollHeight - container.clientHeight
         
-        // Check if we've reached the bottom (with small threshold for smooth looping)
+        // If there's no scrollable content, don't try to scroll
+        if (maxScroll <= 0) {
+          rafRef.current = requestAnimationFrame(step)
+          return
+        }
+        
+        // Handle pausing at the bottom
         if (currentScroll >= maxScroll - 2) {
-          // Smoothly reset to top for continuous loop
-          container.scrollTop = 0
+          if (pauseCounter < pauseDuration) {
+            pauseCounter++
+          } else {
+            // Smooth reset to top after pause
+            container.scrollTop = 0
+            pauseCounter = 0
+          }
         } else {
-          // Continue scrolling down
+          // Normal scrolling down
           container.scrollTop += scrollSpeed
+          pauseCounter = 0
         }
         
         // Continue the animation loop
@@ -275,20 +290,30 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
       
       // Start the animation
       rafRef.current = requestAnimationFrame(step)
-      
-      // Store scroll state for cleanup
-      ;(container as any).__autoScrollActive = true
-    }, 500) // Small delay before starting
+    }, 1000) // Delay before starting
   }
   
   const stopAutoScroll = () => {
+    isScrollingRef.current = false
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current)
       rafRef.current = null
     }
-    const container = containerRef.current
-    if (container) {
-      ;(container as any).__autoScrollActive = false
+  }
+
+  // Add mouse enter/leave handlers to pause/resume auto-scroll on hover
+  const handleMouseEnter = () => {
+    isScrollingRef.current = false
+  }
+
+  const handleMouseLeave = () => {
+    if (currentPdfData && containerRef.current) {
+      // Resume auto-scroll after a short delay
+      setTimeout(() => {
+        if (containerRef.current && !isScrollingRef.current) {
+          isScrollingRef.current = true
+        }
+      }, 500)
     }
   }
 
@@ -745,6 +770,8 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
         ref={containerRef}
         className="flex-1 overflow-y-auto overflow-x-hidden border rounded-md"
         style={{ background: "#fff" }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       />
 
       {isSelectModalOpen && createPortal(

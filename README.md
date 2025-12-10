@@ -117,7 +117,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 - **Prisma ORM** - Type-safe database client
 - **PostgreSQL** - Primary relational database
 - **NextAuth.js** - Authentication framework
-- **Socket.IO** - Real-time communication
+- **Pusher** - Real-time communication (Vercel compatible)
 - **Bcrypt** - Password hashing
 
 ### File Handling & Media
@@ -467,9 +467,20 @@ model PublicNoticeSettings {
    
    Configure your environment variables:
    ```env
+   # Database
    DATABASE_URL="postgresql://username:password@localhost:5432/digitalnoticeboard"
+   
+   # NextAuth.js
    NEXTAUTH_SECRET="your-secret-key"
    NEXTAUTH_URL="http://localhost:3000"
+   
+   # Pusher (optional - for real-time updates)
+   PUSHER_APP_ID="your-pusher-app-id"
+   PUSHER_KEY="your-pusher-key"
+   PUSHER_SECRET="your-pusher-secret"
+   PUSHER_CLUSTER="ap2"
+   NEXT_PUBLIC_PUSHER_KEY="your-pusher-key"
+   NEXT_PUBLIC_PUSHER_CLUSTER="ap2"
    ```
 
 4. **Database Setup**
@@ -478,7 +489,30 @@ model PublicNoticeSettings {
    npx prisma db push
    ```
 
-5. **Run Development Server**
+5. **Pusher Setup for Real-time Updates**
+   
+   Create a free Pusher account at [https://pusher.com](https://pusher.com)
+   
+   a. Go to your Pusher dashboard
+   b. Create a new app or select an existing one
+   c. Go to "App Keys" tab
+   d. Copy your credentials and add them to `.env.local`:
+   
+   ```env
+   # Pusher Configuration
+   PUSHER_APP_ID="your-pusher-app-id"
+   PUSHER_KEY="your-pusher-key"  
+   PUSHER_SECRET="your-pusher-secret"
+   PUSHER_CLUSTER="ap2"  # or your cluster
+   
+   # Public Pusher Configuration (exposed to client)
+   NEXT_PUBLIC_PUSHER_KEY="your-pusher-key"
+   NEXT_PUBLIC_PUSHER_CLUSTER="ap2"  # or your cluster
+   ```
+   
+   **Note:** Real-time updates will work without Pusher (falling back to manual refresh), but Pusher enables instant synchronization across all devices.
+
+6. **Run Development Server**
    ```bash
    npm run dev
    ```
