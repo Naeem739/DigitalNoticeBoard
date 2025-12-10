@@ -2,13 +2,13 @@ import { Server as SocketIOServer } from 'socket.io';
 
 // Get Socket.IO instance from global (set by server.js)
 export function getSocketIO(): SocketIOServer | null {
-  if (typeof global !== 'undefined' && (global as any).io) {
-    return (global as any).io as SocketIOServer;
+  if (typeof global !== 'undefined' && (global as typeof globalThis & { io?: SocketIOServer }).io) {
+    return (global as typeof globalThis & { io?: SocketIOServer }).io;
   }
   return null;
 }
 
-export function emitDashboardUpdate(dashboardData?: any) {
+export function emitDashboardUpdate(dashboardData?: unknown) {
   const io = getSocketIO();
   if (io) {
     io.to('dashboard-updates').emit('dashboard-updated', {
