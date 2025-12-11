@@ -11,7 +11,7 @@ import {
   X,
   Layout,
   FileText,
-  Image,
+  ImageIcon,
   LayoutTemplate,
   Users,
   User,
@@ -122,7 +122,7 @@ export default function Home() {
       description: 'Save and reuse dashboard layouts as templates. Speed up workflow and maintain consistency across notice boards.'
     },
     {
-      icon: Image,
+      icon: ImageIcon,
       title: 'Multi-Format Support',
       description: 'Upload images and PDF documents. Support for multiple image formats with customizable fit options and PDF display.'
     },
