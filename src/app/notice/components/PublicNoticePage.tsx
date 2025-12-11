@@ -81,6 +81,45 @@ export default function PublicNoticePage() {
     return () => {}
   }, [])
 
+  // Fetch all dashboards
+  const fetchDashboards = useCallback(async () => {
+    try {
+      setDashboardLoading(true)
+      
+      // Fetch all dashboards with pagination
+      const response = await fetch('/api/dashboard/get-all?limit=100') // Get more dashboards
+      const data = await response.json()
+      
+      if (data.success) {
+        console.log('Fetched dashboards:', data.result)
+        console.log('Dashboard ordering details:')
+        data.result.forEach((dashboard: any, index: number) => {
+          console.log(`${index + 1}. Dashboard ID: ${dashboard.id}, Created: ${dashboard.createdAt}, Screen: ${dashboard.screenIndex || 'N/A'}, Total Screens: ${dashboard.totalScreens || 1}`)
+        })
+        
+        // Additional debug: Check if screen ordering is correct
+        console.log('=== SCREEN ORDERING CHECK ===')
+        const multiScreenDashboards = data.result.filter((d: any) => d.totalScreens && d.totalScreens > 1);
+        multiScreenDashboards.forEach((dashboard: any) => {
+          console.log(`Multi-screen dashboard: ${dashboard.screenName || dashboard.id}, Screen ${dashboard.screenIndex}, Total: ${dashboard.totalScreens}`);
+        });
+        console.log('=== END SCREEN ORDERING CHECK ===')
+        
+        setDashboards(data.result || [])
+        setPagination(data.pagination || null)
+        
+        // Set first dashboard as current if no current dashboard
+        if (data.result && data.result.length > 0 && !currentDashboard) {
+          setCurrentDashboardIndex(0)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching dashboards:', error)
+    } finally {
+      setDashboardLoading(false)
+    }
+  }, [currentDashboard])
+
   // Auto-refresh every 5 minutes
   useEffect(() => {
     if (!mounted) return
@@ -342,45 +381,6 @@ export default function PublicNoticePage() {
     console.log('Dashboard update received via Pusher, refreshing...')
     fetchDashboards()
   }, mounted)
-
-  // Fetch all dashboards
-  const fetchDashboards = useCallback(async () => {
-    try {
-      setDashboardLoading(true)
-      
-      // Fetch all dashboards with pagination
-      const response = await fetch('/api/dashboard/get-all?limit=100') // Get more dashboards
-      const data = await response.json()
-      
-      if (data.success) {
-        console.log('Fetched dashboards:', data.result)
-        console.log('Dashboard ordering details:')
-        data.result.forEach((dashboard: any, index: number) => {
-          console.log(`${index + 1}. Dashboard ID: ${dashboard.id}, Created: ${dashboard.createdAt}, Screen: ${dashboard.screenIndex || 'N/A'}, Total Screens: ${dashboard.totalScreens || 1}`)
-        })
-        
-        // Additional debug: Check if screen ordering is correct
-        console.log('=== SCREEN ORDERING CHECK ===')
-        const multiScreenDashboards = data.result.filter((d: any) => d.totalScreens && d.totalScreens > 1);
-        multiScreenDashboards.forEach((dashboard: any) => {
-          console.log(`Multi-screen dashboard: ${dashboard.screenName || dashboard.id}, Screen ${dashboard.screenIndex}, Total: ${dashboard.totalScreens}`);
-        });
-        console.log('=== END SCREEN ORDERING CHECK ===')
-        
-        setDashboards(data.result || [])
-        setPagination(data.pagination || null)
-        
-        // Set first dashboard as current if no current dashboard
-        if (data.result && data.result.length > 0 && !currentDashboard) {
-          setCurrentDashboardIndex(0)
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching dashboards:', error)
-    } finally {
-      setDashboardLoading(false)
-    }
-  }, [currentDashboard])
 
   // Fetch all dashboards on mount and set up polling
   useEffect(() => {
