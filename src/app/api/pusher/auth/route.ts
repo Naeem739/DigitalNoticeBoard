@@ -9,6 +9,10 @@ export async function POST(request: NextRequest) {
   try {
     const { socket_id, channel_name } = await request.json();
 
+    if (!pusherServer) {
+      return NextResponse.json({ error: 'Pusher not configured' }, { status: 503 });
+    }
+
     // For now, we'll allow all connections since we're using public channels
     // In the future, you can add authentication logic here
     const authResponse = pusherServer.authorizeChannel(socket_id, channel_name);
