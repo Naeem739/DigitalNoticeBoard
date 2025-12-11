@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, 
@@ -172,11 +173,12 @@ export default function Home() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b-2 border-blue-100 px-3 sm:px-6 py-3 sm:py-4 shadow-lg shadow-blue-100/50">
         <div className="container mx-auto flex justify-between items-center">
           <Link href="/" className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity cursor-pointer" onClick={() => setMobileMenuOpen(false)}>
-            <div className="relative">
-              <img 
+            <div className="relative w-8 h-8 sm:w-10 sm:h-10">
+              <Image 
                 src="/images/logo.png" 
                 alt="Digital Notice Board Logo" 
-                className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-lg"
+                fill
+                className="object-contain drop-shadow-lg"
               />
             </div>
             <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-black tracking-tight">Digital Notice Board</span>
@@ -592,12 +594,12 @@ export default function Home() {
             viewport={{ once: true }}
             className="hidden md:block"
           >
-            <div className="relative w-full">
-              <img 
+            <div className="relative w-full h-96">
+              <Image 
                 src="/images/faq-illustration.png" 
                 alt="FAQ Illustration - People interacting with technology and FAQ information" 
-                className="w-full h-auto object-contain"
-                style={{ mixBlendMode: 'normal' }}
+                fill
+                className="object-contain"
               />
             </div>
           </motion.div>
@@ -667,11 +669,12 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 md:gap-10 relative z-10">
           <div className="sm:col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center space-x-2 sm:space-x-3 mb-4 sm:mb-6 hover:opacity-80 transition-opacity cursor-pointer">
-              <div className="relative">
-                <img 
+              <div className="relative w-10 h-10 sm:w-12 sm:h-12">
+                <Image 
                   src="/images/logo.png" 
                   alt="Digital Notice Board Logo" 
-                  className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-lg"
+                  fill
+                  className="object-contain drop-shadow-lg"
                 />
               </div>
               <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Digital Notice Board</span>

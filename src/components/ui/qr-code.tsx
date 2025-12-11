@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import QRCode from 'qrcode'
 import { Download, QrCode } from 'lucide-react'
 import { Button } from './button'
@@ -122,7 +123,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
       
       return () => clearTimeout(timer)
     }
-  }, [notice.id])
+  }, [notice.id, qrDataUrl, isLoading, generateQRCode])
 
   const handleDownload = async () => {
     try {
@@ -213,12 +214,12 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
 
   return (
     <div className={`flex flex-col items-center ${className}`}>
-      <div className="relative group">
-        <img
+      <div className="relative group" style={{ width: size, height: size }}>
+        <Image
           src={qrDataUrl}
           alt="QR Code"
-          style={{ width: size, height: size }}
-          className="border border-gray-200 rounded-lg shadow-sm"
+          fill
+          className="border border-gray-200 rounded-lg shadow-sm object-contain"
         />
         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
           <Button
