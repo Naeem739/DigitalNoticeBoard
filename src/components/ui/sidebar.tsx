@@ -114,6 +114,10 @@ export const MobileSidebar = ({
   ...props
 }: React.ComponentProps<"div">) => {
   const { open, setOpen } = useSidebar();
+  
+  // Filter out HTML drag event handlers that conflict with framer-motion
+  const { onDrag, onDragStart, onDragEnd, onDragCapture, onDragEndCapture, onDragEnter, onDragEnterCapture, onDragExit, onDragExitCapture, onDragLeave, onDragLeaveCapture, onDragOver, onDragOverCapture, onDragStartCapture, onDrop, onDropCapture, ...filteredProps } = props;
+  
   return (
     <>
       {/* Removed black menu bar - using Header's hamburger menu instead */}
@@ -142,7 +146,7 @@ export const MobileSidebar = ({
                 "fixed h-full w-full inset-0 bg-black text-white p-4 sm:p-6 z-[100] flex flex-col overflow-y-auto md:hidden",
                 className
               )}
-              {...props}
+              {...filteredProps}
             >
               <div
                 className="absolute right-4 top-4 sm:right-6 sm:top-6 z-50 text-white cursor-pointer"
