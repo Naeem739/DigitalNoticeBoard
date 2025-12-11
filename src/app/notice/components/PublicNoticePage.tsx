@@ -3,7 +3,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import Image from 'next/image'
 import { usePublicNoticeSettings } from '@/hooks/usePublicNoticeSettings'
 import { motion } from 'framer-motion'
 import { 
@@ -90,7 +91,7 @@ export default function PublicNoticePage() {
     }, 300000) // 5 minutes (5 * 60 * 1000 ms)
 
     return () => clearInterval(interval)
-  }, [mounted, refreshSettings])
+  }, [mounted, refreshSettings, fetchDashboards])
 
   // Update current time every second
   useEffect(() => {
@@ -343,20 +344,7 @@ export default function PublicNoticePage() {
   }, mounted)
 
   // Fetch all dashboards
-  useEffect(() => {
-    if (!mounted) return
-    fetchDashboards()
-  }, [mounted])
-
-  // Update current dashboard when dashboards or index changes
-  useEffect(() => {
-    if (dashboards.length > 0 && currentDashboardIndex < dashboards.length) {
-      setCurrentDashboard(dashboards[currentDashboardIndex])
-      fetchDashboardContent(dashboards[currentDashboardIndex])
-    }
-  }, [dashboards, currentDashboardIndex])
-
-  const fetchDashboards = async () => {
+  const fetchDashboards = useCallback(async () => {
     try {
       setDashboardLoading(true)
       
@@ -392,7 +380,21 @@ export default function PublicNoticePage() {
     } finally {
       setDashboardLoading(false)
     }
-  }
+  }, [])
+
+  // Fetch all dashboards on mount and set up polling
+  useEffect(() => {
+    if (!mounted) return
+    fetchDashboards()
+  }, [mounted, fetchDashboards])
+
+  // Update current dashboard when dashboards or index changes
+  useEffect(() => {
+    if (dashboards.length > 0 && currentDashboardIndex < dashboards.length) {
+      setCurrentDashboard(dashboards[currentDashboardIndex])
+      fetchDashboardContent(dashboards[currentDashboardIndex])
+    }
+  }, [dashboards, currentDashboardIndex])
 
   const fetchDashboardContent = async (dashboard: TDashboard) => {
     try {
@@ -643,9 +645,10 @@ export default function PublicNoticePage() {
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.2 }}
                   >
-                    <img 
+                    <Image 
                       src={settings.logo} 
                       alt="Logo" 
+                      fill
                       className="w-full h-full object-contain"
                     />
                   </motion.div>
@@ -1098,15 +1101,13 @@ export default function PublicNoticePage() {
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ duration: 0.4 }}
                                   >
-                                    <img
+                                    <Image
                                       src={reconstructImageUrl(notice)}
                                       alt={notice.title}
-                                      className="w-full h-full transition-transform duration-300"
+                                      fill
+                                      className="w-full h-full transition-transform duration-300 object-contain"
                                       style={{
-                                        objectFit: settings.imageFit || 'contain',
                                         borderRadius: `${settings.imageBorderRadius || 12}px`,
-                                        width: '100%',
-                                        height: '100%'
                                       }}
                                     />
                                     

@@ -5,6 +5,7 @@
 import type { TDashboard2, PublicNoticeSettings } from "@/types/types"
 import { AlertCircle, Info, Star } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import Image from 'next/image'
 import { NoticeQRCode } from "@/components/ui/qr-code"
 
 interface WidgetContainerProps {
@@ -172,7 +173,8 @@ export function WidgetContainer({ data }: WidgetContainerProps) {
 
     // Cleanup intervals on unmount
     return () => {
-      Object.values(scrollIntervals.current).forEach((interval) => clearInterval(interval))
+      const intervalsToClean = scrollIntervals.current
+      Object.values(intervalsToClean).forEach((interval) => clearInterval(interval))
     }
   }, [data.containers])
 
@@ -259,12 +261,12 @@ export function WidgetContainer({ data }: WidgetContainerProps) {
                 >
                   {image ? (
                     <div className="w-full h-full relative">
-                      <img
+                      <Image
                         src={image.imageData}
                         alt={image.title}
-                        className="w-full h-full rounded-lg"
+                        fill
+                        className="w-full h-full rounded-lg object-contain"
                         style={{
-                          objectFit: widget.settings?.imageFit as any || "contain",
                           borderRadius: `${widget.settings?.imageBorderRadius || 8}px`,
                         }}
                       />

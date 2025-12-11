@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
 import QRCode from 'qrcode'
 import { Download, QrCode } from 'lucide-react'
@@ -29,7 +29,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
 
-  const generateQRCode = async () => {
+  const generateQRCode = useCallback(async () => {
     if (isLoading || qrDataUrl) return
 
     try {
@@ -109,7 +109,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [notice.id, notice.title, imageData, notice.imageData, notice.imageUrl, notice.pdfData, notice.pdfUrl, size, isLoading, qrDataUrl])
 
   // Generate QR code on mount
   useEffect(() => {
