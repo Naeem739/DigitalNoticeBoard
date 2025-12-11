@@ -175,7 +175,7 @@ const OptimizedPdfDisplay = memo(function OptimizedPdfDisplay({
       setIsLoading(false)
       onError?.()
     }
-  }, [pdfData, cacheKey, mounted, startAutoScroll, isValidPDF])
+  }, [pdfData, cacheKey, mounted, startAutoScroll, isValidPDF, onError])
 
   // Render PDF when mounted and data is available
   useEffect(() => {

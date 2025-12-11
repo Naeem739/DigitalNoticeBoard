@@ -380,7 +380,7 @@ export default function PublicNoticePage() {
     } finally {
       setDashboardLoading(false)
     }
-  }, [])
+  }, [currentDashboard])
 
   // Fetch all dashboards on mount and set up polling
   useEffect(() => {

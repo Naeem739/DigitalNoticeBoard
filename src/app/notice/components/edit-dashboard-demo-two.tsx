@@ -173,8 +173,7 @@ export function WidgetContainer({ data }: WidgetContainerProps) {
 
     // Cleanup intervals on unmount
     return () => {
-      const intervalsToClean = scrollIntervals.current
-      Object.values(intervalsToClean).forEach((interval) => clearInterval(interval))
+      Object.values(scrollIntervals.current).forEach((interval) => clearInterval(interval))
     }
   }, [data.containers])
 

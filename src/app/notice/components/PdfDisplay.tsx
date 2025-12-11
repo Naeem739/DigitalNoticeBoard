@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useRef, useEffect, useState } from "react"
+import { useRef, useEffect, useState, useCallback } from "react"
 import * as pdfjsLib from "pdfjs-dist"
 
 // Configure PDF.js worker
@@ -26,16 +26,7 @@ export default function PdfDisplay({ pdfData, title, autoScroll = true, classNam
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (pdfData) {
-      renderPdf()
-    }
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [pdfData])
-
-  const startAutoScroll = () => {
+  const startAutoScroll = useCallback(() => {
     if (!autoScroll) return
     
     const container = containerRef.current
@@ -59,9 +50,9 @@ export default function PdfDisplay({ pdfData, title, autoScroll = true, classNam
       rafRef.current = requestAnimationFrame(step)
     }
     rafRef.current = requestAnimationFrame(step)
-  }
+  }, [autoScroll])
 
-  const renderPdf = async () => {
+  const renderPdf = useCallback(async () => {
     const container = containerRef.current
     if (!container) return
 
@@ -113,7 +104,16 @@ export default function PdfDisplay({ pdfData, title, autoScroll = true, classNam
       setError("Failed to load PDF")
       setIsLoading(false)
     }
-  }
+  }, [pdfData, startAutoScroll])
+
+  useEffect(() => {
+    if (pdfData) {
+      renderPdf()
+    }
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [pdfData, renderPdf])
 
   if (error) {
     return (
