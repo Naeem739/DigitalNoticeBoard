@@ -1,9 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
 
+type TContainer = {
+  i?: string;
+  h?: number;
+  w?: number;
+  x?: number;
+  y?: number;
+  id: string;
+  type?: string;
+  title?: string;
+  category?: string;
+  noticeIds?: string[] | string;
+  imageIds?: string[] | string;
+  width?: string;
+  height?: string;
+  settings?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
 type TDashboard = {
   id: string;
   aspectRatio: string;
-  containers: any[];
+  containers: TContainer[];
   createdAt?: Date;
   screenName?: string;
   screenIndex?: number;
