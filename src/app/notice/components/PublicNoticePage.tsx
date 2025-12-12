@@ -1108,7 +1108,7 @@ export default function PublicNoticePage() {
                                                             {/* Handle PDF widgets with pdfIds (from PDF table) */}
                               {container.pdfIds && container.pdfIds.slice(0, 1).map((pdfId: string) => {
                                 const pdf = getPdfById(pdfId)
-                                if (!pdf) return null
+                                if (!pdf || !pdf.pdfData) return null
                                 
                                 return (
                                   <motion.div
@@ -1205,7 +1205,7 @@ export default function PublicNoticePage() {
                               })}
                               
                                                             {/* Handle PDF widgets with pdfData directly in container */}
-                              {container.pdfData && !container.pdfIds && (
+                              {container.pdfData && typeof container.pdfData === 'string' && !container.pdfIds && (
                                 <motion.div
                                   key={`pdf-${container.id}`}
                                   className="relative w-full h-full flex flex-col rounded-lg overflow-hidden shadow-lg"
