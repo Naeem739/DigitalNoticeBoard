@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
-import { emitDashboardUpdate } from "@/lib/socket-server";
 
 export async function PUT(
   request: Request,
@@ -23,8 +22,8 @@ export async function PUT(
       }
     });
 
-    // Emit Socket.io event for real-time update
-    emitDashboardUpdate(updatedDashboard);
+    // Real-time updates are handled by TanStack Query polling
+    // No need for Socket.io emits
 
     return NextResponse.json({
       success: true,
