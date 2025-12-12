@@ -13,7 +13,9 @@ import {
 import { NoticeQRCode } from '@/components/ui/qr-code'
 import LazyPdfWidget from './LazyPdfWidget'
 import ClientOnly from './ClientOnly'
-import { getSocket, disconnectSocket } from '@/lib/socket'
+import { useDashboards } from '@/hooks/useDashboardData'
+import { useNotices } from '@/hooks/useNotices'
+import { usePDFs } from '@/hooks/usePDFs'
 
 
 type TDashboard = {
@@ -61,18 +63,24 @@ export default function PublicNoticePage() {
   const { settings, loading, refreshSettings } = usePublicNoticeSettings()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [mounted, setMounted] = useState(false)
-  const [dashboards, setDashboards] = useState<TDashboard[]>([])
   const [currentDashboardIndex, setCurrentDashboardIndex] = useState(0)
   const [currentDashboard, setCurrentDashboard] = useState<TDashboard | null>(null)
-  const [notices, setNotices] = useState<TNotice[]>([])
   const [images, setImages] = useState<TImage[]>([])
-  const [pdfs, setPdfs] = useState<any[]>([])
-  const [dashboardLoading, setDashboardLoading] = useState(true)
-  const [pagination, setPagination] = useState<TPagination | null>(null)
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
   const [countdown, setCountdown] = useState(240) // 4 minutes = 240 seconds
   const [viewportWidth, setViewportWidth] = useState(0)
   const isMobile = viewportWidth > 0 && viewportWidth <= 480
+
+  // TanStack Query hooks for real-time data fetching
+  // Refetch every 3 seconds for real-time updates (works on Vercel)
+  const { data: dashboardsData, isLoading: dashboardLoading } = useDashboards(3000)
+  const { data: noticesData } = useNotices(3000)
+  const { data: pdfsData } = usePDFs(3000)
+
+  // Extract data from query results
+  const dashboards = dashboardsData?.result || []
+  const allNotices = noticesData?.result || []
+  const allPdfs = pdfsData?.result || []
 
   // Initialize component
   useEffect(() => {
@@ -80,13 +88,12 @@ export default function PublicNoticePage() {
     return () => {}
   }, [])
 
-  // Auto-refresh every 5 minutes
+  // Auto-refresh settings every 5 minutes
   useEffect(() => {
     if (!mounted) return
 
     const interval = setInterval(() => {
       refreshSettings()
-      fetchDashboards()
     }, 300000) // 5 minutes (5 * 60 * 1000 ms)
 
     return () => clearInterval(interval)
@@ -336,159 +343,54 @@ export default function PublicNoticePage() {
     return () => clearInterval(timer)
   }, [mounted, autoPaginationEnabled, dashboards.length])
 
-  // Socket.io connection for real-time updates
-  useEffect(() => {
-    if (!mounted) return
-
-    const socket = getSocket()
-    if (!socket) return
-
-    // Join dashboard room
-    socket.emit('join-dashboard-room')
-
-    // Listen for dashboard updates
-    socket.on('dashboard-updated', () => {
-      console.log('Dashboard update received via Socket.io, refreshing...')
-      fetchDashboards()
-    })
-
-    // Handle connection events
-    socket.on('connect', () => {
-      console.log('Socket.io connected')
-      socket.emit('join-dashboard-room')
-    })
-
-    socket.on('disconnect', () => {
-      console.log('Socket.io disconnected')
-    })
-
-    socket.on('connect_error', (error) => {
-      console.error('Socket.io connection error:', error)
-    })
-
-    // Cleanup on unmount
-    return () => {
-      socket.off('dashboard-updated')
-      socket.off('connect')
-      socket.off('disconnect')
-      socket.off('connect_error')
-      socket.emit('leave-dashboard-room')
-    }
-  }, [mounted])
-
-  // Fetch all dashboards
-  useEffect(() => {
-    if (!mounted) return
-    fetchDashboards()
-  }, [mounted])
-
   // Update current dashboard when dashboards or index changes
   useEffect(() => {
-    if (dashboards.length > 0 && currentDashboardIndex < dashboards.length) {
-      setCurrentDashboard(dashboards[currentDashboardIndex])
-      fetchDashboardContent(dashboards[currentDashboardIndex])
+    if (dashboards.length > 0) {
+      if (currentDashboardIndex < dashboards.length) {
+        const selectedDashboard = dashboards[currentDashboardIndex]
+        setCurrentDashboard(selectedDashboard)
+      } else {
+        // Reset to first dashboard if index is out of bounds
+        setCurrentDashboardIndex(0)
+        setCurrentDashboard(dashboards[0])
+      }
+    } else {
+      setCurrentDashboard(null)
     }
   }, [dashboards, currentDashboardIndex])
 
-  const fetchDashboards = async () => {
-    try {
-      setDashboardLoading(true)
-      
-      // Fetch all dashboards with pagination
-      const response = await fetch('/api/dashboard/get-all?limit=100') // Get more dashboards
-      const data = await response.json()
-      
-      if (data.success) {
-        console.log('Fetched dashboards:', data.result)
-        console.log('Dashboard ordering details:')
-        data.result.forEach((dashboard: any, index: number) => {
-          console.log(`${index + 1}. Dashboard ID: ${dashboard.id}, Created: ${dashboard.createdAt}, Screen: ${dashboard.screenIndex || 'N/A'}, Total Screens: ${dashboard.totalScreens || 1}`)
-        })
-        
-        // Additional debug: Check if screen ordering is correct
-        console.log('=== SCREEN ORDERING CHECK ===')
-        const multiScreenDashboards = data.result.filter((d: any) => d.totalScreens && d.totalScreens > 1);
-        multiScreenDashboards.forEach((dashboard: any) => {
-          console.log(`Multi-screen dashboard: ${dashboard.screenName || dashboard.id}, Screen ${dashboard.screenIndex}, Total: ${dashboard.totalScreens}`);
-        });
-        console.log('=== END SCREEN ORDERING CHECK ===')
-        
-        setDashboards(data.result || [])
-        setPagination(data.pagination || null)
-        
-        // Set first dashboard as current if no current dashboard
-        if (data.result && data.result.length > 0 && !currentDashboard) {
-          setCurrentDashboardIndex(0)
-        }
+  // Filter notices based on current dashboard
+  const getDashboardNotices = (dashboard: TDashboard | null): TNotice[] => {
+    if (!dashboard || !allNotices.length) return []
+
+    // Extract notice IDs from containers
+    const noticeIds: string[] = []
+    dashboard.containers.forEach((container: any) => {
+      if (container.noticeIds) {
+        noticeIds.push(...container.noticeIds)
       }
-    } catch (error) {
-      console.error('Error fetching dashboards:', error)
-    } finally {
-      setDashboardLoading(false)
-    }
+    })
+
+    // Filter notices from dashboard containers
+    const dashboardNotices = noticeIds.length > 0
+      ? allNotices.filter((notice: TNotice) => noticeIds.includes(notice.id))
+      : []
+
+    // Get Dashboard Images category notices
+    const dashboardImageNotices = allNotices.filter((notice: TNotice) =>
+      notice.categoryName === 'Dashboard Images' &&
+      (notice.imageData || notice.imageFileName || notice.imageUrl)
+    )
+
+    // Combine and remove duplicates
+    const combinedNotices = [...dashboardNotices, ...dashboardImageNotices]
+    return combinedNotices.filter((notice, index, self) =>
+      index === self.findIndex(n => n.id === notice.id)
+    )
   }
 
-  const fetchDashboardContent = async (dashboard: TDashboard) => {
-    try {
-      // Extract notice IDs from containers (both notice and image widgets now use noticeIds)
-      const noticeIds: string[] = []
-      
-      dashboard.containers.forEach((container: any) => {
-        if (container.noticeIds) {
-          noticeIds.push(...container.noticeIds)
-        }
-      })
-      
-      // Fetch all notices
-      try {
-        const noticesResponse = await fetch('/api/notice/get-all')
-        const noticesData = await noticesResponse.json()
-        if (noticesData.success) {
-          const allNotices = noticesData.result || []
-          
-          // Filter notices from dashboard containers
-          const dashboardNotices = noticeIds.length > 0 ? 
-            allNotices.filter((notice: TNotice) => noticeIds.includes(notice.id)) : []
-          
-          // Get Dashboard Images category notices
-          const dashboardImageNotices = allNotices.filter((notice: TNotice) => 
-            notice.categoryName === 'Dashboard Images' && 
-            (notice.imageData || notice.imageFileName || notice.imageUrl)
-          )
-          
-          // Combine dashboard notices and dashboard image notices
-          const combinedNotices = [...dashboardNotices, ...dashboardImageNotices]
-          
-          // Remove duplicates based on notice ID
-          const uniqueNotices = combinedNotices.filter((notice, index, self) => 
-            index === self.findIndex(n => n.id === notice.id)
-          )
-          
-          setNotices(uniqueNotices)
-        }
-      } catch (error) {
-        console.error('Error fetching notices:', error)
-        setNotices([])
-      }
-      
-      // Clear images array since images are now stored as notices
-      setImages([])
-
-      // Fetch all PDFs
-      try {
-        const pdfsResponse = await fetch('/api/pdf/get-all')
-        const pdfsData = await pdfsResponse.json()
-        if (pdfsData.success) {
-          setPdfs(pdfsData.result || [])
-        }
-      } catch (error) {
-        console.error('Error fetching PDFs:', error)
-        setPdfs([])
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard content:', error)
-    }
-  }
+  // Get notices for current dashboard
+  const notices = getDashboardNotices(currentDashboard)
 
   const getNoticeById = (noticeId: string) => {
     return notices.find(notice => notice.id === noticeId)
@@ -499,7 +401,7 @@ export default function PublicNoticePage() {
   // }
 
   const getPdfById = (pdfId: string) => {
-    return pdfs.find(pdf => pdf.id === pdfId)
+    return allPdfs.find(pdf => pdf.id === pdfId)
   }
 
   // Helper function to reconstruct image URL from notice data
@@ -1206,7 +1108,7 @@ export default function PublicNoticePage() {
                                                             {/* Handle PDF widgets with pdfIds (from PDF table) */}
                               {container.pdfIds && container.pdfIds.slice(0, 1).map((pdfId: string) => {
                                 const pdf = getPdfById(pdfId)
-                                if (!pdf) return null
+                                if (!pdf || !pdf.pdfData) return null
                                 
                                 return (
                                   <motion.div
@@ -1303,7 +1205,7 @@ export default function PublicNoticePage() {
                               })}
                               
                                                             {/* Handle PDF widgets with pdfData directly in container */}
-                              {container.pdfData && !container.pdfIds && (
+                              {container.pdfData && typeof container.pdfData === 'string' && !container.pdfIds && (
                                 <motion.div
                                   key={`pdf-${container.id}`}
                                   className="relative w-full h-full flex flex-col rounded-lg overflow-hidden shadow-lg"

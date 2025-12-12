@@ -8,10 +8,16 @@ import { pdfCache, generatePDFCacheKey, isPDFDataValid, optimizePDFData } from "
 
 // Configure PDF.js worker
 if (typeof window !== "undefined") {
-  ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url
-  ).toString()
+  try {
+    ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
+      "pdfjs-dist/build/pdf.worker.min.mjs",
+      import.meta.url
+    ).toString()
+  } catch (error) {
+    // Fallback to CDN if local worker fails
+    console.warn("Failed to load local PDF.js worker, using CDN fallback:", error)
+    ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`
+  }
 }
 
 interface OptimizedPdfDisplayProps {
@@ -38,6 +44,7 @@ const OptimizedPdfDisplay = memo(function OptimizedPdfDisplay({
 }: OptimizedPdfDisplayProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number | null>(null)
+  const retryCountRef = useRef<number>(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -64,30 +71,68 @@ const OptimizedPdfDisplay = memo(function OptimizedPdfDisplay({
   const startAutoScroll = useCallback(() => {
     if (!autoScroll || !mounted) return
     
-    const container = containerRef.current
-    if (!container) return
+    // Reset retry count
+    retryCountRef.current = 0
     
-    // Always start from the very top
-    container.scrollTop = 0
-
-    // Cancel any ongoing animation loop before starting a new one
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
-
-    const step = () => {
-      if (!container) return
-      
-      // Scroll down by 0.5px each frame (slower scrolling)
-      container.scrollBy(0, 0.5)
-
-      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1
-      if (atBottom) {
-        // Loop back to the top for infinite scrolling
-        container.scrollTop = 0
+    const container = containerRef.current
+    if (!container) {
+      // Retry after a short delay if container isn't ready (max 10 retries)
+      if (retryCountRef.current < 10) {
+        retryCountRef.current++
+        setTimeout(() => startAutoScroll(), 100)
       }
+      return
+    }
+    
+    // Wait for container to be fully rendered and have content
+    const checkAndStart = () => {
+      const currentContainer = containerRef.current
+      if (!currentContainer) return
+      
+      // Check if container has scrollable content
+      const hasScrollableContent = currentContainer.scrollHeight > currentContainer.clientHeight
+      
+      if (!hasScrollableContent && retryCountRef.current < 20) {
+        // Retry after a short delay if content isn't ready yet (max 20 retries)
+        retryCountRef.current++
+        setTimeout(() => checkAndStart(), 100)
+        return
+      }
+      
+      // Reset retry count on success
+      retryCountRef.current = 0
+      
+      // Always start from the very top
+      currentContainer.scrollTop = 0
 
+      // Cancel any ongoing animation loop before starting a new one
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+
+      const step = () => {
+        const scrollContainer = containerRef.current
+        if (!scrollContainer) {
+          if (rafRef.current) cancelAnimationFrame(rafRef.current)
+          return
+        }
+        
+        // Scroll down by 0.5px each frame (slower scrolling)
+        scrollContainer.scrollBy(0, 0.5)
+
+        const atBottom = scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 1
+        if (atBottom) {
+          // Loop back to the top for infinite scrolling
+          scrollContainer.scrollTop = 0
+        }
+
+        rafRef.current = requestAnimationFrame(step)
+      }
       rafRef.current = requestAnimationFrame(step)
     }
-    rafRef.current = requestAnimationFrame(step)
+    
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      setTimeout(checkAndStart, 50)
+    })
   }, [autoScroll, mounted])
 
   // Memoized PDF rendering function
@@ -109,7 +154,15 @@ const OptimizedPdfDisplay = memo(function OptimizedPdfDisplay({
           container.appendChild(canvas.cloneNode(true))
         })
         setIsLoading(false)
-        startAutoScroll()
+        // Wait for DOM to update before starting auto-scroll
+        requestAnimationFrame(() => {
+          if (container) {
+            container.scrollTop = 0
+            setTimeout(() => {
+              startAutoScroll()
+            }, 100)
+          }
+        })
         return
       }
 
@@ -117,11 +170,37 @@ const OptimizedPdfDisplay = memo(function OptimizedPdfDisplay({
       let pdf = pdfCache.get(`${cacheKey}_document`)
       if (!pdf) {
         // Create data URL for PDF.js
-        const optimizedData = optimizePDFData(pdfData)
-        const dataUrl = `data:application/pdf;base64,${optimizedData}`
+        let optimizedData = optimizePDFData(pdfData)
         
-        pdf = await pdfjsLib.getDocument(dataUrl).promise
-        pdfCache.set(`${cacheKey}_document`, pdf)
+        // Ensure we have valid base64 data
+        if (!optimizedData || optimizedData.trim().length === 0) {
+          throw new Error("PDF data is empty or invalid")
+        }
+        
+        // Try using Uint8Array first (more reliable)
+        let pdfSource: any
+        try {
+          // Convert base64 to Uint8Array
+          const binaryString = atob(optimizedData)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          pdfSource = { data: bytes, verbosity: 0 }
+        } catch (conversionError) {
+          // Fallback to data URL if conversion fails
+          console.warn("Failed to convert PDF to Uint8Array, using data URL:", conversionError)
+          const dataUrl = `data:application/pdf;base64,${optimizedData}`
+          pdfSource = { data: dataUrl, verbosity: 0 }
+        }
+        
+        try {
+          pdf = await pdfjsLib.getDocument(pdfSource).promise
+          pdfCache.set(`${cacheKey}_document`, pdf)
+        } catch (pdfError) {
+          console.error("PDF.js error:", pdfError)
+          throw new Error(`Failed to load PDF document: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`)
+        }
       }
 
       container.innerHTML = ""
@@ -164,9 +243,18 @@ const OptimizedPdfDisplay = memo(function OptimizedPdfDisplay({
       pdfCache.set(`${cacheKey}_canvases`, canvases)
 
       setIsLoading(false)
-      // Ensure we start from the first page on each render
-      if (container) container.scrollTop = 0
-      startAutoScroll()
+      
+      // Wait for DOM to update before starting auto-scroll
+      requestAnimationFrame(() => {
+        // Ensure we start from the first page on each render
+        if (container) {
+          container.scrollTop = 0
+          // Start auto-scroll after ensuring container is ready
+          setTimeout(() => {
+            startAutoScroll()
+          }, 100)
+        }
+      })
     } catch (err) {
       console.error("Error rendering PDF:", err)
       console.error("PDF Data length:", pdfData?.length)
@@ -239,7 +327,9 @@ const OptimizedPdfDisplay = memo(function OptimizedPdfDisplay({
         style={{ 
           background: "#fff",
           borderRadius: "8px",
-          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.05)"
+          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.05)",
+          minHeight: "100%",
+          height: "100%"
         }}
       />
     </div>

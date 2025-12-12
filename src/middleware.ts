@@ -97,7 +97,6 @@ export async function middleware(request: NextRequest) {
         } else {
           allowedRoutes = ['/']
         }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
         console.error("Error fetching moderator permissions:", e);
         allowedRoutes = ['/']

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/db/prisma"
-import { emitDashboardUpdate } from "@/lib/socket-server"
 
 export async function DELETE(
   request: NextRequest,
@@ -15,8 +14,8 @@ export async function DELETE(
       where: { id }
     })
 
-    // Emit Socket.io event for real-time update
-    emitDashboardUpdate({ deleted: true, id });
+    // Real-time updates are handled by TanStack Query polling
+    // No need for Socket.io emits
 
     return NextResponse.json({
       success: true,
