@@ -1,45 +1,39 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PublicNoticeSettings, PublicNoticeTemplate } from '@/types/types';
 
-export const usePublicNoticeSettings = () => {
-  const [settings, setSettings] = useState<PublicNoticeSettings | null>(null);
+type TPublicNoticeSettingsResponse = {
+  success: boolean;
+  data: PublicNoticeSettings | null;
+  error?: string;
+};
+
+// Fetch public notice settings
+const fetchPublicNoticeSettings = async (): Promise<TPublicNoticeSettingsResponse> => {
+  const response = await fetch('/api/public-notice-settings', { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error('Failed to fetch public notice settings');
+  }
+  return response.json();
+};
+
+export const usePublicNoticeSettings = (refetchInterval: number = 300000) => {
   const [activeTemplate, setActiveTemplate] = useState<PublicNoticeTemplate | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Use TanStack Query for automatic refetching
+  const { data, isLoading, error, refetch } = useQuery<TPublicNoticeSettingsResponse>({
+    queryKey: ['public-notice-settings'],
+    queryFn: fetchPublicNoticeSettings,
+    refetchInterval, // Refetch every 5 minutes by default
+    staleTime: 0, // Always consider data stale to ensure fresh updates
+    refetchOnWindowFocus: true,
+  });
 
-  const loadSettings = useCallback(async () => {
-    if (!mounted) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await fetch('/api/public-notice-settings', { cache: 'no-store' });
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        setSettings(result.data);
-      } else {
-        setError(result.error || 'Failed to load settings');
-      }
-    } catch (error) {
-      console.error('Error loading public notice settings:', error);
-      setError('Failed to load settings');
-    } finally {
-      setLoading(false);
-    }
-  }, [mounted]);
+  const settings = data?.data || null;
 
   const applyTemplate = useCallback(async (templateId: string) => {
-    if (!mounted) return false;
-    
     try {
-      setLoading(true);
       const response = await fetch(`/api/templates/${templateId}`, {
         method: 'PATCH',
         headers: {
@@ -51,8 +45,8 @@ export const usePublicNoticeSettings = () => {
       const result = await response.json();
 
       if (result.success) {
-        // Reload settings after applying template
-        await loadSettings();
+        // Invalidate and refetch settings after applying template
+        await queryClient.invalidateQueries({ queryKey: ['public-notice-settings'] });
         
         // Load the template data for immediate use
         const templateResponse = await fetch(`/api/templates/${templateId}`);
@@ -64,17 +58,13 @@ export const usePublicNoticeSettings = () => {
         
         return true;
       } else {
-        setError(result.error || 'Failed to apply template');
         return false;
       }
     } catch (error) {
       console.error('Error applying template:', error);
-      setError('Failed to apply template');
       return false;
-    } finally {
-      setLoading(false);
     }
-  }, [loadSettings, mounted]);
+  }, [queryClient]);
 
   const clearActiveTemplate = useCallback(() => {
     setActiveTemplate(null);
@@ -82,8 +72,6 @@ export const usePublicNoticeSettings = () => {
 
   // Get effective settings (template overrides settings)
   const getEffectiveSettings = useCallback(() => {
-    if (!mounted) return null;
-    
     if (activeTemplate) {
       return {
         ...settings,
@@ -91,19 +79,10 @@ export const usePublicNoticeSettings = () => {
       };
     }
     return settings;
-  }, [settings, activeTemplate, mounted]);
-
-  // Load settings on mount
-  useEffect(() => {
-    if (mounted) {
-      loadSettings();
-    }
-  }, [loadSettings, mounted]);
+  }, [settings, activeTemplate]);
 
   // Listen for cross-tab update signals and refresh immediately
   useEffect(() => {
-    if (!mounted) return;
-
     let bc: BroadcastChannel | null = null;
 
     // BroadcastChannel listener
@@ -112,7 +91,7 @@ export const usePublicNoticeSettings = () => {
       bc.onmessage = (ev) => {
         const msg = ev?.data;
         if (msg && msg.type === 'settings-updated') {
-          loadSettings();
+          queryClient.invalidateQueries({ queryKey: ['public-notice-settings'] });
         }
       };
     }
@@ -120,7 +99,7 @@ export const usePublicNoticeSettings = () => {
     // Fallback via storage event
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'public-notice-settings-updated') {
-        loadSettings();
+        queryClient.invalidateQueries({ queryKey: ['public-notice-settings'] });
       }
     };
     window.addEventListener('storage', onStorage);
@@ -131,29 +110,24 @@ export const usePublicNoticeSettings = () => {
         bc.close();
       }
     };
-  }, [mounted, loadSettings]);
+  }, [queryClient]);
 
   // Manual refresh function
   const refreshSettings = useCallback(() => {
-    if (mounted) {
-      loadSettings();
-    }
-  }, [loadSettings, mounted]);
+    queryClient.invalidateQueries({ queryKey: ['public-notice-settings'] });
+  }, [queryClient]);
 
   // Force immediate refresh
   const forceRefresh = useCallback(() => {
-    if (mounted) {
-      setLoading(true);
-      loadSettings();
-    }
-  }, [loadSettings, mounted]);
+    refetch();
+  }, [refetch]);
 
   return {
     settings: getEffectiveSettings(),
     originalSettings: settings,
     activeTemplate,
-    loading: loading || !mounted,
-    error,
+    loading: isLoading,
+    error: error ? String(error) : data?.error || null,
     refreshSettings,
     forceRefresh,
     applyTemplate,

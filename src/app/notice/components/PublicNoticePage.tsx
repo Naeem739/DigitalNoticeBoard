@@ -70,6 +70,7 @@ export default function PublicNoticePage() {
   const [countdown, setCountdown] = useState(240) // 4 minutes = 240 seconds
   const [viewportWidth, setViewportWidth] = useState(0)
   const isMobile = viewportWidth > 0 && viewportWidth <= 480
+  const [lastDataUpdate, setLastDataUpdate] = useState<number>(Date.now())
 
   // TanStack Query hooks for real-time data fetching
   // Refetch every 3 seconds for real-time updates (works on Vercel)
@@ -88,16 +89,31 @@ export default function PublicNoticePage() {
     return () => {}
   }, [])
 
-  // Auto-refresh settings every 5 minutes
+  // Track when actual data changes (not just refetches)
   useEffect(() => {
     if (!mounted) return
-
-    const interval = setInterval(() => {
-      refreshSettings()
-    }, 300000) // 5 minutes (5 * 60 * 1000 ms)
-
-    return () => clearInterval(interval)
-  }, [mounted, refreshSettings])
+    
+    // Create a hash of the data to detect changes
+    const dataHash = JSON.stringify({
+      dashboardsCount: dashboards.length,
+      noticesCount: allNotices.length,
+      pdfsCount: allPdfs.length,
+      dashboardIds: dashboards.map(d => d.id).sort(),
+      noticeIds: allNotices.map(n => n.id).sort(),
+      pdfIds: allPdfs.map(p => p.id).sort(),
+    })
+    
+    // Store hash in ref to compare on next render
+    const prevHashKey = 'prevDataHash'
+    const prevHash = sessionStorage.getItem(prevHashKey)
+    
+    if (prevHash !== dataHash && prevHash !== null) {
+      // Data actually changed, update timestamp
+      setLastDataUpdate(Date.now())
+    }
+    
+    sessionStorage.setItem(prevHashKey, dataHash)
+  }, [mounted, dashboards, allNotices, allPdfs])
 
   // Update current time every second
   useEffect(() => {
@@ -561,8 +577,34 @@ export default function PublicNoticePage() {
         <div className={`w-full ${getResponsivePadding()}`}>
           {/* Main Header Row */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-            {/* Left side - Empty space for balance */}
-            <div className="flex-1"></div>
+            {/* Left side - Last Updated */}
+            <div className="flex-1 text-center sm:text-left">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                suppressHydrationWarning
+              >
+                <div className={`${getResponsiveSubtitleFontSize()} opacity-75`}>
+                  Last Updated:
+                </div>
+                <div className={`${
+                  viewportWidth < 640 ? 'text-xs' :
+                  viewportWidth < 1700 ? 'text-sm' :
+                  viewportWidth < 2560 ? 'text-base' :
+                  viewportWidth < 3840 ? 'text-lg' : 'text-xl'
+                } font-mono opacity-90`}>
+                  {new Date(lastDataUpdate).toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </div>
+              </motion.div>
+            </div>
 
             {/* Center - Logo, Title and Department Name */}
             <div className="flex flex-col items-center justify-center text-center flex-1">
