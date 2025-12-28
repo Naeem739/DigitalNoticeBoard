@@ -4,19 +4,22 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from "react"
 import * as pdfjsLib from "pdfjs-dist"
 import { memo } from "react"
-import { pdfCache, generatePDFCacheKey, isPDFDataValid, optimizePDFData } from "@/utils/pdfCache"
+import { pdfCache, generatePDFCacheKey, isPDFDataValid } from "@/utils/pdfCache"
 
-// Configure PDF.js worker
+// Configure PDF.js worker - use same approach as InlinePdfWidget
 if (typeof window !== "undefined") {
   try {
-    ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
-      "pdfjs-dist/build/pdf.worker.min.mjs",
-      import.meta.url
-    ).toString()
+    // Use unpkg CDN with the installed version (5.4.54) - same as InlinePdfWidget
+    ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.54/build/pdf.worker.min.mjs`
+    console.log('PDF.js worker configured:', (pdfjsLib as any).GlobalWorkerOptions.workerSrc)
   } catch (error) {
-    // Fallback to CDN if local worker fails
-    console.warn("Failed to load local PDF.js worker, using CDN fallback:", error)
-    ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`
+    console.error('Failed to configure PDF.js worker:', error)
+    // Fallback to alternative CDN
+    try {
+      ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.54/pdf.worker.min.mjs`
+    } catch (fallbackError) {
+      console.error('Failed to configure PDF.js worker fallback:', fallbackError)
+    }
   }
 }
 
@@ -169,37 +172,62 @@ const OptimizedPdfDisplay = memo(function OptimizedPdfDisplay({
       // Check if we have cached document
       let pdf = pdfCache.get(`${cacheKey}_document`)
       if (!pdf) {
-        // Create data URL for PDF.js
-        let optimizedData = optimizePDFData(pdfData)
-        
-        // Ensure we have valid base64 data
-        if (!optimizedData || optimizedData.trim().length === 0) {
-          throw new Error("PDF data is empty or invalid")
+        // Use the same robust PDF data handling as InlinePdfWidget
+        // Validate PDF data
+        if (!pdfData || pdfData.trim() === '') {
+          throw new Error('No PDF data provided')
         }
         
-        // Try using Uint8Array first (more reliable)
-        let pdfSource: any
+        // Ensure PDF data is properly formatted - same approach as InlinePdfWidget
+        let pdfSource = pdfData
+        if (!pdfSource.startsWith('data:')) {
+          pdfSource = `data:application/pdf;base64,${pdfSource}`
+        }
+        
+        // Extract base64 data from data URL (handles both with and without prefix)
+        const base64Data = pdfSource.includes(',') ? pdfSource.split(',')[1] : pdfSource.replace(/^data:application\/pdf;base64,/, '')
+        
+        // Convert base64 to Uint8Array for PDF.js - same as InlinePdfWidget
+        let pdfDocSource: any
         try {
-          // Convert base64 to Uint8Array
-          const binaryString = atob(optimizedData)
+          const binaryString = atob(base64Data)
           const bytes = new Uint8Array(binaryString.length)
           for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i)
           }
-          pdfSource = { data: bytes, verbosity: 0 }
+          
+          // Load PDF using Uint8Array - same format as InlinePdfWidget
+          pdfDocSource = {
+            data: bytes,
+            verbosity: 0
+          }
         } catch (conversionError) {
-          // Fallback to data URL if conversion fails
-          console.warn("Failed to convert PDF to Uint8Array, using data URL:", conversionError)
-          const dataUrl = `data:application/pdf;base64,${optimizedData}`
-          pdfSource = { data: dataUrl, verbosity: 0 }
+          console.error("Error converting PDF to Uint8Array:", conversionError)
+          throw new Error(`Failed to process PDF data: ${conversionError instanceof Error ? conversionError.message : 'Unknown conversion error'}`)
+        }
+        
+        // Check if PDF.js worker is configured
+        if (!(pdfjsLib as any).GlobalWorkerOptions.workerSrc) {
+          console.warn('PDF.js worker not configured, attempting to configure...')
+          try {
+            ;(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.54/build/pdf.worker.min.mjs`
+          } catch (workerError) {
+            console.error('Failed to configure PDF.js worker:', workerError)
+          }
         }
         
         try {
-          pdf = await pdfjsLib.getDocument(pdfSource).promise
+          pdf = await pdfjsLib.getDocument(pdfDocSource).promise
           pdfCache.set(`${cacheKey}_document`, pdf)
-        } catch (pdfError) {
-          console.error("PDF.js error:", pdfError)
-          throw new Error(`Failed to load PDF document: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`)
+          console.log('PDF loaded successfully, pages:', pdf.numPages)
+        } catch (pdfError: any) {
+          console.error("PDF.js load error details:", {
+            error: pdfError,
+            message: pdfError?.message,
+            name: pdfError?.name,
+            stack: pdfError?.stack?.substring(0, 500)
+          })
+          throw new Error(`Failed to load PDF document: ${pdfError?.message || 'Unknown error'}`)
         }
       }
 

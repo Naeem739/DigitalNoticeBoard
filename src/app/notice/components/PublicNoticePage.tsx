@@ -196,10 +196,10 @@ export default function PublicNoticePage() {
     return 160 // Large QR codes for 75" 4K display
   }
 
-  // Get responsive QR code container size (includes padding)
+  // Get responsive QR code container size (includes padding) - Optimized for scanning
   const getResponsiveQRContainerSize = () => {
     const qrSize = getResponsiveQRSize()
-    return qrSize + 16 // Add padding
+    return qrSize + 24 // Add more padding for better scanning visibility
   }
 
   // Get responsive header font size
@@ -1088,40 +1088,6 @@ export default function PublicNoticePage() {
                                       }}
                                     />
                                     
-                                                                        {/* Category Name - Bottom Left */}
-                                    <div className="absolute bottom-3 left-3">
-                                      <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold relative overflow-hidden"
-                                        style={{
-                                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                          color: '#0f172a',
-                                          fontSize: '13px',
-                                          fontWeight: '600',
-                                          border: '1px solid rgba(229, 231, 235, 0.9)',
-                                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                          backdropFilter: 'blur(8px)',
-                                          transition: 'all 0.3s ease'
-                                        }}
-                                      >
-                                        {/* Gradient background */}
-                                        <div 
-                                          className="absolute inset-0 rounded-full opacity-20"
-                                          style={{
-                                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.1))'
-                                          }}
-                                        />
-                                        <span className="relative z-10 font-semibold tracking-wide">
-                                          {container.settings?.customCategoryName || notice.categoryName || 'Image'}
-                                        </span>
-                                        {/* Subtle glow effect */}
-                                        <div 
-                                          className="absolute inset-0 rounded-full opacity-0 hover:opacity-10 transition-opacity duration-300"
-                                          style={{
-                                            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3), transparent)'
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-                                    
                                     {/* QR Code - Bottom Right */}
                                     <div className="absolute bottom-3 right-3">
                                       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2"
@@ -1188,46 +1154,16 @@ export default function PublicNoticePage() {
                                     />
                                     </ClientOnly>
                                     
-                                                                         {/* Category Name - Bottom Left */}
-                                     <div className="absolute bottom-3 left-3">
-                                       <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold relative overflow-hidden"
+                                     {/* QR Code - Bottom Right - Optimized for Easy Scanning */}
+                                     <div className="absolute bottom-4 right-4 z-50">
+                                       <div 
+                                         className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-3"
                                          style={{
-                                           backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                           color: '#0f172a',
-                                           fontSize: '13px',
-                                           fontWeight: '600',
-                                           border: '1px solid rgba(229, 231, 235, 0.9)',
-                                           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                           backdropFilter: 'blur(8px)',
-                                           transition: 'all 0.3s ease'
-                                         }}
-                                       >
-                                         {/* Gradient background */}
-                                         <div 
-                                           className="absolute inset-0 rounded-full opacity-20"
-                                           style={{
-                                             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.1))'
-                                           }}
-                                         />
-                                                                                   <span className="relative z-10 font-semibold tracking-wide">
-                                            {container.settings?.customCategoryName || pdf.title || 'PDF Document'}
-                                          </span>
-                                         {/* Subtle glow effect */}
-                                         <div 
-                                           className="absolute inset-0 rounded-full opacity-0 hover:opacity-10 transition-opacity duration-300"
-                                           style={{
-                                             background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3), transparent)'
-                                           }}
-                                         />
-                                       </div>
-                                     </div>
-                                     
-                                     {/* QR Code - Bottom Right */}
-                                     <div className="absolute bottom-3 right-3">
-                                       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2"
-                                         style={{
-                                           width: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80,
-                                           height: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80
+                                           width: getResponsiveQRContainerSize(),
+                                           height: getResponsiveQRContainerSize(),
+                                           minWidth: '80px',
+                                           minHeight: '80px',
+                                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)'
                                          }}
                                        >
                                          <NoticeQRCode 
@@ -1283,46 +1219,16 @@ export default function PublicNoticePage() {
                                     />
                                     </ClientOnly>
                                     
-                                                                         {/* Category Name - Bottom Left */}
-                                     <div className="absolute bottom-3 left-3">
-                                       <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold relative overflow-hidden"
+                                     {/* QR Code - Bottom Right - Optimized for Easy Scanning */}
+                                     <div className="absolute bottom-4 right-4 z-50">
+                                       <div 
+                                         className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-3"
                                          style={{
-                                           backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                           color: '#0f172a',
-                                           fontSize: '13px',
-                                           fontWeight: '600',
-                                           border: '1px solid rgba(229, 231, 235, 0.9)',
-                                           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                           backdropFilter: 'blur(8px)',
-                                           transition: 'all 0.3s ease'
-                                         }}
-                                       >
-                                         {/* Gradient background */}
-                                         <div 
-                                           className="absolute inset-0 rounded-full opacity-20"
-                                           style={{
-                                             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.1))'
-                                           }}
-                                         />
-                                                                                   <span className="relative z-10 font-semibold tracking-wide">
-                                            {container.settings?.customCategoryName || 'PDF Document'}
-                                          </span>
-                                         {/* Subtle glow effect */}
-                                         <div 
-                                           className="absolute inset-0 rounded-full opacity-0 hover:opacity-10 transition-opacity duration-300"
-                                           style={{
-                                             background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3), transparent)'
-                                           }}
-                                         />
-                                       </div>
-                                     </div>
-                                     
-                                     {/* QR Code - Bottom Right */}
-                                     <div className="absolute bottom-3 right-3">
-                                       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2"
-                                         style={{
-                                           width: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80,
-                                           height: viewportWidth <= 360 ? 56 : viewportWidth <= 400 ? 60 : viewportWidth <= 640 ? 60 : viewportWidth <= 1366 ? 70 : 80
+                                           width: getResponsiveQRContainerSize(),
+                                           height: getResponsiveQRContainerSize(),
+                                           minWidth: '80px',
+                                           minHeight: '80px',
+                                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)'
                                          }}
                                        >
                                          <NoticeQRCode 
