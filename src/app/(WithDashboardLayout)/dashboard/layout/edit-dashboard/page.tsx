@@ -246,6 +246,21 @@ const getTabsForWidgetType = (widgetType: WidgetType | undefined) => {
 
 function EditDashboardDemo() {
   const { data: session } = useSession()
+  const [isMobile, setIsMobile] = useState(false)
+  
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobileDevice = window.innerWidth <= 768 || 
+                             /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                             ('ontouchstart' in window)
+      setIsMobile(isMobileDevice)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
   const userRole = session?.user?.role
   
   // Screen management state
@@ -3491,15 +3506,26 @@ function EditDashboardDemo() {
             cols={12}
             rowHeight={50}
             width={(RATIO_DIMENSIONS[selectedRatio].width * 1.0) -136}
-                                    onLayoutChange={(newLayout: Layout[]) => {
-                          setLayout(newLayout)
-                          // Save to TemporaryDashboard after layout change
-                          setTimeout(() => {
-                            autoSaveToTempDashboard()
-                          }, 100)
-                        }}
+            onLayoutChange={(newLayout: Layout[]) => {
+              setLayout(newLayout)
+              // Save to TemporaryDashboard after layout change
+              setTimeout(() => {
+                autoSaveToTempDashboard()
+              }, 100)
+            }}
             margin={[12, 12]}
-            draggableHandle=".widget-drag-handle"
+            // On mobile: allow dragging from anywhere on widget. On desktop: only from drag handle
+            draggableHandle={isMobile ? undefined : ".widget-drag-handle"}
+            isDraggable={true}
+            isResizable={!isMobile} // Disable resize on mobile for better UX
+            compactType={null}
+            preventCollision={false}
+            useCSSTransforms={true}
+            // Mobile-specific: allow touch dragging
+            {...(isMobile && {
+              allowOverlap: false,
+              transformScale: 1
+            })}
           >
             {widgets.map((widget) => {
               const widgetLayout = layout.find((l) => l.i === widget.id)
@@ -3523,7 +3549,7 @@ function EditDashboardDemo() {
                 <div
                   id={widget.id}
                   key={widget.id}
-                  className="rounded-lg shadow-md relative"
+                  className={`rounded-lg shadow-md relative ${isMobile ? 'touch-manipulation' : ''}`}
                   style={{
                     backgroundColor: bgColor,
                     borderColor: settings.borderColor,
@@ -3534,6 +3560,12 @@ function EditDashboardDemo() {
                     flexDirection: "column",
                     height: "100%",
                     overflow: "hidden", // Prevent content from overflowing the widget
+                    // Mobile: make entire widget draggable
+                    ...(isMobile && {
+                      touchAction: 'none',
+                      WebkitUserSelect: 'none',
+                      userSelect: 'none'
+                    })
                   }}
                   onDrop={(e) => handleDrop(e, widget.id)}
                   onDragOver={handleWidgetDragOver}
@@ -3546,17 +3578,27 @@ function EditDashboardDemo() {
 
                   <div className="absolute top-1 right-8 z-10">
                     <button
-                      onClick={() => toggleWidgetSettings(widget.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleWidgetSettings(widget.id)
+                      }}
+                      onTouchStart={(e) => e.stopPropagation()}
                       className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                      style={{ touchAction: 'manipulation' }}
                     >
                       <Settings size={16} className="text-gray-600" />
                     </button>
                   </div>
 
                   <button
-                    onClick={(e) => removeWidget(e, widget.id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeWidget(e, widget.id)
+                    }}
+                    onTouchStart={(e) => e.stopPropagation()}
                     disabled={isRemovingWidget}
                     className="absolute top-1 right-1 p-0.5 hover:bg-red-100 rounded transition-colors z-10"
+                    style={{ touchAction: 'manipulation' }}
                   >
                     {isRemovingWidget ? (
                       <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-500"></div>
