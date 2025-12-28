@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, memo } from "react"
-import OptimizedPdfDisplay from "./OptimizedPdfDisplay"
+import WorkingPdfDisplay from "./WorkingPdfDisplay"
 import FallbackPdfDisplay from "./FallbackPdfDisplay"
 
 interface LazyPdfWidgetProps {
@@ -63,7 +63,7 @@ const LazyPdfWidget = memo(function LazyPdfWidget({
             showTitle={showTitle}
           />
         ) : (
-          <OptimizedPdfDisplay
+          <WorkingPdfDisplay
             pdfData={pdfData}
             title={title}
             autoScroll={autoScroll}
