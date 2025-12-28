@@ -47,3 +47,45 @@
     padding: 0.25rem;
   }
 }
+
+/* Mobile touch support for drag and drop */
+@media (max-width: 768px) {
+  .react-grid-item {
+    touch-action: none !important;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: grab;
+  }
+  
+  .react-grid-item:active {
+    opacity: 0.8;
+    transform: scale(0.98);
+    cursor: grabbing;
+  }
+  
+  /* Make widgets easier to drag on mobile - entire widget is draggable */
+  .react-grid-item > div {
+    touch-action: none;
+  }
+  
+  /* Prevent text selection while dragging */
+  .react-grid-item.dragging {
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: grabbing !important;
+  }
+  
+  /* Allow buttons to be clicked without triggering drag */
+  .react-grid-item button,
+  .react-grid-item .widget-controls button {
+    touch-action: manipulation;
+    pointer-events: auto;
+    z-index: 20;
+  }
+  
+  /* Make drag handle more visible on mobile */
+  .widget-drag-handle {
+    min-height: 44px; /* Minimum touch target size */
+  }
+}
