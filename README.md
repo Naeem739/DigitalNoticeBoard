@@ -664,5 +664,8 @@ If you have any questions or need help, please:
 - Contact the development team
 
 ---
+______________________________________________________
+__________________________________________________________
+_______________________________________________________________
 
 **Made with ❤️ by the DigitalNoticeBoard Team**
