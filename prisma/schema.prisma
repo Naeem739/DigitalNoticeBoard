@@ -24,6 +24,7 @@ model Notice {
   categoryId          String
   content             String
   createdAt           DateTime?  @default(now())
+  updatedAt           DateTime?  @updatedAt
   title               String
   pdfData             String?
   pdfFileName         String?

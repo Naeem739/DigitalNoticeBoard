@@ -586,7 +586,7 @@ export default function PublicNoticePage() {
                 suppressHydrationWarning
               >
                 <div className={`${getResponsiveSubtitleFontSize()} opacity-75`}>
-                  Last Updated:
+                  Last Refreshed:
                 </div>
                 <div className={`${
                   viewportWidth < 640 ? 'text-xs' :

@@ -60,8 +60,11 @@ export async function GET(
       return entities[char]
     })
     
-    // Safely format the creation date
+    // Safely format the creation and update dates
     const createdDate = notice.createdAt ? new Date(notice.createdAt).toLocaleDateString() : 'Unknown'
+    // Type assertion needed until TypeScript picks up the updated schema
+    const noticeWithUpdatedAt = notice as typeof notice & { updatedAt: Date | null }
+    const updatedDate = noticeWithUpdatedAt.updatedAt ? new Date(noticeWithUpdatedAt.updatedAt).toLocaleDateString() : (notice.createdAt ? new Date(notice.createdAt).toLocaleDateString() : 'Unknown')
     
     const htmlContent = `
       <!DOCTYPE html>
@@ -140,6 +143,7 @@ export async function GET(
         <div class="notice-info">
           <div class="category">${escapedCategory}</div>
           <div><strong>Created:</strong> ${createdDate}</div>
+          <div><strong>Last Updated:</strong> ${updatedDate}</div>
         </div>
         
         <h1>${escapedTitle}</h1>
