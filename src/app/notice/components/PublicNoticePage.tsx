@@ -586,7 +586,7 @@ export default function PublicNoticePage() {
                 suppressHydrationWarning
               >
                 <div className={`${getResponsiveSubtitleFontSize()} opacity-75`}>
-                  Last Refreshed:
+                  Last Refresh:
                 </div>
                 <div className={`${
                   viewportWidth < 640 ? 'text-xs' :
@@ -1317,7 +1317,7 @@ export default function PublicNoticePage() {
         <div className={`w-full ${getResponsivePadding()}`}>
           <div className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-white/60 ${getResponsiveSubtitleFontSize()}`}>
             <span>
-              Project Advisor: Md. Rashid Al Asif, Assistant Professor, CSE-BU
+              Project Superviser: Md. Rashid Al Asif, Assistant Professor, CSE-BU
             </span>
             <span className="hidden sm:inline">•</span>
             <span>
