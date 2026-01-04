@@ -540,6 +540,13 @@ export default function PublicNoticePage() {
     }
   }
 
+  // Format countdown timer (MM:SS)
+  const formatCountdown = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
   if (loading || !mounted) {
     return (
       <div 
@@ -651,7 +658,7 @@ export default function PublicNoticePage() {
               {/* Dashboard Navigation - Below title */}
               {dashboards.length > 1 && (
                 <motion.div 
-                  className="flex items-center space-x-1 sm:space-x-2 mt-1 sm:mt-2"
+                  className="flex items-center justify-center space-x-2 sm:space-x-3 mt-1 sm:mt-2"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.5 }}
@@ -663,6 +670,21 @@ export default function PublicNoticePage() {
                   >
                     <ChevronLeft className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                   </button>
+                  
+                  {/* Compact Screen Info and Countdown */}
+                  <div className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-2.5 py-0.5 bg-white/5 rounded-md">
+                    <span className={`${getResponsiveSubtitleFontSize()} text-white/80`}>
+                      {currentDashboardIndex + 1}/{dashboards.length}
+                    </span>
+                    {autoPaginationEnabled && (
+                      <>
+                        <span className="text-white/40">•</span>
+                        <span className={`${getResponsiveSubtitleFontSize()} font-mono text-white/80`}>
+                          {formatCountdown(countdown)}
+                        </span>
+                      </>
+                    )}
+                  </div>
                   
                   <div className="flex items-center space-x-0.5 sm:space-x-1">
                     {dashboards.map((_, index) => (
