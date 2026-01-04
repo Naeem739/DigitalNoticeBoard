@@ -1317,11 +1317,27 @@ export default function PublicNoticePage() {
         <div className={`w-full ${getResponsivePadding()}`}>
           <div className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-white/60 ${getResponsiveSubtitleFontSize()}`}>
             <span>
-              Project Advisor: Md. Rashid Al Asif
+              Project Advisor: Md. Rashid Al Asif, Assistant Professor, CSE-BU
             </span>
             <span className="hidden sm:inline">•</span>
             <span>
-              Developers: Naeem (20CSE008), Ashik (20CSE032)
+              Developers:{' '}
+              <a 
+                href="mailto:naeem.cse7.bu@gmail.com" 
+                className="hover:text-white/80 transition-colors"
+                title="Email Naeem"
+              >
+                naeem.cse7.bu@gmail.com
+              </a>
+              {' '}(20CSE008),{' '}
+              <a 
+                href="mailto:ashikghosh.cse7.bu@gmail.com" 
+                className=" hover:text-white/80 transition-colors"
+                title="Email Ashik"
+              >
+                ashikghosh.cse7.bu@gmail.com
+              </a>
+              {' '}(20CSE032)
             </span>
           </div>
         </div>

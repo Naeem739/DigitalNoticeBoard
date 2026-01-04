@@ -34,7 +34,7 @@ export async function GET(
     
 
     
-    // Escape the content to prevent XSS and HTML breaking
+    // Escape title and category to prevent XSS (these are plain text fields)
     const escapedTitle = notice.title.replace(/[<>&'"]/g, (char) => {
       const entities: { [key: string]: string } = {
         '<': '&lt;',
@@ -46,16 +46,8 @@ export async function GET(
       return entities[char]
     })
     
-    const escapedContent = (notice.content || 'No content available').replace(/[<>&'"]/g, (char) => {
-      const entities: { [key: string]: string } = {
-        '<': '&lt;',
-        '>': '&gt;',
-        '&': '&amp;',
-        "'": '&#39;',
-        '"': '&quot;'
-      }
-      return entities[char]
-    })
+    // Content is already HTML from the rich text editor, so render it directly
+    const noticeContent = notice.content || 'No content available'
     
     const escapedCategory = (notice.category || 'General').replace(/[<>&'"]/g, (char) => {
       const entities: { [key: string]: string } = {
@@ -93,7 +85,6 @@ export async function GET(
           .content {
             margin-top: 20px;
             font-size: 16px;
-            white-space: pre-wrap;
           }
           .footer {
             margin-top: 40px;
@@ -154,7 +145,7 @@ export async function GET(
         <h1>${escapedTitle}</h1>
         
         <div class="content">
-          ${escapedContent}
+          ${noticeContent}
         </div>
         
         <div class="footer">
