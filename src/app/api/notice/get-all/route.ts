@@ -33,7 +33,8 @@ export async function GET() {
       categoryName: notice.categoryRelation?.editedName || notice.categoryRelation?.name || 'Uncategorized',
       categoryType: notice.categoryRelation?.categoryType || 'TEXT',
       categoryRelation: notice.categoryRelation,
-      createdAt: notice.createdAt
+      createdAt: notice.createdAt,
+      updatedAt: notice.updatedAt
     }));
 
     return NextResponse.json({

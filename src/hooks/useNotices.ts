@@ -6,6 +6,7 @@ type TNotice = {
   content?: string;
   categoryName?: string;
   createdAt?: Date;
+  updatedAt?: Date;
   pdfUrl?: string;
   pdfFileName?: string;
   pdfData?: string;
