@@ -286,7 +286,7 @@ export default function PublicNoticePage() {
         const nextIndex = (prevIndex + 1) % dashboards.length
         return nextIndex
       })
-    }, 120000) // 4 minutes (4 * 60 * 1000 ms)
+    }, 240000) // 4 minutes (4 * 60 * 1000 ms)
 
     return () => clearInterval(interval)
   }, [mounted, autoPaginationEnabled, dashboards.length])
@@ -756,48 +756,47 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className="w-full h-full flex items-center justify-center"
+              className={`w-full h-full rounded-lg shadow-lg ${getResponsiveContentPadding()}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
-              {/* Dashboard Container with Aspect Ratio */}
               <div 
-                className="relative w-full max-w-full mx-auto rounded-lg shadow-lg overflow-hidden"
+                className="relative w-full h-full overflow-visible rounded-lg shadow-lg"
                 style={{
-                  aspectRatio: currentDashboard.aspectRatio || '16:9',
-                  maxHeight: '100%',
-                  maxWidth: '100%'
+                  minHeight: '250px'
                 }}
               >
-                {/* Absolute Positioned Widgets */}
-                {currentDashboard.containers.map((container, index) => {
-                  const settings = container.settings || {}
-                  const bgColor = settings.backgroundColor || '#ffffff'
-                  const bgOpacity = settings.backgroundOpacity || 0.3
-                  const borderColor = settings.borderColor || '#e2e8f0'
-                  const borderWidth = settings.borderWidth || 1
-                  
-                  // Use stored percentage positions for exact layout matching
-                  const leftPos = container.leftPercent || '0%'
-                  const topPos = container.topPercent || '0%'
-                  const widthSize = container.width || '100%'
-                  const heightSize = container.height || '100%'
-                  
-                  return (
-                    <motion.div
-                      key={container.id}
-                      id={container.id}
-                      className="absolute rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
-                      style={{
-                        left: leftPos,
-                        top: topPos,
-                        width: widthSize,
-                        height: heightSize,
-                        backgroundColor: (container.type === 'pdf' || container.type === 'image') ? '#ffffff' : `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
-                        border: (container.type === 'pdf' || container.type === 'image') ? '2px solid #e5e7eb' : `${borderWidth}px solid ${borderColor}`,
-                        boxShadow: (container.type === 'pdf' || container.type === 'image') ? '0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -2px rgba(0,0,0,0.05)' : `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`
-                      }}
+                {/* Grid Layout for Widgets */}
+                <div className={`grid ${getResponsiveGridGap()} ${getResponsiveContentPadding()} notice-grid-container`} style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)' }}>
+                  {currentDashboard.containers.map((container, index) => {
+                    const settings = container.settings || {}
+                    const bgColor = settings.backgroundColor || '#ffffff'
+                    const bgOpacity = settings.backgroundOpacity || 0.3
+                    const borderColor = settings.borderColor || '#e2e8f0'
+                    const borderWidth = settings.borderWidth || 1
+                    
+                    // Calculate grid position using x, y coordinates from database
+                    const gridX = container.x || 0
+                    const gridY = container.y || 0
+                    const gridW = Math.min(container.w || 1, 12)
+                    const gridH = Math.min(container.h || 1, 6)
+                    
+                    return (
+                      <motion.div
+                        key={container.id}
+                        id={container.id}
+                        className="relative rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
+                        style={{
+                          gridColumn: isMobile ? '1 / -1' : `${gridX + 1} / span ${gridW}`,
+                          gridRow: isMobile ? 'auto' : `${gridY + 1} / span ${gridH}`,
+                          backgroundColor: (container.type === 'pdf' || container.type === 'image') ? '#ffffff' : `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
+                          border: (container.type === 'pdf' || container.type === 'image') ? '2px solid #e5e7eb' : `${borderWidth}px solid ${borderColor}`,
+                          position: 'relative',
+                          minHeight: isMobile ? 'auto' : (container.type === 'pdf' || container.type === 'image') ? '200px' : '150px',
+                          maxHeight: isMobile ? 'none' : '100%',
+                          boxShadow: (container.type === 'pdf' || container.type === 'image') ? '0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -2px rgba(0,0,0,0.05)' : `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`
+                        }}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.4, delay: index * 0.1 }}
@@ -1307,6 +1306,7 @@ export default function PublicNoticePage() {
                       </motion.div>
                     )
                   })}
+                </div>
               </div>
             </motion.div>
           ) : (
@@ -1349,7 +1349,7 @@ export default function PublicNoticePage() {
                 className="hover:text-white/80 transition-colors"
                 title="Email Naeem"
               >
-                Naeem (naeem.cse7.bu@gmail.com)
+                naeem.cse7.bu@gmail.com
               </a>
               {' '}(20CSE008),{' '}
               <a 
@@ -1357,7 +1357,7 @@ export default function PublicNoticePage() {
                 className=" hover:text-white/80 transition-colors"
                 title="Email Ashik"
               >
-                Ashik (ashikghosh.cse7.bu@gmail.com)
+                ashikghosh.cse7.bu@gmail.com
               </a>
               {' '}(20CSE032)
             </span>
