@@ -73,89 +73,161 @@ export async function GET(
         <title>${escapedTitle}</title>
         <meta charset="utf-8">
         <style>
+          * {
+            box-sizing: border-box;
+          }
           body {
             font-family: Arial, sans-serif;
             margin: 40px;
             line-height: 1.6;
-            color: #333;
+            color: #1f2933;
+            background-color: #f9fafb;
           }
-          h1 {
-            color: #2c3e50;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
-            margin-bottom: 30px;
-          }
-          .content {
-            margin-top: 20px;
-            font-size: 16px;
-          }
-          .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #ecf0f1;
-            font-size: 12px;
-            color: #7f8c8d;
-            text-align: center;
-          }
-          .notice-info {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border-left: 4px solid #3498db;
-          }
-          .category {
-            display: inline-block;
-            background-color: #3498db;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 10px;
+          .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 32px 36px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+            border: 1px solid #e5e7eb;
           }
           .print-button {
             position: fixed;
             top: 20px;
             right: 20px;
-            background-color: #3498db;
-            color: white;
+            background-color: #2563eb;
+            color: #ffffff;
             border: none;
             padding: 10px 20px;
-            border-radius: 5px;
+            border-radius: 999px;
             cursor: pointer;
             font-size: 14px;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
           }
           .print-button:hover {
-            background-color: #2980b9;
+            background-color: #1d4ed8;
           }
           @media print {
+            body {
+              margin: 0;
+              background: #ffffff;
+            }
+            .container {
+              box-shadow: none;
+              border: none;
+              margin: 0;
+              border-radius: 0;
+            }
             .print-button {
               display: none;
             }
           }
+          .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #e5e7eb;
+          }
+          .meta-section,
+          .content-section {
+            margin-bottom: 28px;
+          }
+          .field-row {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            font-size: 14px;
+          }
+          .field-label {
+            width: 140px;
+            font-weight: 600;
+            color: #374151;
+          }
+          .field-value {
+            flex: 1;
+            color: #111827;
+          }
+          .category-badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 999px;
+            background-color: #e0f2fe;
+            color: #1d4ed8;
+            font-size: 13px;
+            font-weight: 600;
+          }
+          .title-value {
+            font-size: 20px;
+            font-weight: 700;
+          }
+          .description-content {
+            margin-top: 4px;
+            font-size: 15px;
+            line-height: 1.7;
+          }
+          .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 13px;
+            color: #4b5563;
+            text-align: center;
+          }
+          .footer-line-strong {
+            font-weight: 700;
+            color: #111827;
+          }
+          .footer-line {
+            margin-top: 2px;
+          }
         </style>
       </head>
       <body>
-        <button class="print-button" onclick="window.print()">Print as PDF</button>
-        <div class="notice-info">
-          <div class="category">${escapedCategory}</div>
-          <div><strong>Created:</strong> ${createdDate}</div>
-          <div><strong>Last Updated:</strong> ${updatedDate}</div>
-        </div>
-        
-        <h1>${escapedTitle}</h1>
-        
-        <div class="content">
-          ${noticeContent}
-        </div>
-        
-        <div class="footer">
-          <strong>Digital Notice Board</strong><br>
-          Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}<br>
-          Notice ID: ${notice.id}
+        <button class="print-button" onclick="window.print()">Print / Save as PDF</button>
+        <div class="container">
+          <div class="meta-section">
+            <div class="section-title">Notice Information</div>
+            <div class="field-row">
+              <div class="field-label">Category:</div>
+              <div class="field-value">
+                <span class="category-badge">${escapedCategory}</span>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Created at:</div>
+              <div class="field-value">${createdDate}</div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Last Updated at:</div>
+              <div class="field-value">${updatedDate}</div>
+            </div>
+          </div>
+
+          <div class="content-section">
+            <div class="section-title">Notice Content</div>
+            <div class="field-row">
+              <div class="field-label">Title:</div>
+              <div class="field-value title-value">${escapedTitle}</div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Description:</div>
+              <div class="field-value">
+                <div class="description-content">
+                  ${noticeContent}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <div class="footer-line-strong">Digital Notice Board</div>
+            <div class="footer-line">Department of Computer Science &amp; Engineering</div>
+            <div class="footer-line">University of Barishal</div>
+          </div>
         </div>
       </body>
       </html>
