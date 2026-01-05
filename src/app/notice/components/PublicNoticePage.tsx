@@ -68,7 +68,7 @@ export default function PublicNoticePage() {
   const [currentDashboard, setCurrentDashboard] = useState<TDashboard | null>(null)
   const [images, setImages] = useState<TImage[]>([])
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
-  const [countdown, setCountdown] = useState(240) // 4 minutes = 240 seconds
+  const [countdown, setCountdown] = useState(120) // 2 minutes = 120 seconds
   const [viewportWidth, setViewportWidth] = useState(0)
   const isMobile = viewportWidth > 0 && viewportWidth <= 480
   const [lastDataUpdate, setLastDataUpdate] = useState<number>(Date.now())
@@ -278,7 +278,7 @@ export default function PublicNoticePage() {
     return '10.5em'                // ~168px up to 480px
   }
 
-  // Auto-pagination every 4 minutes
+  // Auto-pagination every 2 minutes
   useEffect(() => {
     if (!mounted || !autoPaginationEnabled || dashboards.length <= 1) return
 
@@ -287,7 +287,7 @@ export default function PublicNoticePage() {
         const nextIndex = (prevIndex + 1) % dashboards.length
         return nextIndex
       })
-    }, 240000) // 4 minutes (4 * 60 * 1000 ms)
+    }, 120000) // 2 minutes (2 * 60 * 1000 ms)
 
     return () => clearInterval(interval)
   }, [mounted, autoPaginationEnabled, dashboards.length])
@@ -344,14 +344,14 @@ export default function PublicNoticePage() {
   // Countdown timer for auto-pagination
   useEffect(() => {
     if (!mounted || !autoPaginationEnabled || dashboards.length <= 1) {
-      setCountdown(240)
+      setCountdown(120)
       return
     }
 
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          return 240 // Reset to 4 minutes
+          return 120 // Reset to 2 minutes
         }
         return prev - 1
       })
@@ -440,21 +440,21 @@ export default function PublicNoticePage() {
   const goToNextDashboard = () => {
     if (currentDashboardIndex < dashboards.length - 1) {
       setCurrentDashboardIndex(currentDashboardIndex + 1)
-      setCountdown(240) // Reset countdown when manually changing
+      setCountdown(120) // Reset countdown when manually changing
     }
   }
 
   const goToPrevDashboard = () => {
     if (currentDashboardIndex > 0) {
       setCurrentDashboardIndex(currentDashboardIndex - 1)
-      setCountdown(240) // Reset countdown when manually changing
+      setCountdown(120) // Reset countdown when manually changing
     }
   }
 
   const goToDashboard = (index: number) => {
     if (index >= 0 && index < dashboards.length) {
       setCurrentDashboardIndex(index)
-      setCountdown(240) // Reset countdown when manually changing
+      setCountdown(120) // Reset countdown when manually changing
     }
   }
 

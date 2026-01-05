@@ -76,10 +76,10 @@ export default function ManagePublicNoticePage() {
   const { toast } = useToast()
   const [settings, setSettings] = useState<Partial<PublicNoticeSettings>>({
     title: "Digital Notice Board",
-    subtitle: "Information Technology Department",
+    subtitle: "Department of Computer Science and Engineering",
     emergencyNumber: "01734528367",
     emergencyContact: "Md. Rashid Al Asif",
-    departmentName: "Information Technology Department",
+    departmentName: "Department of Computer Science and Engineering",
     backgroundType: "gradient",
     gradientColors: ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b"],
     headerBackgroundColor: "#1e293b",
@@ -625,7 +625,7 @@ export default function ManagePublicNoticePage() {
                         id="subtitle"
                         value={settings.subtitle || ""}
                         onChange={(e) => setSettings(prev => ({ ...prev, subtitle: e.target.value }))}
-                        placeholder="Information Technology Department"
+                        placeholder="Department of Computer Science and Engineering"
                         className="mt-1 text-sm sm:text-base"
                       />
                     </div>
@@ -635,7 +635,7 @@ export default function ManagePublicNoticePage() {
                         id="departmentName"
                         value={settings.departmentName || ""}
                         onChange={(e) => setSettings(prev => ({ ...prev, departmentName: e.target.value }))}
-                        placeholder="Information Technology Department"
+                        placeholder="Department of Computer Science and Engineering"
                         className="mt-1 text-sm sm:text-base"
                       />
                     </div>
