@@ -187,14 +187,14 @@ export default function Home() {
               Home
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
+            <Link href="/notice"  className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
+              Notice
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
+            </Link>
             {session && (
               <>
                 <Link href="/dashboard"  className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Dashboard
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
-                </Link>
-                <Link href="/notice"  className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
-                  Notice
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
                 </Link>
               </>
@@ -270,10 +270,10 @@ export default function Home() {
           <div className="md:hidden absolute left-0 right-0 bg-white border-b-2 border-blue-200 py-4 shadow-xl max-h-[calc(100vh-80px)] overflow-y-auto">
             <div className="container mx-auto px-4 sm:px-6 space-y-3">
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Home</Link>
+              <Link href="/notice" target='_blank' onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Notice</Link>
               {session && (
                 <>
                   <Link href="/dashboard" target='_blank' onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Dashboard</Link>
-                  <Link href="/notice" target='_blank' onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Notice</Link>
                 </>
               )}
               <Link href="#features" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 block py-2 border-b border-blue-100 text-sm sm:text-base">Features</Link>

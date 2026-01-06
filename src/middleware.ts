@@ -10,11 +10,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Get token - let NextAuth determine secureCookie based on environment
+  // Get token - explicitly set secureCookie based on environment
   const token = await getToken({ 
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
-    // Don't manually set secureCookie - let NextAuth detect it
+    secureCookie: process.env.NODE_ENV === 'production',
   });
 
   console.log("Middleware Token:", {
