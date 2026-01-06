@@ -152,10 +152,10 @@ model Pdf {
 model ModeratorPermission {
   id            String   @id @default(cuid())
   moderatorId   String   @unique
-  moderator     User     @relation(fields: [moderatorId], references: [id])
   allowedRoutes String[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  moderator     User     @relation(fields: [moderatorId], references: [id])
 }
 
 enum UserRole {

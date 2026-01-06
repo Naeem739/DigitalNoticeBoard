@@ -1,112 +1,100 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { UserPlus, Eye, EyeOff, Shield, CheckCircle, AlertCircle, Zap, Crown } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { UserPlus, Shield, CheckCircle, AlertCircle, Zap, Crown, Mail, User as UserIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 
+type TUser = {
+  id: string
+  name: string
+  email: string
+  role: string
+  createdAt: Date
+  updatedAt: Date
+}
+
 export default function MakeAdminPage() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [users, setUsers] = useState<TUser[]>([])
+  const [selectedEmail, setSelectedEmail] = useState<string>('')
   const [loading, setLoading] = useState(false)
-  const [passwordStrength, setPasswordStrength] = useState(0)
+  const [fetchingUsers, setFetchingUsers] = useState(true)
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
+  useEffect(() => {
+    fetchUsers()
+  }, [])
 
-    // Calculate password strength
-    if (name === 'password') {
-      let strength = 0
-      if (value.length >= 8) strength += 25
-      if (/[a-z]/.test(value)) strength += 25
-      if (/[A-Z]/.test(value)) strength += 25
-      if (/[0-9]/.test(value)) strength += 25
-      setPasswordStrength(strength)
+  const fetchUsers = async () => {
+    try {
+      setFetchingUsers(true)
+      const response = await fetch('/api/admin/all-users')
+      const result = await response.json()
+
+      console.log('API Response:', result)
+
+      if (result.success) {
+        // Robust filter: exclude SUPER_ADMIN regardless of order
+        const filteredUsers = (Array.isArray(result.users) ? result.users : []).filter((u: any) => u.role !== 'SUPER_ADMIN')
+        console.log('Filtered users:', filteredUsers)
+        setUsers(filteredUsers)
+      } else {
+        toast.error('Failed to fetch users')
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      toast.error('Error fetching users')
+    } finally {
+      setFetchingUsers(false)
     }
-  }
-
-  const getPasswordStrengthColor = () => {
-    if (passwordStrength <= 25) return 'bg-red-500'
-    if (passwordStrength <= 50) return 'bg-orange-500'
-    if (passwordStrength <= 75) return 'bg-yellow-500'
-    return 'bg-green-500'
-  }
-
-  const getPasswordStrengthText = () => {
-    if (passwordStrength <= 25) return 'Weak'
-    if (passwordStrength <= 50) return 'Fair'
-    if (passwordStrength <= 75) return 'Good'
-    return 'Strong'
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.name || !formData.email || !formData.password) {
-      toast.error('Please fill in all required fields')
+    if (!selectedEmail) {
+      toast.error('Please select a user')
       return
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match')
-      return
-    }
-
-    if (formData.password.length < 8) {
-      toast.error('Password must be at least 8 characters long')
-      return
-    }
-
-    if (passwordStrength < 75) {
-      toast.error('Please choose a stronger password')
+    const selectedUser = users.find(user => user.email === selectedEmail)
+    if (selectedUser?.role === 'ADMIN') {
+      toast.error('This user is already an admin')
       return
     }
 
     try {
       setLoading(true)
       
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
+      const response = await fetch('/api/admin/update-role', {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          role: 'admin'
+          email: selectedEmail,
+          role: 'ADMIN'
         }),
       })
 
       const result = await response.json()
 
       if (response.ok) {
-        toast.success('Admin user created successfully!', {
-          description: `${formData.name} now has full administrative privileges.`
+        toast.success('Admin role granted successfully!', {
+          description: `${selectedUser?.name} now has full administrative privileges.`
         })
-        setFormData({ name: '', email: '', password: '', confirmPassword: '' })
-        setPasswordStrength(0)
+        setSelectedEmail('')
+        fetchUsers() // Refresh the user list
       } else {
-        toast.error(result.message || 'Failed to create admin user')
+        toast.error(result.message || 'Failed to grant admin role')
       }
     } catch (error) {
-      console.error('Error creating admin:', error)
-      toast.error('Error creating admin user')
+      console.error('Error granting admin role:', error)
+      toast.error('Error granting admin role')
     } finally {
       setLoading(false)
     }
@@ -127,7 +115,7 @@ export default function MakeAdminPage() {
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Make Admin
           </h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">Grant administrative privileges to trusted users</p>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Grant administrative privileges to existing users</p>
         </div>
       </motion.div>
 
@@ -141,171 +129,103 @@ export default function MakeAdminPage() {
             <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
               <CardTitle className="flex items-center gap-2 text-blue-800">
                 <UserPlus className="w-5 h-5" />
-                Create New Administrator
+                Grant Administrator Role
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-semibold">
-                      Full Name *
-                    </Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      type="text"
-                      placeholder="Enter admin's full name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full border-2 focus:border-blue-500 transition-colors"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-semibold">
-                      Email Address *
-                    </Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="admin@company.com"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full border-2 focus:border-blue-500 transition-colors"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="user-select" className="text-sm font-semibold">
+                    Select User * {!fetchingUsers && users.length > 0 && <span className="text-gray-500 font-normal">({users.length} users available)</span>}
+                  </Label>
+                  <Select
+                    value={selectedEmail}
+                    onValueChange={setSelectedEmail}
+                    disabled={fetchingUsers}
+                  >
+                    <SelectTrigger className="w-full border-2 focus:border-blue-500 transition-colors">
+                      <SelectValue placeholder={fetchingUsers ? "Loading users..." : users.length === 0 ? "No users available" : "Choose a user from the list"} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {users.length === 0 && !fetchingUsers ? (
+                        <div className="p-4 text-center text-gray-500">No users found</div>
+                      ) : (
+                        users.map((user) => (
+                        <SelectItem key={user.id} value={user.email}>
+                          <div className="flex items-center justify-between w-full gap-4">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <UserIcon className="w-4 h-4" />
+                                <span className="font-medium">{user.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                                <Mail className="w-3 h-3" />
+                                <span>{user.email}</span>
+                              </div>
+                            </div>
+                            <Badge 
+                              variant={
+                                user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' 
+                                  ? 'default' 
+                                  : user.role === 'MODERATOR' 
+                                  ? 'secondary' 
+                                  : 'outline'
+                              }
+                            >
+                              {user.role}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Select an existing user to grant them administrator privileges
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-semibold">
-                    Password *
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Create a strong password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full pr-10 border-2 focus:border-blue-500 transition-colors"
-                      minLength={8}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  
-                  {/* Password Strength Indicator */}
-                  {formData.password && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="space-y-2"
-                    >
+                {selectedEmail && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="bg-blue-50 border border-blue-200 rounded-lg p-4"
+                  >
+                    <h3 className="font-semibold text-blue-900 mb-2">Selected User Details</h3>
+                    <div className="space-y-2 text-sm">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full transition-all duration-300 ${getPasswordStrengthColor()}`}
-                            style={{ width: `${passwordStrength}%` }}
-                          ></div>
-                        </div>
-                        <Badge variant={passwordStrength >= 75 ? "default" : "secondary"}>
-                          {getPasswordStrengthText()}
+                        <UserIcon className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">Name:</span>
+                        <span>{users.find(u => u.email === selectedEmail)?.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">Email:</span>
+                        <span>{selectedEmail}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">Current Role:</span>
+                        <Badge variant="outline">
+                          {users.find(u => u.email === selectedEmail)?.role}
                         </Badge>
+                        <span className="text-gray-400">→</span>
+                        <Badge variant="default">ADMIN</Badge>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className={`w-3 h-3 ${formData.password.length >= 8 ? 'text-green-500' : 'text-gray-400'}`} />
-                          At least 8 characters
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className={`w-3 h-3 ${/[a-z]/.test(formData.password) ? 'text-green-500' : 'text-gray-400'}`} />
-                          Lowercase letter
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className={`w-3 h-3 ${/[A-Z]/.test(formData.password) ? 'text-green-500' : 'text-gray-400'}`} />
-                          Uppercase letter
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className={`w-3 h-3 ${/[0-9]/.test(formData.password) ? 'text-green-500' : 'text-gray-400'}`} />
-                          Number
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-sm font-semibold">
-                    Confirm Password *
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Confirm your password"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full pr-10 border-2 transition-colors ${
-                        formData.confirmPassword && formData.password !== formData.confirmPassword
-                          ? 'border-red-500 focus:border-red-500'
-                          : 'focus:border-blue-500'
-                      }`}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                    <motion.p 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="text-sm text-red-600 flex items-center gap-1"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      Passwords do not match
-                    </motion.p>
-                  )}
-                </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 <div className="pt-4">
                   <Button
                     type="submit"
-                    disabled={loading || passwordStrength < 75 || formData.password !== formData.confirmPassword}
+                    disabled={loading || !selectedEmail || fetchingUsers}
                     className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3"
                   >
                     {loading ? (
                       <div className="flex items-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Creating Administrator...
+                        Granting Administrator Access...
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
