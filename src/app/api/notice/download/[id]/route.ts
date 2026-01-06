@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/db/prisma'
+import puppeteer from 'puppeteer'
 
 export async function GET(
   request: NextRequest,
@@ -95,114 +96,133 @@ export async function GET(
           }
           
           body {
-            font-family: 'Tiro Bangla', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 60px 80px;
+            font-family: 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, sans-serif;
+            padding: 0;
             line-height: 1.6;
-            color: #1e293b;
+            color: #000;
             background: white;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
           }
           
-          .content-wrapper {
+          .page-container {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20mm 15mm;
+          }
+          
+          /* Header Section */
+          .header-section {
+            border-bottom: 2px solid #000;
+            padding-bottom: 8mm;
+            margin-bottom: 8mm;
+            position: relative;
+          }
+          
+          .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15mm;
+            margin-bottom: 5mm;
+          }
+          
+
+          
+          .header-title {
+            text-align: center;
             flex: 1;
           }
           
-          .field {
-            margin-bottom: 25px;
-          }
-          
-          .info-box {
-            background: #f1f5f9;
-            border-left: 4px solid #3b82f6;
-            border-radius: 4px;
-            padding: 15px 20px;
-            margin-bottom: 30px;
-            display: inline-block;
-          }
-          
-          .info-item {
-            display: inline-block;
-            margin-right: 30px;
-          }
-          
-          .info-item:last-child {
-            margin-right: 0;
-          }
-          
-          .info-label {
-            font-weight: 600;
-            font-size: 13px;
-            color: #64748b;
-            margin-right: 8px;
-          }
-          
-          .info-value {
-            font-size: 13px;
-            color: #0f172a;
-            font-weight: 600;
-          }
-          
-          .field-label {
-            font-weight: 600;
-            font-size: 16px;
-            color: #475569;
-            margin-bottom: 8px;
-          }
-          
-          .field-value {
-            font-size: 15px;
-            color: #1e293b;
-            line-height: 1.7;
-            padding-left: 10px;
-            border-left: 3px solid #3b82f6;
-            background: #f8fafc;
-            padding: 12px 15px;
-            border-radius: 4px;
-          }
-          
-          .title-field .field-value {
-            font-size: 24px;
+          .header-title h1 {
+            font-size: 22px;
             font-weight: 700;
-            color: #0f172a;
-            border-left-color: #2563eb;
-            border-left-width: 4px;
+            margin-bottom: 3mm;
+            color: #000;
           }
           
-          .description-field .field-value {
-            min-height: 100px;
+          .header-title h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 2mm;
+            color: #000;
           }
           
-          .footer {
-            margin-top: 60px;
-            padding-top: 30px;
-            border-top: 2px solid #e2e8f0;
+          .header-contact {
+            font-size: 11px;
             text-align: center;
+            color: #000;
+            line-height: 1.4;
           }
           
-          .footer-content {
-            font-size: 14px;
-            color: #475569;
-            line-height: 1.8;
+          .reference-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-top: 5mm;
+            color: #000;
           }
           
-          .footer-title {
+          .ref-number {
+            text-align: left;
+          }
+          
+          .ref-date {
+            text-align: right;
+          }
+          
+          /* Notice Title */
+          .notice-title {
+            text-align: center;
+            margin: 8mm 0;
+            padding-bottom: 5mm;
+            border-bottom: 1px solid #ccc;
+          }
+          
+          .notice-title h3 {
+            font-size: 20px;
+            font-weight: 700;
+            text-decoration: underline;
+            color: #000;
+          }
+          
+          /* Content Section */
+          .content-section {
+            margin-bottom: 10mm;
+          }
+          
+          .notice-meta {
+            margin-bottom: 8mm;
+            font-size: 13px;
+            color: #000;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5mm;
+          }
+          
+          .meta-item {
+            display: inline-block;
+          }
+          
+          .meta-label {
+            font-weight: 600;
+            margin-right: 2mm;
+          }
+          
+          .notice-content {
+            margin-top: 5mm;
+          }
+          
+          .notice-content h4 {
             font-size: 16px;
             font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 5px;
+            margin-bottom: 3mm;
+            color: #000;
           }
           
-          .footer-dept {
+          .notice-content .content-body {
             font-size: 14px;
-            color: #64748b;
-            margin-bottom: 3px;
-          }
-          
-          .footer-university {
-            font-size: 14px;
-            color: #64748b;
+            line-height: 1.8;
+            text-align: justify;
+            color: #000;
           }
           
           .print-button {
@@ -219,27 +239,59 @@ export async function GET(
             font-weight: 600;
             box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
             transition: all 0.3s ease;
+            z-index: 1000;
           }
           
           .print-button:hover {
             background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
             transform: translateY(-2px);
           }
           
+          .page-number {
+            position: fixed;
+            bottom: 15mm;
+            right: 15mm;
+            font-size: 12px;
+            color: #666;
+            text-align: right;
+            width: 20mm;
+          }
+          
           @media print {
-            @page {
-              margin: 0;
-              size: auto;
+            .print-button {
+              display: none;
             }
             
             body {
-              padding: 40px;
-              margin: 0;
+              background: white;
+              counter-reset: page;
             }
             
-            .print-button {
-              display: none;
+            .page-container {
+              padding: 0;
+            }
+            
+            .header-section {
+              break-after: avoid;
+            }
+            
+            .page-number {
+              position: fixed;
+              bottom: 15mm;
+              right: 15mm;
+              font-size: 12px;
+              color: #666;
+              width: 20mm;
+            }
+            
+            @page {
+              size: A4;
+              margin: 20mm 15mm;
+              counter-increment: page;
+            }
+            
+            @page :first {
+              margin-top: 10mm;
             }
           }
         </style>
@@ -247,52 +299,80 @@ export async function GET(
       <body>
         <button class="print-button" onclick="window.print()">Print as PDF</button>
         
-        <div class="content-wrapper">
-          <div class="info-box">
-            <div class="info-item">
-              <span class="info-label">Category:</span>
-              <span class="info-value">${escapedCategory}</span>
+        <div class="page-container">
+          <!-- Header Section -->
+          <div class="header-section">
+            <div class="header-top">
+              <div class="header-title">
+                <h1>Digital Notice Board</h1>
+                <h2>Dept. of Computer Science and Engineering</h2>
+                <div class="header-contact">
+                  University of Barishal
+                </div>
+              </div>
             </div>
             
-            <div class="info-item">
-              <span class="info-label">Created:</span>
-              <span class="info-value">${createdDate}</span>
-            </div>
-            
-            <div class="info-item">
-              <span class="info-label">Updated:</span>
-              <span class="info-value">${updatedDate}</span>
+            <div class="reference-line">
+              <div class="ref-number">
+                <strong>Category:</strong> ${escapedCategory}
+              </div>
+              <div class="ref-date">
+                <strong>Date:</strong> ${createdDate}<br>
+                <strong>Updated:</strong> ${updatedDate}
+              </div>
             </div>
           </div>
           
-          <div class="field title-field">
-            <div class="field-label">Title:</div>
-            <div class="field-value">${escapedTitle}</div>
+          <!-- Notice Title -->
+          <div class="notice-title">
+            <h3>NOTICE</h3>
           </div>
           
-          <div class="field description-field">
-            <div class="field-label">Description:</div>
-            <div class="field-value">${noticeContent}</div>
+          <!-- Content Section -->
+          <div class="content-section">
+            <div class="notice-content">
+              <h4>${escapedTitle}</h4>
+              <div class="content-body">
+                ${noticeContent}
+              </div>
+            </div>
           </div>
         </div>
         
-        <div class="footer">
-          <div class="footer-content">
-            <div class="footer-title">Digital Notice Board</div>
-            <div class="footer-dept">Department of Computer science and Engineering</div>
-            <div class="footer-university">University of Barishal</div>
-          </div>
+        <!-- Page Number -->
+        <div class="page-number">
+          <span id="page">1</span>
         </div>
       </body>
       </html>
     `
+    // If requested as PDF, render server-side with no browser headers/footers
+    const format = request.nextUrl.searchParams.get('format')
+    if (format === 'pdf') {
+      const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+      try {
+        const page = await browser.newPage()
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          displayHeaderFooter: false,
+          margin: { top: '20mm', right: '15mm', bottom: '25mm', left: '15mm' }
+        })
+        await page.close()
+        return new NextResponse(Buffer.from(pdfBuffer), {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${escapedTitle}.pdf"`,
+          },
+        })
+      } finally {
+        await browser.close()
+      }
+    }
 
-    // For now, return HTML content that can be saved as a file
-    return new NextResponse(htmlContent, {
-      headers: {
-        'Content-Type': 'text/html',
-      },
-    })
+    // Default: return HTML content for browser print
+    return new NextResponse(htmlContent, { headers: { 'Content-Type': 'text/html' } })
 
   } catch (error) {
     console.error('Error generating notice download:', error)
