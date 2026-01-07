@@ -167,51 +167,26 @@
     }
   }
 
-  /* Responsive QR Code sizing */
+  /* Fixed QR Code sizing (square, scan-friendly on 75" display) */
   .responsive-qr-code {
-    width: clamp(48px, 8vw, 96px) !important;
-    height: clamp(48px, 8vw, 96px) !important;
-    min-width: 48px !important;
-    min-height: 48px !important;
-    max-width: 96px !important;
-    max-height: 96px !important;
+    width: 160px !important;
+    height: 160px !important;
+    min-width: 160px !important;
+    min-height: 160px !important;
+    max-width: 160px !important;
+    max-height: 160px !important;
   }
 
-  /* QR Code container responsive positioning */
+  /* Fixed QR Code container positioning: right side, vertically centered in notice card */
   .qr-code-container {
     position: absolute !important;
-    top: clamp(8px, 1.5vw, 16px) !important;
-    right: clamp(8px, 1.5vw, 16px) !important;
+    top: 50% !important;
+    right: 24px !important;
+    transform: translateY(-50%);
     z-index: 10 !important;
-  }
-
-  /* Ensure QR code scales with viewport */
-  @media (max-width: 480px) {
-    .responsive-qr-code {
-      width: 48px !important;
-      height: 48px !important;
-    }
-  }
-
-  @media (min-width: 481px) and (max-width: 768px) {
-    .responsive-qr-code {
-      width: 64px !important;
-      height: 64px !important;
-    }
-  }
-
-  @media (min-width: 769px) and (max-width: 1024px) {
-    .responsive-qr-code {
-      width: 80px !important;
-      height: 80px !important;
-    }
-  }
-
-  @media (min-width: 1025px) {
-    .responsive-qr-code {
-      width: 96px !important;
-      height: 96px !important;
-    }
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
 }
