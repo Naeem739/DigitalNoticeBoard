@@ -918,21 +918,21 @@ export default function PublicNoticePage() {
                                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                                     }}
                                   >
-                                    {/* QR Code - Responsive Size */}
-                                                                         <div className="qr-code-container responsive-qr-code">
-                                       <NoticeQRCode 
-                                         notice={notice}
-                                         imageData={notice.imageData}
-                                         imageTitle={notice.imageFileName || notice.title}
-                                         size={getResponsiveQRSize()}
-                                         className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
-                                       />
-                                     </div>
+                                    {/* QR Code - Fixed square, right-centered */}
+                                    <div className="qr-code-container responsive-qr-code">
+                                      <NoticeQRCode 
+                                        notice={notice}
+                                        imageData={notice.imageData}
+                                        imageTitle={notice.imageFileName || notice.title}
+                                        size={160}
+                                        className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
+                                      />
+                                    </div>
                                     {/* Notice Header */}
-                                    <div className="p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 pr-16 sm:pr-20 md:pr-24 lg:pr-28 xl:pr-32">
+                                    <div className="p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 pr-24 sm:pr-28 md:pr-32 lg:pr-40 xl:pr-48">
                                       {/* Notice Title */}
                                       <h4 
-                                        className="text-xs md:text-sm font-semibold leading-tight mb-2 line-clamp-2 break-words"
+                                        className="text-xs md:text-sm font-semibold leading-tight mb-2 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
                                           fontSize: `${getResponsiveTitleFontSize()}px`,
@@ -1075,20 +1075,15 @@ export default function PublicNoticePage() {
                                       }}
                                     />
                                     
-                                    {/* QR Code - Bottom Right */}
+                                    {/* QR Code - Fixed square, bottom right for image widgets */}
                                     <div className="absolute bottom-3 right-3">
-                                      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2"
-                                        style={{
-                                          width: getResponsiveQRContainerSize(),
-                                          height: getResponsiveQRContainerSize()
-                                        }}
-                                      >
+                                      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2">
                                         <NoticeQRCode 
                                           notice={notice}
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
-                                          size={getResponsiveQRSize()}
-                                          className="w-full h-full"
+                                          size={160}
+                                          className="w-full h-full responsive-qr-code"
                                         />
                                       </div>
                                     </div>
@@ -1141,15 +1136,13 @@ export default function PublicNoticePage() {
                                     />
                                     </ClientOnly>
                                     
-                                     {/* QR Code - Bottom Right - Optimized for Easy Scanning */}
+                                     {/* QR Code - Fixed square, bottom right - optimized for scanning */}
                                      <div className="absolute bottom-4 right-4 z-50">
                                        <div 
                                          className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-3"
                                          style={{
-                                           width: getResponsiveQRContainerSize(),
-                                           height: getResponsiveQRContainerSize(),
-                                           minWidth: '80px',
-                                           minHeight: '80px',
+                                           minWidth: '160px',
+                                           minHeight: '160px',
                                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)'
                                          }}
                                        >
@@ -1160,8 +1153,8 @@ export default function PublicNoticePage() {
                                              pdfData: pdf.pdfData,
                                              pdfFileName: pdf.fileName || pdf.title
                                            }}
-                                           size={getResponsiveQRSize()}
-                                           className="w-full h-full"
+                                           size={160}
+                                           className="w-full h-full responsive-qr-code"
                                          />
                                        </div>
                                      </div>

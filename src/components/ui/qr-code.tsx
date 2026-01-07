@@ -28,6 +28,20 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
 
+  // Helper to check if we have a "real" Notice id (UUID-like) vs a widget id (e.g. "widget-...")
+  const isValidNoticeId = (id: string | undefined | null) => {
+    if (!id) return false
+    // Basic UUID v4 style check: 8-4-4-4-12 hex chars
+    return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)
+  }
+
+  // Helper to detect PDF ids (from Pdf table, typically cuid-like, e.g. "clxyz...")
+  const isPdfId = (id: string | undefined | null) => {
+    if (!id) return false
+    // Very loose CUID-style check: starts with a letter, then at least 10 more chars
+    return /^[a-zA-Z][a-zA-Z0-9_-]{10,}$/.test(id) && !isValidNoticeId(id)
+  }
+
   const generateQRCode = async () => {
     if (isLoading || qrDataUrl) return
 
@@ -38,13 +52,25 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
       // Create a simple, reliable QR content
       let qrContent = `Notice: ${notice.title}\nID: ${notice.id}`
       
-      // If we have image data, add image download URL
-      if (imageData || notice.imageData || notice.imageUrl) {
-        qrContent = `${window.location.origin}/api/notice/download-image/${notice.id}`
-      } else if (notice.pdfData || notice.pdfUrl) {
-        qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
+      // If we have a proper Notice id (from Notice table), generate API URLs.
+      // If we have a PDF id (from Pdf table), point to /api/pdf/:id.
+      // For widget-generated ids (like "widget-..."), fall back to simple text so
+      // we don't hit non‑existent API routes like /api/notice/download/widget-...
+      if (isValidNoticeId(notice.id)) {
+        // If we have image data, add image download URL
+        if (imageData || notice.imageData || notice.imageUrl) {
+          qrContent = `${window.location.origin}/api/notice/download-image/${notice.id}`
+        } else if (notice.pdfData || notice.pdfUrl) {
+          qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
+        } else {
+          qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
+        }
+      } else if (isPdfId(notice.id) && (notice.pdfData || notice.pdfUrl)) {
+        // PDF coming from Pdf table (used in PDF widgets)
+        qrContent = `${window.location.origin}/api/pdf/${notice.id}`
       } else {
-        qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
+        // Use a safe, descriptive text payload for non‑database IDs (e.g. widget IDs)
+        qrContent = `Notice: ${notice.title}`
       }
 
       console.log('Generating QR code for:', qrContent)
@@ -129,9 +155,18 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
       let downloadUrl = ''
       
       if (imageData || notice.imageData || notice.imageUrl) {
+        // Images are always stored on Notice (UUID id)
+        if (!isValidNoticeId(notice.id)) return
         downloadUrl = `/api/notice/download-image/${notice.id}`
-      } else {
+      } else if (isValidNoticeId(notice.id)) {
+        // Text/PDF stored on Notice model
         downloadUrl = `/api/notice/download/${notice.id}`
+      } else if (isPdfId(notice.id) && (notice.pdfData || notice.pdfUrl)) {
+        // PDF from Pdf table (PDF widget)
+        downloadUrl = `/api/pdf/${notice.id}`
+      } else {
+        // Unknown id type – nothing to download
+        return
       }
       
       console.log('Downloading from:', downloadUrl)
