@@ -3,7 +3,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import GridLayout, { type Layout } from "react-grid-layout"
 import {
@@ -161,6 +161,13 @@ const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> =
   "16:9":  { width: 1440, height: 810 },
   "16:10": { width: 1440, height: 900 },
 };
+
+// Shared grid configuration for layout sizing and bounds
+const GRID_ROW_HEIGHT = 50
+const GRID_MARGIN: [number, number] = [12, 12]
+// Account for the padded/bordered dashboard container so maxRows matches visible space
+const DASHBOARD_VERTICAL_PADDING = 32 // p-4 top + bottom (16px each)
+const DASHBOARD_VERTICAL_BORDER = 8   // border-4 top + bottom (4px each)
 
 // Helper function to convert hex color to rgba
 const hexToRgba = (hex: string, opacity: number) => {
@@ -325,6 +332,19 @@ function EditDashboardDemo() {
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false)
   const [categories, setCategories] = useState<TCategoriesWithNotices[]>([])
   const [activeSettingsWidget, setActiveSettingsWidget] = useState<string | null>(null)
+
+  // Calculate the maximum rows the grid can fit inside the visible container
+  const gridMaxRows = useMemo(() => {
+    if (!selectedRatio) return undefined
+    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height * 1.0
+    const innerHeight = Math.max(
+      0,
+      containerHeight - DASHBOARD_VERTICAL_PADDING - DASHBOARD_VERTICAL_BORDER,
+    )
+    const totalRowHeight = GRID_ROW_HEIGHT + GRID_MARGIN[1]
+    const rows = Math.floor((innerHeight + GRID_MARGIN[1]) / totalRowHeight)
+    return Math.max(1, rows)
+  }, [selectedRatio])
 
   // New state for draggable settings panel
   const [settingsPosition, setSettingsPosition] = useState({ x: 0, y: 0 })
@@ -2093,6 +2113,22 @@ function EditDashboardDemo() {
     }
   }
 
+  const handleLayoutChange = (newLayout: Layout[]) => {
+    // Prevent dragging past the bottom by clamping y within the allowed rows
+    const boundedLayout = gridMaxRows
+      ? newLayout.map((item) => {
+          const maxY = Math.max(0, gridMaxRows - item.h)
+          return item.y > maxY ? { ...item, y: maxY } : item
+        })
+      : newLayout
+
+    setLayout(boundedLayout)
+    // Save to TemporaryDashboard after layout change
+    setTimeout(() => {
+      autoSaveToTempDashboard()
+    }, 100)
+  }
+
   const handleSave = async () => {
     const urlParams = new URLSearchParams(window.location.search)
     const dashboardId = urlParams.get('id')
@@ -3469,6 +3505,9 @@ function EditDashboardDemo() {
               <span>Editing:</span>
               <span className="text-blue-600 font-medium">{currentScreen?.name}</span>
               <span className="text-gray-400">({currentScreenIndex + 1} of {screens.length})</span>
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                {widgets.length} widget{widgets.length === 1 ? "" : "s"}
+              </span>
             </div>
           </div>
           
@@ -3504,16 +3543,11 @@ function EditDashboardDemo() {
             className="layout"
             layout={layout}
             cols={12}
-            rowHeight={50}
+            rowHeight={GRID_ROW_HEIGHT}
             width={(RATIO_DIMENSIONS[selectedRatio].width * 1.0) -136}
-            onLayoutChange={(newLayout: Layout[]) => {
-              setLayout(newLayout)
-              // Save to TemporaryDashboard after layout change
-              setTimeout(() => {
-                autoSaveToTempDashboard()
-              }, 100)
-            }}
-            margin={[12, 12]}
+            onLayoutChange={handleLayoutChange}
+            margin={GRID_MARGIN}
+            {...(gridMaxRows ? { maxRows: gridMaxRows } : {})}
             // On mobile: allow dragging from anywhere on widget. On desktop: only from drag handle
             draggableHandle={isMobile ? undefined : ".widget-drag-handle"}
             isDraggable={true}
