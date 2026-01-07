@@ -828,45 +828,24 @@ export default function PublicNoticePage() {
                             }}
                           />
                           
-                        <div className="relative flex items-center justify-start">
+                        <div className="relative flex items-center justify-center w-full">
                             <h3 
-                              className="text-xs sm:text-sm md:text-lg font-bold text-left truncate px-1 sm:px-2 md:px-4 py-0.5 sm:py-1 md:py-2 rounded-xl relative overflow-hidden"
+                              className="text-xs sm:text-sm md:text-lg font-bold text-center px-2 sm:px-4 md:px-6 py-1 sm:py-2 md:py-3 relative"
                             style={{
                               color: settings.categoryFontColor || '#1e293b',
                               fontFamily: settings.categoryFont || "'Tiro Bangla', 'Inter', sans-serif",
                               fontSize: `clamp(10px, ${settings.categoryFontSize || 16}px, 18px)`,
                               fontWeight: settings.categoryFontWeight || 'bold',
-                              textShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                              backgroundColor: `${settings.categoryBackgroundColor || '#f8fafc'}90`,
-                              border: `2px solid ${settings.categoryBorderColor || '#e2e8f0'}`,
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)',
-                              backdropFilter: 'blur(10px)',
-                              position: 'relative'
+                              position: 'relative',
+                              display: 'inline-block',
+                              maxWidth: '90%',
+                              borderBottom: `3px solid ${settings.categoryBorderColor || settings.accentColor || '#3b82f6'}`,
+                              paddingBottom: '8px'
                             }}
                           >
-                            {/* Gradient overlay for extra visual appeal */}
-                            <div 
-                              className="absolute inset-0 rounded-xl opacity-20"
-                              style={{
-                                background: `linear-gradient(135deg, ${settings.accentColor || '#3b82f6'}20, ${settings.accentColor || '#3b82f6'}10)`
-                              }}
-                            />
                             <span className="relative z-10">
                               {container.settings?.customCategoryName || container.title || `Widget ${index + 1}`}
                             </span>
-                            {/* Decorative elements */}
-                            <div 
-                              className="absolute top-0 left-0 w-1 h-1 sm:w-2 sm:h-2 rounded-full opacity-60"
-                              style={{
-                                backgroundColor: settings.accentColor || '#3b82f6'
-                              }}
-                            />
-                            <div 
-                              className="absolute bottom-0 right-0 w-1 h-1 sm:w-2 sm:h-2 rounded-full opacity-60"
-                              style={{
-                                backgroundColor: settings.accentColor || '#3b82f6'
-                              }}
-                            />
                           </h3>
                           </div>
                           
@@ -889,8 +868,16 @@ export default function PublicNoticePage() {
                           }}
                         >
                           {container.type === 'notice' && container.noticeIds && (
-                            <div className="h-full flex flex-col justify-between gap-2">
-                              <div className={`notices-container flex flex-col gap-2 overflow-auto scrollbar-hide flex-1`}>
+                            <div className="flex flex-col h-full gap-2">
+                              {!notices || notices.length === 0 ? (
+                                <div className="flex items-center justify-center h-full">
+                                  <div className="text-center">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600 mx-auto mb-3"></div>
+                                    <p className="text-sm text-gray-600">Loading notices...</p>
+                                  </div>
+                                </div>
+                              ) : (
+                              <div className={`notices-container flex flex-col gap-2 overflow-auto scrollbar-hide`}>
                                 {(isMobile ? container.noticeIds.slice(0, getMaxNoticesPerWidget()) : container.noticeIds.slice(0, 5)).map((noticeId: string, noticeIndex: number) => {
                                 const notice = getNoticeById(noticeId)
                                 if (!notice) return null
@@ -898,17 +885,19 @@ export default function PublicNoticePage() {
                                 return (
                                   <motion.div
                                     key={noticeId}
-                                    className="group relative overflow-hidden rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex-1 min-h-0"
+                                    className="group relative shadow-sm hover:shadow-md transition-all duration-200"
                                     style={{
                                       backgroundColor: `${bgColor}${Math.round((settings.cardOpacity || 0.95) * 255).toString(16).padStart(2, '0')}`,
-                                      borderLeft: `3px solid ${borderColor}`,
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
-                                      height: isMobile ? getMobileNoticeMinHeight() : getResponsiveNoticeHeight(),
-                                      minHeight: isMobile ? getMobileNoticeMinHeight() : getResponsiveNoticeHeight(),
-                                      maxHeight: isMobile ? 'none' : getResponsiveNoticeHeight(),
+                                      borderRadius: '20px',
+                                      // Dynamic height: grows with content, minimum greater than QR code (160px)
+                                      minHeight: '200px',
                                       width: '100%',
-                                      overflow: 'hidden'
+                                      position: 'relative',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      padding: '12px 16px'
                                     }}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -932,7 +921,7 @@ export default function PublicNoticePage() {
                                     <div className="p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 pr-24 sm:pr-28 md:pr-32 lg:pr-40 xl:pr-48">
                                       {/* Notice Title */}
                                       <h4 
-                                        className="text-xs md:text-sm font-semibold leading-tight mb-2 break-words"
+                                        className="text-xs md:text-sm font-semibold leading-tight mb-4 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
                                           fontSize: `${getResponsiveTitleFontSize()}px`,
@@ -940,14 +929,16 @@ export default function PublicNoticePage() {
                                           fontFamily: settings.fontFamily || "'Tiro Bangla', 'Inter', sans-serif",
                                           lineHeight: '1.3',
                                           wordBreak: 'break-word',
-                                          overflowWrap: 'break-word'
+                                          overflowWrap: 'break-word',
+                                          marginBottom: '16px',
+                                          textAlign: 'justify'
                                         }}
                                       >
                                         {notice.title}
                                       </h4>
                                       
                                       {/* Publish Date and Last Updated Row */}
-                                      <div className="flex items-center gap-2 flex-wrap">
+                                      <div className="flex items-center gap-2 flex-wrap mt-2">
                                         {/* Publish Date */}
                                         {notice.createdAt && (
                                           <div 
@@ -1037,6 +1028,7 @@ export default function PublicNoticePage() {
                                 </div>
                               )}
                               </div>
+                              )}
                             </div>
                           )}
 
