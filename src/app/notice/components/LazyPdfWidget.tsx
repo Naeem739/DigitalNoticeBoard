@@ -26,6 +26,18 @@ const LazyPdfWidget = memo(function LazyPdfWidget({
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // For large displays, load immediately instead of waiting for intersection
+    // This prevents issues with IntersectionObserver on very large viewports
+    const isLargeDisplay = typeof window !== "undefined" && window.innerWidth >= 3000
+    
+    if (isLargeDisplay) {
+      // Load immediately on large displays
+      setIsVisible(true)
+      setHasLoaded(true)
+      return
+    }
+    
+    // Use IntersectionObserver for smaller displays
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !hasLoaded) {

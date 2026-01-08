@@ -82,6 +82,58 @@ export async function GET(
       year: 'numeric'
     }) : createdDate
     
+    // Generate Notice ID: BU/CSE/{CategoryName}/{Year}/{NoticeNumber}
+    let formattedNoticeId = ''
+    if (notice.createdAt) {
+      const noticeDate = new Date(notice.createdAt)
+      const currentYear = noticeDate.getFullYear()
+      const yearStart = new Date(currentYear, 0, 1)
+      const yearEnd = new Date(currentYear + 1, 0, 1)
+      
+      // Get all notices in the same category created in the same year, ordered by createdAt
+      const sameCategoryYearNotices = await prisma.notice.findMany({
+        where: {
+          categoryId: notice.categoryId,
+          createdAt: {
+            gte: yearStart,
+            lt: yearEnd
+          }
+        },
+        orderBy: {
+          createdAt: 'asc'
+        },
+        select: {
+          id: true,
+          createdAt: true
+        }
+      })
+      
+      // Find the position of current notice (1-indexed)
+      const noticeIndex = sameCategoryYearNotices.findIndex(n => n.id === notice.id)
+      // If notice is found, use its index + 1. If not found (shouldn't happen), use length + 1 as fallback
+      const noticeNumber = noticeIndex >= 0 ? noticeIndex + 1 : sameCategoryYearNotices.length + 1
+      
+      // Format notice number as 3-digit padded (e.g., 001, 012, 123)
+      const formattedNoticeNumber = noticeNumber.toString().padStart(3, '0')
+      
+      // Escape category name for Notice ID
+      const categoryNameForId = categoryName.replace(/[^a-zA-Z0-9]/g, '') // Remove special characters, keep only alphanumeric
+      
+      formattedNoticeId = `BU/CSE/${categoryNameForId}/${currentYear}/${formattedNoticeNumber}`
+    }
+    
+    // Escape Notice ID to prevent XSS
+    const escapedNoticeId = formattedNoticeId ? formattedNoticeId.replace(/[<>&'"]/g, (char) => {
+      const entities: { [key: string]: string } = {
+        '<': '&lt;',
+        '>': '&gt;',
+        '&': '&amp;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }
+      return entities[char]
+    }) : ''
+    
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -169,12 +221,20 @@ export async function GET(
             text-align: right;
           }
           
+          /* Notice ID */
+          .notice-id {
+            text-align: left;
+            margin-bottom: 3mm;
+            font-size: 13px;
+            color: #000;
+            font-weight: 600;
+          }
+          
           /* Notice Title */
           .notice-title {
             text-align: center;
             margin: 8mm 0;
             padding-bottom: 5mm;
-            border-bottom: 1px solid #ccc;
           }
           
           .notice-title h3 {
@@ -250,11 +310,10 @@ export async function GET(
           .page-number {
             position: fixed;
             bottom: 15mm;
-            right: 15mm;
+            left: 15mm;
             font-size: 12px;
             color: #666;
-            text-align: right;
-            width: 20mm;
+            text-align: left;
           }
           
           @media print {
@@ -264,7 +323,7 @@ export async function GET(
             
             body {
               background: white;
-              counter-reset: page;
+              counter-reset: page-counter;
             }
             
             .page-container {
@@ -281,13 +340,27 @@ export async function GET(
               right: 15mm;
               font-size: 12px;
               color: #666;
-              width: 20mm;
+              text-align: right;
+            }
+            
+            /* Hide the HTML page number element when printing - we use @page instead */
+            @media print {
+              .page-number {
+                display: none;
+              }
             }
             
             @page {
               size: A4;
-              margin: 20mm 15mm;
-              counter-increment: page;
+              margin: 20mm 15mm 25mm 15mm;
+              counter-increment: page-counter;
+              @bottom-right {
+                content: "Page " counter(page-counter);
+                font-size: 12px;
+                color: #666;
+                text-align: right;
+                font-family: 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, sans-serif;
+              }
             }
             
             @page :first {
@@ -314,7 +387,7 @@ export async function GET(
             
             <div class="reference-line">
               <div class="ref-number">
-                <strong>Category:</strong> ${escapedCategory}
+                <strong>Category:</strong> ${escapedCategory}${formattedNoticeId ? `<br><strong>Notice ID:</strong> ${escapedNoticeId}` : ''}
               </div>
               <div class="ref-date">
                 <strong>Date:</strong> ${createdDate}<br>
@@ -339,10 +412,8 @@ export async function GET(
           </div>
         </div>
         
-        <!-- Page Number -->
-        <div class="page-number">
-          <span id="page">1</span>
-        </div>
+        <!-- Page Number - Will be automatically numbered by CSS counter -->
+        <div class="page-number"></div>
       </body>
       </html>
     `

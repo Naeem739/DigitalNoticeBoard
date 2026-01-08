@@ -1,9 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Get categoryId from query parameters if provided
+    const searchParams = request.nextUrl.searchParams;
+    const categoryId = searchParams.get('categoryId');
+
+    // Build where clause - filter by categoryId if provided
+    const whereClause = categoryId ? { categoryId } : {};
+
     const notices = await prisma.notice.findMany({
+      where: whereClause,
       orderBy: { createdAt: "desc" },
       include: {
         categoryRelation: {
