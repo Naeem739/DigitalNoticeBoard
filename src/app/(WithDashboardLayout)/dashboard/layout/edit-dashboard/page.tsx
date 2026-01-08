@@ -1110,7 +1110,8 @@ function EditDashboardDemo() {
               },
             }
           } else if (widget.type === "notice") {
-            // For notice widgets, use existing logic
+            // For notice widgets, save categoryId for dynamic fetching (preferred)
+            // Also keep noticeIds for backward compatibility
             const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
 
             return {
@@ -1128,7 +1129,8 @@ function EditDashboardDemo() {
               title: widget.content || widget.title,
               category: widget.category,
               type: "notice",
-              noticeIds: noticeIds,
+              categoryId: widget.categoryId, // Save categoryId for dynamic filtering
+              noticeIds: noticeIds, // Keep for backward compatibility
               settings: {
                 backgroundColor: settings.backgroundColor,
                 backgroundOpacity: settings.backgroundOpacity,

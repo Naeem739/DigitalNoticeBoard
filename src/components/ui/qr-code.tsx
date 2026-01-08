@@ -52,23 +52,35 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
       // Create a simple, reliable QR content
       let qrContent = `Notice: ${notice.title}\nID: ${notice.id}`
       
-      // If we have a proper Notice id (from Notice table), generate API URLs.
-      // If we have a PDF id (from Pdf table), point to /api/pdf/:id.
-      // For widget-generated ids (like "widget-..."), fall back to simple text so
-      // we don't hit non‑existent API routes like /api/notice/download/widget-...
-      if (isValidNoticeId(notice.id)) {
-        // If we have image data, add image download URL
-        if (imageData || notice.imageData || notice.imageUrl) {
+      // Handle direct PDF data (like images) - no API needed, use descriptive text
+      if (notice.pdfData) {
+        // For PDFs with direct data (widget-based), use descriptive text
+        // The download will work directly from the data
+        qrContent = `PDF: ${notice.title}\nScan to view details`
+      } 
+      // Handle direct image data - no API needed
+      else if (imageData || notice.imageData) {
+        // For images with direct data, use descriptive text
+        qrContent = `Image: ${notice.title}\nScan to view details`
+      }
+      // If we have a proper Notice id (from Notice table), generate API URLs
+      else if (isValidNoticeId(notice.id)) {
+        // If we have image URL, add image download URL
+        if (notice.imageUrl) {
           qrContent = `${window.location.origin}/api/notice/download-image/${notice.id}`
-        } else if (notice.pdfData || notice.pdfUrl) {
+        } else if (notice.pdfUrl) {
           qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
         } else {
           qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
         }
-      } else if (isPdfId(notice.id) && (notice.pdfData || notice.pdfUrl)) {
-        // PDF coming from Pdf table (used in PDF widgets)
+      } 
+      // If we have a PDF id (from Pdf table), point to /api/pdf/:id
+      else if (isPdfId(notice.id) && notice.pdfUrl) {
+        // PDF coming from Pdf table (used in PDF widgets) - only if valid PDF ID
         qrContent = `${window.location.origin}/api/pdf/${notice.id}`
-      } else {
+      } 
+      // For widget-generated ids (like "widget-..."), use descriptive text
+      else {
         // Use a safe, descriptive text payload for non‑database IDs (e.g. widget IDs)
         qrContent = `Notice: ${notice.title}`
       }
@@ -152,24 +164,87 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
 
   const handleDownload = async () => {
     try {
+      // Handle direct PDF data download (like images) - no API call needed
+      if (notice.pdfData) {
+        // Extract base64 data from data URL if present
+        let base64Data = notice.pdfData
+        if (base64Data.startsWith('data:application/pdf;base64,')) {
+          base64Data = base64Data.replace('data:application/pdf;base64,', '')
+        } else if (base64Data.startsWith('data:')) {
+          // Handle other data URL formats
+          base64Data = base64Data.split(',')[1] || base64Data
+        }
+        
+        // Convert base64 to blob
+        const byteCharacters = atob(base64Data)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], { type: 'application/pdf' })
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = notice.pdfFileName || `${notice.title}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        return
+      }
+      
+      // Handle direct image data download (like images) - no API call needed
+      if (imageData || notice.imageData) {
+        // Extract base64 data from data URL if present
+        let base64Data = imageData || notice.imageData || ''
+        if (base64Data.startsWith('data:image/')) {
+          base64Data = base64Data.split(',')[1] || base64Data
+        }
+        
+        // Convert base64 to blob
+        const byteCharacters = atob(base64Data)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], { type: 'image/jpeg' })
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `${notice.imageFileName || imageTitle || notice.title}.jpg`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        return
+      }
+      
+      // Fallback to API-based downloads for database-stored content
       let downloadUrl = ''
       
-      if (imageData || notice.imageData || notice.imageUrl) {
-        // Images are always stored on Notice (UUID id)
+      if (notice.imageUrl) {
+        // Images stored on Notice (UUID id) - use API
         if (!isValidNoticeId(notice.id)) return
         downloadUrl = `/api/notice/download-image/${notice.id}`
       } else if (isValidNoticeId(notice.id)) {
         // Text/PDF stored on Notice model
         downloadUrl = `/api/notice/download/${notice.id}`
-      } else if (isPdfId(notice.id) && (notice.pdfData || notice.pdfUrl)) {
-        // PDF from Pdf table (PDF widget)
+      } else if (isPdfId(notice.id) && notice.pdfUrl) {
+        // PDF from Pdf table (PDF widget) - only if we have a valid PDF ID
         downloadUrl = `/api/pdf/${notice.id}`
       } else {
         // Unknown id type – nothing to download
+        console.warn('Cannot download: invalid ID or missing data', notice.id)
         return
       }
       
-      console.log('Downloading from:', downloadUrl)
+      console.log('Downloading from API:', downloadUrl)
       
       const response = await fetch(downloadUrl)
       if (response.ok) {
@@ -187,12 +262,12 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
           const link = document.createElement('a')
           link.href = url
           
-          if (imageData || notice.imageData || notice.imageUrl) {
-            link.download = `${notice.imageFileName || imageTitle || notice.title}.jpg`
+          if (notice.imageFileName) {
+            link.download = notice.imageFileName
           } else if (notice.pdfFileName) {
             link.download = notice.pdfFileName
           } else {
-            link.download = `${notice.title}.pdf`
+            link.download = `${notice.title}.${contentType?.includes('image') ? 'jpg' : 'pdf'}`
           }
           
           document.body.appendChild(link)
@@ -201,7 +276,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
           window.URL.revokeObjectURL(url)
         }
       } else {
-        console.error('Download failed:', response.statusText)
+        console.error('Download failed:', response.statusText, response.status)
       }
     } catch (err) {
       console.error('Error downloading file:', err)

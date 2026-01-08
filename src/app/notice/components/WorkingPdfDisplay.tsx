@@ -210,66 +210,203 @@ export default function WorkingPdfDisplay({
       container.innerHTML = ""
 
       // Render each page with enhanced text clarity
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        try {
-          const page = await pdf.getPage(pageNum)
-          // Fit page width to container to avoid horizontal scroll
-          const containerWidth = container.clientWidth || 600
-          const baseViewport = page.getViewport({ scale: 1 })
-          
-          // Increase scale significantly for better readability (larger, clearer text)
-          const baseFitScale = containerWidth / baseViewport.width
-          const readabilityScale = baseFitScale * 1.5 // 50% larger for much better readability
-          const viewport = page.getViewport({ scale: readabilityScale })
-          
-          // Render at extremely high pixel density for ultra-crisp, clear text
-          const devicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1
-          // Use even higher DPI scaling for maximum text clarity
-          const outputScale = Math.max(4, devicePixelRatio * 3) // Much higher DPI for ultra-sharp text
-          
-          const canvas = document.createElement("canvas")
-          const context = canvas.getContext("2d", {
-            alpha: false, // Better performance
-            desynchronized: true, // Better performance
-            willReadFrequently: false // Optimize for rendering, not reading
-          })
-          
-          if (!context) {
-            throw new Error('Failed to get canvas context')
+      // Browser canvas size limits (most browsers support up to 16,384px per dimension)
+      const MAX_CANVAS_SIZE = 16384
+      
+      // Detect large displays (75" 4K displays typically have viewport width > 3000px)
+      const isLargeDisplay = typeof window !== "undefined" && window.innerWidth >= 3000
+      
+      // For large displays, use image-based rendering to avoid canvas size limits
+      if (isLargeDisplay) {
+        console.log('Using image-based rendering for large display')
+        
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          try {
+            const page = await pdf.getPage(pageNum)
+            // Fit page width to container to avoid horizontal scroll
+            const rawContainerWidth = container.clientWidth || 600
+            const containerWidth = Math.min(rawContainerWidth, 4096) // Cap at 4K width for safety
+            const baseViewport = page.getViewport({ scale: 1 })
+            
+            // Calculate appropriate scale for large displays
+            const baseFitScale = containerWidth / baseViewport.width
+            const viewport = page.getViewport({ scale: baseFitScale })
+            
+            // Use device pixel ratio for quality, but keep it reasonable
+            const devicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1
+            let outputScale = Math.min(2, devicePixelRatio) // Max 2x for large displays
+            
+            // Create a temporary canvas for rendering
+            const tempCanvas = document.createElement("canvas")
+            const tempContext = tempCanvas.getContext("2d", {
+              alpha: false,
+              desynchronized: true,
+              willReadFrequently: false
+            })
+            
+            if (!tempContext) {
+              throw new Error('Failed to get canvas context')
+            }
+            
+            // Calculate canvas dimensions with safe limits
+            let canvasWidth = Math.floor(viewport.width * outputScale)
+            let canvasHeight = Math.floor(viewport.height * outputScale)
+            
+            // Ensure we don't exceed canvas limits
+            if (canvasWidth > MAX_CANVAS_SIZE || canvasHeight > MAX_CANVAS_SIZE) {
+              const widthRatio = MAX_CANVAS_SIZE / canvasWidth
+              const heightRatio = MAX_CANVAS_SIZE / canvasHeight
+              const reductionFactor = Math.min(widthRatio, heightRatio) * 0.95 // 95% to be safe
+              outputScale = outputScale * reductionFactor
+              canvasWidth = Math.floor(viewport.width * outputScale)
+              canvasHeight = Math.floor(viewport.height * outputScale)
+              console.warn(`Canvas size would exceed limits, reducing scale to ${outputScale.toFixed(2)}x for page ${pageNum}`)
+            }
+            
+            // Set canvas size
+            tempCanvas.width = canvasWidth
+            tempCanvas.height = canvasHeight
+            
+            // Configure context for optimal rendering
+            tempContext.imageSmoothingEnabled = true
+            tempContext.imageSmoothingQuality = "high"
+            tempContext.scale(outputScale, outputScale)
+            
+            // Render PDF page to canvas
+            await page.render({ 
+              canvasContext: tempContext, 
+              viewport,
+              canvas: tempCanvas,
+              intent: "display"
+            }).promise
+            
+            // Convert canvas to image (this avoids canvas size limits in DOM)
+            const imageDataUrl = tempCanvas.toDataURL('image/png', 0.95) // High quality PNG
+            
+            // Create image element
+            const img = document.createElement("img")
+            img.src = imageDataUrl
+            img.style.width = "100%"
+            img.style.height = "auto"
+            img.style.display = "block"
+            img.style.imageRendering = "auto"
+            img.alt = `PDF Page ${pageNum}`
+            
+            // Add loading handler
+            img.onload = () => {
+              // Clean up temporary canvas to free memory
+              tempCanvas.width = 0
+              tempCanvas.height = 0
+            }
+            
+            img.onerror = () => {
+              console.error(`Failed to load image for PDF page ${pageNum}`)
+            }
+            
+            container.appendChild(img)
+            
+            // Note: tempCanvas will be garbage collected after img.onload cleans it up
+            // No need to explicitly remove it as it's not in the DOM
+            
+          } catch (pageError) {
+            console.error(`Error rendering PDF page ${pageNum} as image:`, pageError)
+            if (pageError instanceof Error) {
+              console.error(`Page error details:`, {
+                message: pageError.message,
+                name: pageError.name,
+                stack: pageError.stack?.substring(0, 500)
+              })
+            }
+            // Continue with other pages even if one fails
           }
-          
-          // Set canvas size for ultra-high DPI rendering
-          canvas.width = Math.floor(viewport.width * outputScale)
-          canvas.height = Math.floor(viewport.height * outputScale)
-          
-          // Set CSS size to display size (no blur) - this ensures it fits the widget
-          canvas.style.width = "100%"
-          canvas.style.height = "auto"
-          // Use auto instead of crisp-edges for better text smoothing
-          canvas.style.imageRendering = "auto"
-          
-          // Configure context for optimal text rendering
-          context.imageSmoothingEnabled = true
-          context.imageSmoothingQuality = "high"
-          
-          // Additional text rendering optimizations
-          context.textBaseline = "alphabetic"
-          context.textAlign = "left"
-          
-          // Scale context for high DPI rendering
-          context.scale(outputScale, outputScale)
-          
-          // Render with maximum quality settings for best text clarity
-          await page.render({ 
-            canvasContext: context, 
-            viewport,
-            canvas,
-            intent: "display" // Optimize for display with best quality
-          }).promise
-          container.appendChild(canvas)
-        } catch (pageError) {
-          console.error(`Error rendering PDF page ${pageNum}:`, pageError)
-          // Continue with other pages even if one fails
+        }
+      } else {
+        // Use canvas-based rendering for smaller displays (original method)
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          try {
+            const page = await pdf.getPage(pageNum)
+            // Fit page width to container to avoid horizontal scroll
+            // Cap container width to prevent issues on extremely large displays
+            const rawContainerWidth = container.clientWidth || 600
+            const containerWidth = Math.min(rawContainerWidth, 4096) // Cap at 4K width for safety
+            const baseViewport = page.getViewport({ scale: 1 })
+            
+            // Increase scale significantly for better readability (larger, clearer text)
+            const baseFitScale = containerWidth / baseViewport.width
+            const readabilityScale = baseFitScale * 1.5 // 50% larger for much better readability
+            const viewport = page.getViewport({ scale: readabilityScale })
+            
+            // Render at high pixel density for crisp text
+            const devicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1
+            let outputScale = Math.max(2, Math.min(4, devicePixelRatio * 2))
+            
+            // Calculate canvas dimensions
+            let canvasWidth = Math.floor(viewport.width * outputScale)
+            let canvasHeight = Math.floor(viewport.height * outputScale)
+            
+            // Enforce canvas size limits - if exceeded, reduce scale
+            if (canvasWidth > MAX_CANVAS_SIZE || canvasHeight > MAX_CANVAS_SIZE) {
+              const widthRatio = MAX_CANVAS_SIZE / canvasWidth
+              const heightRatio = MAX_CANVAS_SIZE / canvasHeight
+              const reductionFactor = Math.min(widthRatio, heightRatio)
+              outputScale = outputScale * reductionFactor
+              canvasWidth = Math.floor(viewport.width * outputScale)
+              canvasHeight = Math.floor(viewport.height * outputScale)
+              console.warn(`Canvas size exceeded limits, reducing scale to ${outputScale.toFixed(2)}x for page ${pageNum}`)
+            }
+            
+            const canvas = document.createElement("canvas")
+            const context = canvas.getContext("2d", {
+              alpha: false, // Better performance
+              desynchronized: true, // Better performance
+              willReadFrequently: false // Optimize for rendering, not reading
+            })
+            
+            if (!context) {
+              throw new Error('Failed to get canvas context')
+            }
+            
+            // Set canvas size with enforced limits
+            canvas.width = canvasWidth
+            canvas.height = canvasHeight
+            
+            // Set CSS size to display size (no blur) - this ensures it fits the widget
+            canvas.style.width = "100%"
+            canvas.style.height = "auto"
+            // Use auto instead of crisp-edges for better text smoothing
+            canvas.style.imageRendering = "auto"
+            
+            // Configure context for optimal text rendering
+            context.imageSmoothingEnabled = true
+            context.imageSmoothingQuality = "high"
+            
+            // Additional text rendering optimizations
+            context.textBaseline = "alphabetic"
+            context.textAlign = "left"
+            
+            // Scale context for high DPI rendering
+            context.scale(outputScale, outputScale)
+            
+            // Render with maximum quality settings for best text clarity
+            await page.render({ 
+              canvasContext: context, 
+              viewport,
+              canvas,
+              intent: "display" // Optimize for display with best quality
+            }).promise
+            container.appendChild(canvas)
+          } catch (pageError) {
+            console.error(`Error rendering PDF page ${pageNum}:`, pageError)
+            // Log detailed error for debugging
+            if (pageError instanceof Error) {
+              console.error(`Page error details:`, {
+                message: pageError.message,
+                name: pageError.name,
+                stack: pageError.stack?.substring(0, 500)
+              })
+            }
+            // Continue with other pages even if one fails
+          }
         }
       }
 
@@ -288,9 +425,33 @@ export default function WorkingPdfDisplay({
     } catch (error: any) {
       console.error('Error rendering PDF:', error)
       
+      // Log detailed error information for debugging
+      const errorDetails = {
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        stack: error?.stack?.substring(0, 500),
+        viewportWidth: typeof window !== "undefined" ? window.innerWidth : 'unknown',
+        viewportHeight: typeof window !== "undefined" ? window.innerHeight : 'unknown',
+        devicePixelRatio: typeof window !== "undefined" ? window.devicePixelRatio : 'unknown',
+        containerWidth: container?.clientWidth || 'unknown',
+        pdfDataLength: pdfData?.length || 0
+      }
+      console.error('PDF rendering error details:', errorDetails)
+      
       // Clear container and show error message
       container.innerHTML = ""
-      setError(error?.message || 'Failed to load PDF')
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to load PDF'
+      if (error?.message?.includes('canvas')) {
+        errorMessage = 'PDF too large for display. Please try a smaller file or contact support.'
+      } else if (error?.message?.includes('memory') || error?.message?.includes('allocation')) {
+        errorMessage = 'Insufficient memory to render PDF. Please refresh the page.'
+      } else if (error?.message) {
+        errorMessage = `Failed to load PDF: ${error.message}`
+      }
+      
+      setError(errorMessage)
       setIsLoading(false)
       onError?.()
     }

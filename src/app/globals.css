@@ -68,10 +68,10 @@
     display: none;  /* Safari and Chrome */
   }
 
-  /* Allow vertical scrolling on notice page */
+  /* Prevent vertical scrolling on notice page - fit to viewport */
   .notice-page-container {
     overflow-x: hidden !important;
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
     width: 100vw !important;
     height: 100vh !important;
     max-width: 100vw !important;
@@ -83,13 +83,16 @@
     box-sizing: border-box !important;
   }
 
-  /* Ensure grid can grow vertically and be scrolled by parent */
+  /* Ensure grid fits within viewport height */
   .notice-grid-container {
     width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
     display: grid !important;
-    grid-auto-rows: minmax(auto, 1fr) !important;
+    grid-template-rows: repeat(auto-fit, minmax(0, 1fr)) !important;
+    grid-auto-rows: minmax(0, 1fr) !important;
+    grid-auto-flow: dense !important;
     align-items: stretch !important;
   }
 
@@ -97,18 +100,14 @@
     max-width: 100% !important;
   }
 
-  /* Dynamic grid improvements */
-  .notice-grid-container {
-    grid-template-rows: repeat(auto-fit, minmax(120px, 1fr)) !important;
-    grid-auto-flow: dense !important;
-  }
-
-  /* Ensure widgets fill available space */
+  /* Ensure widgets fill available space without exceeding viewport */
   .notice-grid-container > div {
-    min-height: 120px !important;
-    height: auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
     display: flex !important;
     flex-direction: column !important;
+    overflow: hidden !important;
   }
 
   /* Remove empty space between grid items */
@@ -116,47 +115,62 @@
     display: none !important;
   }
 
-  /* Responsive grid adjustments */
+  /* Responsive grid adjustments - fit to viewport */
   @media (max-width: 640px) {
     .notice-grid-container {
-      grid-template-rows: repeat(auto-fit, minmax(100px, 1fr)) !important;
+      grid-template-rows: repeat(auto-fit, minmax(0, 1fr)) !important;
     }
     
     .notice-grid-container > div {
-      min-height: 100px !important;
+      min-height: 0 !important;
+      height: 100% !important;
     }
   }
 
   @media (min-width: 641px) and (max-width: 1024px) {
     .notice-grid-container {
-      grid-template-rows: repeat(auto-fit, minmax(140px, 1fr)) !important;
+      grid-template-rows: repeat(auto-fit, minmax(0, 1fr)) !important;
     }
     
     .notice-grid-container > div {
-      min-height: 140px !important;
+      min-height: 0 !important;
+      height: 100% !important;
     }
   }
 
   @media (min-width: 1025px) {
     .notice-grid-container {
-      grid-template-rows: repeat(auto-fit, minmax(160px, 1fr)) !important;
+      grid-template-rows: repeat(auto-fit, minmax(0, 1fr)) !important;
     }
     
     .notice-grid-container > div {
-      min-height: 160px !important;
+      min-height: 0 !important;
+      height: 100% !important;
     }
   }
 
-  /* Ensure inner containers don't clip vertical overflow */
+  /* Ensure inner containers fit within viewport - no page-level scrolling */
   .notice-page-container .motion-div,
   .notice-page-container .motion-header,
   .notice-page-container .motion-footer,
-  .notice-page-container main,
-  .notice-page-container .grid {
+  .notice-page-container main {
     max-width: 100% !important;
     max-height: 100% !important;
     overflow-x: hidden !important;
+    overflow-y: hidden !important;
+  }
+  
+  /* Allow internal scrolling only for widget content containers */
+  .notice-page-container .notices-container {
     overflow-y: auto !important;
+  }
+  
+  /* Grid container should fit within available space */
+  .notice-page-container .notice-grid-container {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    height: 100% !important;
   }
 
   /* Ensure responsive behavior */

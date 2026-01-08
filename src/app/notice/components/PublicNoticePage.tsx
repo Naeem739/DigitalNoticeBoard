@@ -32,6 +32,8 @@ type TNotice = {
   id: string
   title: string
   content?: string
+  category?: string
+  categoryId?: string
   categoryName?: string
   createdAt?: Date
   updatedAt?: Date
@@ -187,10 +189,10 @@ export default function PublicNoticePage() {
   const getResponsiveQRSize = () => {
     const w = viewportWidth
     if (!w) return 80
-    if (w <= 360) return 48
-    if (w <= 400) return 54
-    if (w <= 640) return 60
-    if (w <= 1366) return 80
+    if (w <= 360) return 30
+    if (w <= 400) return 30
+    if (w <= 640) return 30
+    if (w <= 1366) return 30
     if (w <= 2560) return 100
     if (w <= 3400) return 120
     if (w < 3840) return 140
@@ -376,41 +378,14 @@ export default function PublicNoticePage() {
     }
   }, [dashboards, currentDashboardIndex])
 
-  // Filter notices based on current dashboard
-  const getDashboardNotices = (dashboard: TDashboard | null): TNotice[] => {
-    if (!dashboard || !allNotices.length) return []
-
-    // Extract notice IDs from containers
-    const noticeIds: string[] = []
-    dashboard.containers.forEach((container: any) => {
-      if (container.noticeIds) {
-        noticeIds.push(...container.noticeIds)
-      }
-    })
-
-    // Filter notices from dashboard containers
-    const dashboardNotices = noticeIds.length > 0
-      ? allNotices.filter((notice: TNotice) => noticeIds.includes(notice.id))
-      : []
-
-    // Get Dashboard Images category notices
-    const dashboardImageNotices = allNotices.filter((notice: TNotice) =>
-      notice.categoryName === 'Dashboard Images' &&
-      (notice.imageData || notice.imageFileName || notice.imageUrl)
-    )
-
-    // Combine and remove duplicates
-    const combinedNotices = [...dashboardNotices, ...dashboardImageNotices]
-    return combinedNotices.filter((notice, index, self) =>
-      index === self.findIndex(n => n.id === notice.id)
-    )
+  // Helper to get notice by ID from all notices (not filtered)
+  const getNoticeById = (noticeId: string) => {
+    return allNotices.find(notice => notice.id === noticeId)
   }
 
-  // Get notices for current dashboard
-  const notices = getDashboardNotices(currentDashboard)
-
-  const getNoticeById = (noticeId: string) => {
-    return notices.find(notice => notice.id === noticeId)
+  // Helper to get notices by categoryId (used for image widgets)
+  const getNoticesByCategoryId = (categoryId: string): TNotice[] => {
+    return allNotices.filter((notice: TNotice) => notice.categoryId === categoryId)
   }
 
   // const getImageById = (imageId: string) => {
@@ -740,8 +715,8 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-0 p-0 overflow-y-auto">
-        <div className="w-full h-full">
+      <main className="flex-1 min-h-0 p-0 overflow-hidden">
+        <div className="w-full h-full overflow-hidden">
           {/* Dashboard Content */}
           {dashboardLoading ? (
             <motion.div 
@@ -757,19 +732,28 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className={`w-full h-full rounded-lg shadow-lg ${getResponsiveContentPadding()}`}
+              className={`w-full h-full rounded-lg shadow-lg ${getResponsiveContentPadding()} overflow-hidden`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
               <div 
-                className="relative w-full h-full overflow-visible rounded-lg shadow-lg"
+                className="relative w-full h-full overflow-hidden rounded-lg shadow-lg"
                 style={{
-                  minHeight: '250px'
+                  minHeight: '0',
+                  height: '100%'
                 }}
               >
                 {/* Grid Layout for Widgets */}
-                <div className={`grid ${getResponsiveGridGap()} ${getResponsiveContentPadding()} notice-grid-container`} style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)' }}>
+                <div 
+                  className={`grid ${getResponsiveGridGap()} ${getResponsiveContentPadding()} notice-grid-container`} 
+                  style={{ 
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)',
+                    height: '100%',
+                    maxHeight: '100%',
+                    overflow: 'hidden'
+                  }}
+                >
                   {currentDashboard.containers.map((container, index) => {
                     const settings = container.settings || {}
                     const bgColor = settings.backgroundColor || '#ffffff'
@@ -867,24 +851,63 @@ export default function PublicNoticePage() {
                             padding: (container.type === 'pdf' || container.type === 'image') ? '0' : (isMobile ? '0.75rem' : '1rem')
                           }}
                         >
-                          {container.type === 'notice' && container.noticeIds && (
+                          {container.type === 'notice' && (container.category || container.categoryId || container.noticeIds) && (
                             <div className="flex flex-col h-full gap-2">
-                              {!notices || notices.length === 0 ? (
-                                <div className="flex items-center justify-center h-full">
-                                  <div className="text-center">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600 mx-auto mb-3"></div>
-                                    <p className="text-sm text-gray-600">Loading notices...</p>
-                                  </div>
-                                </div>
-                              ) : (
-                              <div className={`notices-container flex flex-col gap-2 overflow-auto scrollbar-hide`}>
-                                {(isMobile ? container.noticeIds.slice(0, getMaxNoticesPerWidget()) : container.noticeIds.slice(0, 5)).map((noticeId: string, noticeIndex: number) => {
-                                const notice = getNoticeById(noticeId)
-                                if (!notice) return null
-                                
+                              {(() => {
+                                // Determine which notices to display based on category name (primary),
+                                // then categoryId, then noticeIds (fallback)
+                                let widgetNotices: TNotice[] = []
+
+                                if (container.category) {
+                                  // Primary: filter by category name (string stored in Notice.category)
+                                  widgetNotices = allNotices.filter((notice: TNotice) => 
+                                    notice.category === container.category
+                                  )
+                                  if (process.env.NODE_ENV === 'development') {
+                                    console.log(`Widget ${container.id}: Filtering by category name "${container.category}", found ${widgetNotices.length} notices`)
+                                  }
+                                } else if (container.categoryId) {
+                                  // Secondary: filter by categoryId if present
+                                  widgetNotices = allNotices.filter((notice: TNotice) => 
+                                    notice.categoryId === container.categoryId
+                                  )
+                                  if (process.env.NODE_ENV === 'development') {
+                                    console.log(`Widget ${container.id}: Filtering by categoryId ${container.categoryId}, found ${widgetNotices.length} notices`)
+                                  }
+                                } else if (container.noticeIds) {
+                                  // Fallback to noticeIds for backward compatibility
+                                  widgetNotices = container.noticeIds
+                                    .map((noticeId: string) => allNotices.find((n: TNotice) => n.id === noticeId))
+                                    .filter((notice: TNotice | undefined) => notice !== undefined) as TNotice[]
+                                  if (process.env.NODE_ENV === 'development') {
+                                    console.log(`Widget ${container.id}: Using noticeIds (${container.noticeIds.length} IDs), found ${widgetNotices.length} notices`)
+                                  }
+                                }
+
+                                if (widgetNotices.length === 0) {
+                                  return (
+                                    <div className="flex items-center justify-center h-full">
+                                      <div className="text-center">
+                                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600 mx-auto mb-3"></div>
+                                        <p className="text-sm text-gray-600">Loading notices...</p>
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                // Limit the number of notices displayed
+const maxNotices = (typeof container.settings?.noticeCount === 'number' && container.settings.noticeCount > 0)
+  ? container.settings.noticeCount
+  : (isMobile ? getMaxNoticesPerWidget() : 5);
+const displayedNotices = widgetNotices.slice(0, maxNotices)
+
                                 return (
-                                  <motion.div
-                                    key={noticeId}
+                                  <div className={`notices-container flex flex-col gap-2 overflow-auto scrollbar-hide`}>
+                                    {displayedNotices.map((notice: TNotice, noticeIndex: number) => {
+                                
+                                    return (
+                                      <motion.div
+                                        key={notice.id}
                                     className="group relative shadow-sm hover:shadow-md transition-all duration-200"
                                     style={{
                                       backgroundColor: `${bgColor}${Math.round((settings.cardOpacity || 0.95) * 255).toString(16).padStart(2, '0')}`,
@@ -1007,41 +1030,64 @@ export default function PublicNoticePage() {
                                       style={{
                                         background: `linear-gradient(90deg, ${borderColor}, ${borderColor}80)`
                                       }}
-                                    />
-                                  </motion.div>
-                                )
-                              })}
-                              
-                              {/* Show warning if there are more notices */}
-                              {container.noticeIds.length > 5 && (
-                                <div className="text-center py-1">
-                                  <div 
-                                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium opacity-60"
-                                    style={{
-                                      backgroundColor: `${borderColor}15`,
-                                      color: settings.fontColor || '#1e293b',
-                                      fontSize: '10px'
-                                    }}
-                                  >
-                                    +{container.noticeIds.length - 5} more notices
+                                      />
+                                    </motion.div>
+                                  )
+                                })}
+                                
+                                {/* Show warning if there are more notices */}
+                                {widgetNotices.length > maxNotices && (
+                                  <div className="text-center py-1">
+                                    <div 
+                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium opacity-60"
+                                      style={{
+                                        backgroundColor: `${borderColor}15`,
+                                        color: settings.fontColor || '#1e293b',
+                                        fontSize: '10px'
+                                      }}
+                                    >
+                                      +{widgetNotices.length - maxNotices} more notices
+                                    </div>
                                   </div>
+                                )}
                                 </div>
-                              )}
-                              </div>
-                              )}
+                              )
+                            })()}
                             </div>
                           )}
 
-                          {container.type === 'image' && container.noticeIds && (
+                          {container.type === 'image' && (container.category || container.categoryId || container.noticeIds) && (
                             <div className="h-full flex items-center justify-center" style={{ padding: '0' }}>
-                              {container.noticeIds.slice(0, 1).map((noticeId: string) => {
-                                const notice = getNoticeById(noticeId)
-                                // Render if there is an image URL or base64 data; reconstruct if needed
-                                if (!notice || (!notice.imageUrl && !notice.imageData)) return null
+                              {(() => {
+                                // Determine which notices to display based on category name (primary),
+                                // then categoryId, then noticeIds (fallback)
+                                let imageNotices: TNotice[] = []
+
+                                if (container.category) {
+                                  // Primary: filter by category name and ensure notice has image data
+                                  imageNotices = allNotices
+                                    .filter((notice: TNotice) => notice.category === container.category)
+                                    .filter(notice => notice.imageUrl || notice.imageData || notice.imageFileName)
+                                } else if (container.categoryId) {
+                                  // Secondary: filter by categoryId if present
+                                  imageNotices = getNoticesByCategoryId(container.categoryId)
+                                    .filter(notice => notice.imageUrl || notice.imageData || notice.imageFileName)
+                                } else if (container.noticeIds) {
+                                  // Fallback to noticeIds for backward compatibility
+                                  imageNotices = container.noticeIds
+                                    .map((noticeId: string) => getNoticeById(noticeId))
+                                    .filter((notice: TNotice | undefined) => 
+                                      notice !== undefined && (notice.imageUrl || notice.imageData || notice.imageFileName)
+                                    ) as TNotice[]
+                                }
+
+                                // Get the first image notice
+                                const notice = imageNotices[0]
+                                if (!notice) return null
                                 
                                 return (
                                   <motion.div 
-                                    key={noticeId} 
+                                    key={notice.id} 
                                     className="w-full h-full relative group rounded-lg shadow-md"
                                     style={{
                                       height: '100%',
@@ -1081,7 +1127,7 @@ export default function PublicNoticePage() {
                                     </div>
                                   </motion.div>
                                 )
-                              })}
+                              })()}
                             </div>
                           )}
 
