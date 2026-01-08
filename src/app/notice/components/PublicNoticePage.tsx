@@ -893,12 +893,12 @@ export default function PublicNoticePage() {
 
                                 if (widgetNotices.length === 0) {
                                   return (
-                                    <div className="flex items-center justify-center h-full">
-                                      <div className="text-center">
-                                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600 mx-auto mb-3"></div>
-                                        <p className="text-sm text-gray-600">Loading notices...</p>
-                                      </div>
-                                    </div>
+                                <div className="flex items-center justify-center h-full">
+                                  <div className="text-center">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600 mx-auto mb-3"></div>
+                                    <p className="text-sm text-gray-600">Loading notices...</p>
+                                  </div>
+                                </div>
                                   )
                                 }
 
@@ -909,11 +909,11 @@ const maxNotices = (typeof container.settings?.noticeCount === 'number' && conta
 const displayedNotices = widgetNotices.slice(0, maxNotices)
 
                                 return (
-                                  <div className={`notices-container flex flex-col gap-2 overflow-auto scrollbar-hide`}>
+                              <div className={`notices-container flex flex-col gap-2 overflow-auto scrollbar-hide`}>
                                     {displayedNotices.map((notice: TNotice, noticeIndex: number) => {
                                 
-                                    return (
-                                      <motion.div
+                                return (
+                                  <motion.div
                                         key={notice.id}
                                     className="group relative shadow-sm hover:shadow-md transition-all duration-200"
                                     style={{
@@ -1037,27 +1037,27 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       style={{
                                         background: `linear-gradient(90deg, ${borderColor}, ${borderColor}80)`
                                       }}
-                                      />
-                                    </motion.div>
-                                  )
-                                })}
-                                
-                                {/* Show warning if there are more notices */}
+                                    />
+                                  </motion.div>
+                                )
+                              })}
+                              
+                              {/* Show warning if there are more notices */}
                                 {widgetNotices.length > maxNotices && (
-                                  <div className="text-center py-1">
-                                    <div 
-                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium opacity-60"
-                                      style={{
-                                        backgroundColor: `${borderColor}15`,
-                                        color: settings.fontColor || '#1e293b',
-                                        fontSize: '10px'
-                                      }}
-                                    >
+                                <div className="text-center py-1">
+                                  <div 
+                                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium opacity-60"
+                                    style={{
+                                      backgroundColor: `${borderColor}15`,
+                                      color: settings.fontColor || '#1e293b',
+                                      fontSize: '10px'
+                                    }}
+                                  >
                                       +{widgetNotices.length - maxNotices} more notices
-                                    </div>
                                   </div>
-                                )}
                                 </div>
+                              )}
+                              </div>
                               )
                             })()}
                             </div>

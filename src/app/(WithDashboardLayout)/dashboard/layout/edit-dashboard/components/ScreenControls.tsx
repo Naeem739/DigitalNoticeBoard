@@ -20,7 +20,6 @@ type Props = {
   isAddingScreen: boolean
   isClearingScreens: boolean
   isRemovingScreen: boolean
-  autoSaveToTempDashboard: () => Promise<void> | void
 }
 
 export default function ScreenControls({
@@ -35,7 +34,6 @@ export default function ScreenControls({
   isAddingScreen,
   isClearingScreens,
   isRemovingScreen,
-  autoSaveToTempDashboard,
 }: Props) {
   return (
     <div className="mb-2 flex items-center gap-3">
@@ -85,9 +83,6 @@ export default function ScreenControls({
                 onClick={() => {
                   const nextIndex = currentScreenIndex > 0 ? currentScreenIndex - 1 : screens.length - 1
                   setCurrentScreenIndex(nextIndex)
-                  setTimeout(() => {
-                    autoSaveToTempDashboard()
-                  }, 100)
                 }}
                 className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
                 title="Previous Screen"
@@ -100,9 +95,6 @@ export default function ScreenControls({
                 onClick={() => {
                   const nextIndex = currentScreenIndex < screens.length - 1 ? currentScreenIndex + 1 : 0
                   setCurrentScreenIndex(nextIndex)
-                  setTimeout(() => {
-                    autoSaveToTempDashboard()
-                  }, 100)
                 }}
                 className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-gray-600 hover:text-gray-800"
                 title="Next Screen"
@@ -125,9 +117,6 @@ export default function ScreenControls({
                 }`}
                 onClick={() => {
                   setCurrentScreenIndex(index)
-                  setTimeout(() => {
-                    autoSaveToTempDashboard()
-                  }, 100)
                 }}
               >
                 <span className="text-sm font-medium">{index + 1}</span>
