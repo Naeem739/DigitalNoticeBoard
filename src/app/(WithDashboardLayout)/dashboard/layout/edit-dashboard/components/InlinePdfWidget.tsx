@@ -180,61 +180,13 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
     }
   }, [currentPdfData])
 
-  // Auto-save entire dashboard state to TemporaryDashboard
-  const autoSaveDashboardToTemp = async () => {
-    try {
-      // Get current temp dashboard data
-      const response = await fetch('/api/temp-dashboard/get-all')
-      const result = await response.json()
-      
-      if (result.success && result.result.length > 0) {
-        // Update the first temp dashboard with current state
-        const tempDashboard = result.result[0]
-        const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-        
-        // Update the widget container with current PDF data
-        const updatedContainers = containers.map((container: any) => {
-          if (container.id === widgetId && currentPdfData) {
-            return {
-              ...container,
-              pdfData: currentPdfData,
-              pdfFileName: 'auto-saved.pdf',
-              type: "pdf"
-            }
-          }
-          return container
-        })
-
-        // Update the temp dashboard
-        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            containers: updatedContainers
-          })
-        })
-
-        const updateResult = await updateResponse.json()
-        if (updateResult.success) {
-          console.log("Dashboard state auto-saved to temp dashboard")
-        }
-      }
-    } catch (error) {
-      console.error("Error auto-saving dashboard to temp:", error)
-    }
-  }
-
+  // Removed TempDashboard auto-save - using localStorage only for better performance
   // Auto-save dashboard state when component unmounts
   useEffect(() => {
     return () => {
       stopAutoScroll()
-      if (currentPdfData) {
-        autoSaveDashboardToTemp()
-      }
     }
-  }, [currentPdfData])
+  }, [])
 
   const startAutoScroll = () => {
     const container = containerRef.current

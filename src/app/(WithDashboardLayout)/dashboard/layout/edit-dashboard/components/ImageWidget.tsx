@@ -42,13 +42,11 @@ export default function ImageWidget({
   settings,
   onSetWidgetImages,
   onOpenSettings,
-  onAutoSave,
 }: {
   widget: ExtendedWidget
   settings: WidgetSettings
   onSetWidgetImages: (images: ImageData[]) => void
   onOpenSettings: () => void
-  onAutoSave: () => void
 }) {
   const [isUploading, setIsUploading] = useState(false)
   const [isSelectOpen, setIsSelectOpen] = useState(false)
@@ -93,7 +91,6 @@ export default function ImageWidget({
             type: file.type,
           }
           onSetWidgetImages([imageData])
-          setTimeout(() => onAutoSave(), 100)
           toast.dismiss(loadingToast)
           toast.success(`Image uploaded successfully! (${img.width}×${img.height})`, { description: `${(file.size / 1024 / 1024).toFixed(1)}MB` })
         }
@@ -347,7 +344,6 @@ export default function ImageWidget({
                             try {
                               if (!url) return
                               onSetWidgetImages([{ id: `img-${Date.now()}-${Math.floor(Math.random()*1000)}`, url, title: n.imageFileName || n.title || 'Image', dbId: n.id }])
-                              setTimeout(() => onAutoSave(), 100)
                               setAnimateOpen(false)
                               setTimeout(() => setIsSelectOpen(false), 150)
                               toast.success('Image selected successfully')

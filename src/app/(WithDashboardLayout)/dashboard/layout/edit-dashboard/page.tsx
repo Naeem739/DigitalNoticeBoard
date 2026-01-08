@@ -29,7 +29,7 @@ import "./edit-dashboard.css"
 import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } from "@/types/template-types"
 import { getCategories, getDefaultCategory, ensureDefaultCategories, getTextCategoriesWithNotices } from "@/app/actions/category.action"
 import {  getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
-import { createDashboard, createTempDashboard, deleteAllTempDashboards } from "@/app/actions/dashboard.action"
+import { createDashboard } from "@/app/actions/dashboard.action"
 import { createNotice } from "@/app/actions/notice.action"
 import { createCategory } from "@/app/actions/category.action"
 // import { createImage } from "@/app/actions/image.action"
@@ -432,9 +432,7 @@ function EditDashboardDemo() {
   const [hasInitialized, setHasInitialized] = useState(false)
   const [scrollPosition, setScrollPosition] = useState({ x: 0, y: 0 })
 
-  // TempDashboard state management
-  const [tempDashboardId, setTempDashboardId] = useState<string | null>(null)
-  const [isTempDashboardActive, setIsTempDashboardActive] = useState(false)
+  // Removed TempDashboard - using localStorage only for better performance
 
   // Template management state
   const [templates, setTemplates] = useState<DashboardTemplate[]>([])
@@ -506,20 +504,10 @@ function EditDashboardDemo() {
             // Automatically restore the saved state
             restoreStateFromSaved(savedState)
             localStorageUtils.removeItem('dashboardState')
-            
-            // Save to TemporaryDashboard after restoring state
-            setTimeout(() => {
-              autoSaveToTempDashboard()
-            }, 100)
           } else {
             // No previous content, just load the ratio and screens structure
             restoreStateFromSaved(savedState)
             localStorageUtils.removeItem('dashboardState')
-            
-            // Save to TemporaryDashboard after restoring state
-            setTimeout(() => {
-              autoSaveToTempDashboard()
-            }, 100)
           }
         }
       } catch (error) {
@@ -577,127 +565,7 @@ function EditDashboardDemo() {
     ensureDefaults()
   }, [])
 
-  // Function to auto-save current dashboard state to TemporaryDashboard
-  const autoSaveToTempDashboard = async () => {
-    try {
-      // Get current temp dashboard data
-      const response = await fetch('/api/temp-dashboard/get-all')
-      const result = await response.json()
-      
-      if (result.success && result.result.length > 0) {
-        // Update the first temp dashboard with current state
-        const tempDashboard = result.result[0]
-        
-        // Prepare updated containers with current widget data
-        const updatedContainers = []
-        
-        for (let screenIndex = 0; screenIndex < screens.length; screenIndex++) {
-          const screen = screens[screenIndex]
-          
-          for (const widget of screen.widgets) {
-            const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
-            if (!specificLayout) continue
-
-            const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
-            const containerHeight = (RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0)
-
-            const colWidth = (containerWidth - 11 * 24) / 12
-            const rowHeight = 50
-
-            const leftPx = specificLayout.x * (colWidth + 24)
-            const topPx = specificLayout.y * (rowHeight + 24)
-
-            const leftPercent = (leftPx / containerWidth) * 100
-            const topPercent = (topPx / containerHeight) * 100
-
-            const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
-            const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
-
-            const settings = screen.widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
-
-            const container: any = {
-              id: specificLayout.i,
-              x: specificLayout.x,
-              y: specificLayout.y,
-              w: specificLayout.w,
-              h: specificLayout.h,
-              leftPx: `${leftPx.toFixed(1)}px`,
-              topPx: `${topPx.toFixed(1)}px`,
-              leftPercent: `${leftPercent.toFixed(2)}%`,
-              topPercent: `${topPercent.toFixed(2)}%`,
-              width: `${widgetWidth.toFixed(2)}%`,
-              height: `${widgetHeight.toFixed(2)}%`,
-              title: widget.content || widget.title,
-              category: widget.category,
-              type: widget.type || "notice",
-              settings: settings
-            }
-
-            // Add PDF data if it's a PDF widget
-            if (widget.type === "pdf" && widget.pdfs && widget.pdfs.length > 0) {
-              container.pdfData = widget.pdfs[0].pdfData || ''
-              container.pdfFileName = widget.pdfs[0].fileName || 'uploaded.pdf'
-            }
-
-            updatedContainers.push(container)
-          }
-        }
-
-        // Update the temp dashboard
-        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            containers: updatedContainers,
-            aspectRatio: selectedRatio,
-            screenName: screens[currentScreenIndex]?.name || 'Screen 1',
-            screenIndex: currentScreenIndex,
-            totalScreens: screens.length
-          })
-        })
-
-        const updateResult = await updateResponse.json()
-        if (updateResult.success) {
-          console.log("Dashboard state auto-saved to temp dashboard")
-        } else {
-          console.warn("Failed to auto-save to temp dashboard:", updateResult.error)
-        }
-      } else if (result.success && result.result.length === 0) {
-        // No temp dashboard exists, create one
-        try {
-          const createResponse = await fetch('/api/temp-dashboard/create', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              aspectRatio: selectedRatio || '16:9',
-              containers: [],
-              screenName: screens[currentScreenIndex]?.name || 'Screen 1',
-              screenIndex: currentScreenIndex,
-              totalScreens: screens.length
-            })
-          })
-
-          const createResult = await createResponse.json()
-          if (createResult.success) {
-            console.log("Created new temp dashboard for auto-save")
-          } else {
-            console.warn("Failed to create temp dashboard for auto-save:", createResult.error)
-          }
-        } catch (createError) {
-          console.warn("Error creating temp dashboard for auto-save:", createError)
-        }
-      } else {
-        console.warn("Failed to get temp dashboards for auto-save:", result.error)
-      }
-    } catch (error) {
-      console.error("Error auto-saving dashboard to temp:", error)
-      // Don't show error to user, just log it for debugging
-    }
-  }
+  // Removed autoSaveToTempDashboard - using localStorage only for better performance
 
   // Enhanced useEffect to save state whenever it changes
   useEffect(() => {
@@ -786,120 +654,9 @@ function EditDashboardDemo() {
     }
   }, [hasInitialized])
 
-  // Auto-save dashboard state to TemporaryDashboard whenever changes are made
-  useEffect(() => {
-    if (!hasInitialized) return
+  // Removed TempDashboard auto-save - using localStorage only for better performance
 
-    const autoSaveTimer = setTimeout(async () => {
-      try {
-        // Only auto-save if there are widgets and we have a selected ratio
-        if (screens.some(screen => screen.widgets.length > 0) && selectedRatio) {
-          await autoSaveToTempDashboard()
-        }
-      } catch (error) {
-        console.error('Error auto-saving to temp dashboard:', error)
-      }
-    }, 2000) // Auto-save after 2 seconds of no changes
-
-    return () => clearTimeout(autoSaveTimer)
-  }, [screens, selectedRatio, hasInitialized])
-
-  // Load data from TemporaryDashboard on mount if available
-  useEffect(() => {
-    if (!hasInitialized) return
-
-    const loadFromTempDashboard = async () => {
-      try {
-        const response = await fetch('/api/temp-dashboard/get-all')
-        const result = await response.json()
-        
-        if (result.success && result.result.length > 0) {
-          const tempDashboard = result.result[0]
-          if (tempDashboard.containers && tempDashboard.containers.length > 0) {
-            console.log("Loading dashboard state from TemporaryDashboard")
-            // Set the temp dashboard ID to indicate it's active
-            setTempDashboardId(tempDashboard.id)
-            setIsTempDashboardActive(true)
-            
-            // Load PDF data from temp dashboard containers into widget state
-            const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-            const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
-            
-            if (pdfContainers.length > 0) {
-              console.log("Found PDF containers in temp dashboard:", pdfContainers.length)
-              setWidgets(prev => prev.map(widget => {
-                const pdfContainer = pdfContainers.find((container: any) => container.id === widget.id)
-                if (pdfContainer && widget.type === 'pdf') {
-                  console.log("Updating widget with PDF data:", widget.id, pdfContainer.pdfFileName)
-                  return {
-                    ...widget,
-                    pdfs: [{
-                      id: `pdf-${Date.now()}`,
-                      title: pdfContainer.pdfFileName || 'PDF',
-                      pdfData: pdfContainer.pdfData,
-                      fileName: pdfContainer.pdfFileName || 'uploaded.pdf',
-                      dbId: `pdf-${Date.now()}`
-                    }]
-                  }
-                }
-                return widget
-              }))
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error loading from temp dashboard:', error)
-      }
-    }
-
-    // Load on mount
-    loadFromTempDashboard()
-    
-    // Set up real-time polling to refresh dashboard state every 3 seconds
-    const intervalId = setInterval(async () => {
-      try {
-        const response = await fetch('/api/temp-dashboard/get-all')
-        const result = await response.json()
-        
-        if (result.success && result.result.length > 0) {
-          const tempDashboard = result.result[0]
-          if (tempDashboard.containers && tempDashboard.containers.length > 0) {
-            const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-            const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
-            
-            if (pdfContainers.length > 0) {
-              // Update widgets with latest PDF data
-              setWidgets(prev => prev.map(widget => {
-                const pdfContainer = pdfContainers.find((container: any) => container.id === widget.id)
-                if (pdfContainer && widget.type === 'pdf') {
-                  // Check if PDF data has changed
-                  const currentPdfData = widget.pdfs?.[0]?.pdfData
-                  if (pdfContainer.pdfData !== currentPdfData) {
-                    console.log("Refreshing PDF data for widget:", widget.id)
-                    return {
-                      ...widget,
-                      pdfs: [{
-                        id: `pdf-${Date.now()}`,
-                        title: pdfContainer.pdfFileName || 'PDF',
-                        pdfData: pdfContainer.pdfData,
-                        fileName: pdfContainer.pdfFileName || 'uploaded.pdf',
-                        dbId: `pdf-${Date.now()}`
-                      }]
-                    }
-                  }
-                }
-                return widget
-              }))
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error refreshing dashboard from temp dashboard:', error)
-      }
-    }, 3000) // Check every 3 seconds
-    
-    return () => clearInterval(intervalId)
-  }, [hasInitialized])
+  // Removed TempDashboard loading - using localStorage only for better performance
 
   // Save state before page unload
   useEffect(() => {
@@ -984,229 +741,14 @@ function EditDashboardDemo() {
     })
   }, [screens, currentScreenIndex, widgets.length, layout.length, selectedRatio, activeSettingsTab, activeSettingsWidget, scrollPosition])
 
-  // Auto-save to TempDashboard whenever state changes
-  useEffect(() => {
-    // Only auto-save if we have a ratio selected and some content
-    if (selectedRatio && screens.length > 0 && screens.some(screen => screen.widgets.length > 0)) {
-      // Debounce the auto-save to avoid too many database calls
-      const timeoutId = setTimeout(() => {
-        saveToTempDashboard()
-      }, 2000) // Wait 2 seconds after last change
-
-      return () => clearTimeout(timeoutId)
-    }
-  }, [screens, selectedRatio]) // Only depend on screens and selectedRatio to avoid infinite loops
+  // Removed TempDashboard auto-save - using localStorage only for better performance
 
   // Add function to clear saved state
   const clearSavedState = () => {
     localStorageUtils.removeItem('dashboardState')
-    
-    // Save to TemporaryDashboard after clearing saved state
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
   }
 
-  // Function to save current state to TempDashboard
-  const saveToTempDashboard = async () => {
-    if (!selectedRatio) {
-      toast.error("Please select a display ratio first")
-      return
-    }
-
-    try {
-      // Calculate positions for all screens
-      const allScreenData = []
-      
-      for (let screenIndex = 0; screenIndex < screens.length; screenIndex++) {
-        const screen = screens[screenIndex]
-        
-        // Calculate positions for this screen
-        const positions = await Promise.all(screen.widgets.map(async (widget) => {
-          const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
-          if (!specificLayout) return null
-
-          const containerWidth = RATIO_DIMENSIONS[selectedRatio].width - 32
-          const containerHeight = RATIO_DIMENSIONS[selectedRatio].height
-
-          const colWidth = (containerWidth - 11 * 24) / 12
-          const rowHeight = 50
-
-          const leftPx = specificLayout.x * (colWidth + 24)
-          const topPx = specificLayout.y * (rowHeight + 24)
-
-          const leftPercent = (leftPx / containerWidth) * 100
-          const topPercent = (topPx / containerHeight) * 100
-
-          const widgetWidth = ((specificLayout.w * colWidth + (specificLayout.w - 1) * 24) / containerWidth) * 100
-          const widgetHeight = ((specificLayout.h * rowHeight + (specificLayout.h - 1) * 24) / containerHeight) * 100
-
-          const settings = screen.widgetSettings[widget.id] || DEFAULT_WIDGET_SETTINGS
-
-          // Handle different widget types
-          if (widget.type === "image" && widget.images && widget.images.length > 0) {
-            // For image displays, collect image IDs
-            const imageNoticeIds = widget.images.map(image => image.dbId).filter(Boolean)
-            
-            return {
-              id: specificLayout.i,
-              x: specificLayout.x,
-              y: specificLayout.y,
-              w: specificLayout.w,
-              h: specificLayout.h,
-              leftPx: `${leftPx.toFixed(1)}px`,
-              topPx: `${topPx.toFixed(1)}px`,
-              leftPercent: `${leftPercent.toFixed(2)}%`,
-              topPercent: `${topPercent.toFixed(2)}%`,
-              width: `${widgetWidth.toFixed(2)}%`,
-              height: `${widgetHeight.toFixed(2)}%`,
-              title: widget.content || widget.title || "Image Display",
-              category: "Default(Images)",
-              type: "image",
-              noticeIds: imageNoticeIds,
-              settings: {
-                backgroundColor: settings.backgroundColor,
-                backgroundOpacity: settings.backgroundOpacity,
-                cardOpacity: settings.cardOpacity,
-                borderColor: settings.borderColor,
-                borderWidth: settings.borderWidth,
-                fontColor: settings.fontColor,
-                noticeCount: settings.noticeCount,
-                fontFamily: settings.fontFamily,
-                fontSize: settings.fontSize,
-                fontWeight: settings.fontWeight,
-                autoScroll: settings.autoScroll,
-                showFullContent: settings.showFullContent,
-                categoryFont: settings.categoryFont,
-                categoryFontSize: settings.categoryFontSize,
-                categoryFontWeight: settings.categoryFontWeight,
-                categoryFontColor: settings.categoryFontColor,
-                categoryBackgroundColor: settings.categoryBackgroundColor,
-                categoryHeight: settings.categoryHeight,
-                categoryBorderColor: settings.categoryBorderColor,
-                categoryBorderWidth: settings.categoryBorderWidth,
-                customCategoryName: settings.customCategoryName,
-                imageFit: settings.imageFit,
-                imageBorderRadius: settings.imageBorderRadius,
-                showImageTitle: settings.showImageTitle,
-                imageTitleColor: settings.imageTitleColor,
-                imageTitleFontSize: settings.imageTitleFontSize,
-                imageTitleFontWeight: settings.imageTitleFontWeight,
-                imageOverlay: settings.imageOverlay,
-                imageOverlayOpacity: settings.imageOverlayOpacity,
-                imageShadow: settings.imageShadow,
-                imageShadowColor: settings.imageShadowColor,
-                imageShadowBlur: settings.imageShadowBlur,
-                imageShadowOffset: settings.imageShadowOffset,
-                imageZoom: settings.imageZoom,
-                imageRotation: settings.imageRotation,
-                imageBrightness: settings.imageBrightness,
-                imageContrast: settings.imageContrast,
-                imageSaturation: settings.imageSaturation,
-                imageBlur: settings.imageBlur,
-                imageGrayscale: settings.imageGrayscale,
-                imageSepia: settings.imageSepia,
-                imageInvert: settings.imageInvert,
-              },
-            }
-          } else if (widget.type === "notice") {
-            // For notice widgets, save categoryId for dynamic fetching (preferred)
-            // Also keep noticeIds for backward compatibility
-            const noticeIds = widget.topNotices ? widget.topNotices.map((notice) => notice.id) : []
-
-            return {
-              id: specificLayout.i,
-              x: specificLayout.x,
-              y: specificLayout.y,
-              w: specificLayout.w,
-              h: specificLayout.h,
-              leftPx: `${leftPx.toFixed(1)}px`,
-              topPx: `${topPx.toFixed(1)}px`,
-              leftPercent: `${leftPercent.toFixed(2)}%`,
-              topPercent: `${topPercent.toFixed(2)}%`,
-              width: `${widgetWidth.toFixed(2)}%`,
-              height: `${widgetHeight.toFixed(2)}%`,
-              title: widget.content || widget.title,
-              category: widget.category,
-              type: "notice",
-              categoryId: widget.categoryId, // Save categoryId for dynamic filtering
-              noticeIds: noticeIds, // Keep for backward compatibility
-              settings: {
-                backgroundColor: settings.backgroundColor,
-                backgroundOpacity: settings.backgroundOpacity,
-                cardOpacity: settings.cardOpacity,
-                borderColor: settings.borderColor,
-                borderWidth: settings.borderWidth,
-                fontColor: settings.fontColor,
-                noticeCount: settings.noticeCount,
-                fontFamily: settings.fontFamily,
-                fontSize: settings.fontSize,
-                fontWeight: settings.fontWeight,
-                autoScroll: settings.autoScroll,
-                showFullContent: settings.showFullContent,
-                categoryFont: settings.categoryFont,
-                categoryFontSize: settings.categoryFontSize,
-                categoryFontWeight: settings.categoryFontWeight,
-                categoryFontColor: settings.categoryFontColor,
-                categoryBackgroundColor: settings.categoryBackgroundColor,
-                categoryHeight: settings.categoryHeight,
-                categoryBorderColor: settings.categoryBorderColor,
-                categoryBorderWidth: settings.categoryBorderWidth,
-                customCategoryName: settings.customCategoryName,
-              },
-            }
-          }
-        }))
-
-        // Filter out null positions
-        const validPositions = positions.filter(Boolean)
-
-        // Create temp dashboard data for this screen
-        const tempDashboardData = {
-          aspectRatio: selectedRatio,
-          containers: validPositions,
-          screenName: screen.name,
-          screenIndex: screenIndex,
-          totalScreens: screens.length
-        }
-
-        allScreenData.push(tempDashboardData)
-      }
-
-      // Delete existing temp dashboards if any
-      if (tempDashboardId) {
-        try {
-          await deleteAllTempDashboards()
-        } catch (error) {
-          console.warn("Error deleting existing temp dashboards:", error)
-        }
-      }
-
-      // Create new temp dashboard records
-      const tempDashboardResults = []
-      for (const screenData of allScreenData) {
-        const result = await createTempDashboard(screenData)
-        tempDashboardResults.push(result)
-        
-        if (!result.success) {
-          console.error("Failed to save temp dashboard screen:", result.result)
-          return
-        }
-      }
-
-      // Set the temp dashboard ID from the first result
-      if (tempDashboardResults.length > 0 && tempDashboardResults[0].success) {
-        const newTempDashboardId = tempDashboardResults[0].result.id
-        setTempDashboardId(newTempDashboardId)
-        setIsTempDashboardActive(true)
-        console.log("TempDashboard saved successfully:", tempDashboardResults)
-      }
-
-    } catch (error) {
-      console.error("Error saving to temp dashboard:", error)
-      toast.error(`Error saving to temp dashboard: ${error}`)
-    }
-  }
+  // Removed saveToTempDashboard - using localStorage only for better performance
 
   // Screen management functions
   const addScreen = async () => {
@@ -1223,11 +765,6 @@ function EditDashboardDemo() {
     }
     setScreens([...screens, newScreen])
     setCurrentScreenIndex(screens.length) // Switch to the new screen
-    
-    // Save to TemporaryDashboard after adding screen
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
     } catch (error) {
       console.error("Error adding screen:", error)
       toast.error("Failed to add screen")
@@ -1252,11 +789,6 @@ function EditDashboardDemo() {
     if (currentScreenIndex >= screenIndex) {
       setCurrentScreenIndex(Math.max(0, currentScreenIndex - 1))
       }
-      
-      // Save to TemporaryDashboard after removing screen
-      setTimeout(() => {
-        autoSaveToTempDashboard()
-      }, 100)
     } catch (error) {
       console.error("Error removing screen:", error)
       toast.error("Failed to remove screen")
@@ -1272,11 +804,6 @@ function EditDashboardDemo() {
       name: newName
     }
     setScreens(newScreens)
-    
-    // Save to TemporaryDashboard after renaming screen
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
   }
 
   const clearAllScreens = async () => {
@@ -1293,22 +820,8 @@ function EditDashboardDemo() {
       setScreens([initialScreen])
       setCurrentScreenIndex(0)
 
-      // Clear any temp dashboard data
-      try {
-        await deleteAllTempDashboards()
-        setTempDashboardId(null)
-        setIsTempDashboardActive(false)
-      } catch (error) {
-        console.warn('Error clearing temp dashboards while clearing screens:', error)
-      }
-
       // Clear saved local state
       clearSavedState()
-      
-      // Save to TemporaryDashboard after clearing screens
-      setTimeout(() => {
-        autoSaveToTempDashboard()
-      }, 100)
       
       toast.success('All screens cleared')
     } catch (error) {
@@ -1455,10 +968,6 @@ function EditDashboardDemo() {
             setScreens(newScreens)
             setCurrentScreenIndex(0)
             
-            // Save to TemporaryDashboard after loading existing dashboard
-            setTimeout(() => {
-              autoSaveToTempDashboard()
-            }, 100)
             
             toast.success(`Dashboard loaded successfully! ${newScreens.length} screen${newScreens.length > 1 ? 's' : ''} found.`, { duration: 1500 })
           } else {
@@ -1561,10 +1070,6 @@ function EditDashboardDemo() {
               setScreens([singleScreen])
               setCurrentScreenIndex(0)
               
-              // Save to TemporaryDashboard after loading existing dashboard
-              setTimeout(() => {
-                autoSaveToTempDashboard()
-              }, 100)
               
               toast.success('Existing dashboard loaded successfully!', { duration: 1500 })
             } else {
@@ -1795,10 +1300,6 @@ function EditDashboardDemo() {
     setWidgets(prev => [...prev, newWidget])
     setLayout(prev => [...prev, newLayout])
 
-    // Save to TemporaryDashboard after adding widget
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
 
     toast.success("Widget added successfully!", { duration: 1200 })
     } catch (error) {
@@ -1825,10 +1326,6 @@ function EditDashboardDemo() {
     })
     setActiveSettingsWidget(null)
 
-    // Save to TemporaryDashboard after removing widget
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
 
     toast.success("Widget removed", { duration: 1200 })
     } catch (error) {
@@ -1870,10 +1367,6 @@ function EditDashboardDemo() {
       }
     })
 
-    // Save to TemporaryDashboard after ratio change
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
   }
 
   const handleDragStart2 = (e: React.DragEvent, category: TCategoriesWithNotices) => {
@@ -2013,10 +1506,6 @@ function EditDashboardDemo() {
 
               toast.success(`Added ${categoryName} to widget`, { duration: 1200 })
               
-              // Save to TemporaryDashboard after updating widget
-              setTimeout(() => {
-                autoSaveToTempDashboard()
-              }, 100)
     } else {
       console.log("Creating new widget with category:", category.name)
       // Create new widget at drop location
@@ -2089,10 +1578,6 @@ function EditDashboardDemo() {
     setWidgets(prev => [...prev, newWidget])
     setLayout(prev => [...prev, newLayout])
 
-    // Save to TemporaryDashboard after creating widget
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
 
     toast.success(`Created new widget with ${category.name} category!`, { duration: 1200 })
   }
@@ -2125,10 +1610,6 @@ function EditDashboardDemo() {
       : newLayout
 
     setLayout(boundedLayout)
-    // Save to TemporaryDashboard after layout change
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
   }
 
   const handleSave = async () => {
@@ -2269,30 +1750,8 @@ function EditDashboardDemo() {
             // For PDF widgets, save PDF data directly in the container
             const pdf = widget.pdfs[0] // Take the first PDF for now
             
-            // Get PDF data from TemporaryDashboard if not in widget
-            let pdfData = pdf.pdfData
-            if (!pdfData) {
-              try {
-                const tempResponse = await fetch('/api/temp-dashboard/get-all')
-                const tempResult = await tempResponse.json()
-                
-                if (tempResult.success && tempResult.result.length > 0) {
-                  for (const tempDashboard of tempResult.result) {
-                    if (tempDashboard.containers) {
-                      const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-                      const widgetContainer = containers.find((container: any) => container.id === widget.id)
-                      
-                      if (widgetContainer && widgetContainer.pdfData) {
-                        pdfData = widgetContainer.pdfData
-                        break
-                      }
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error("Error fetching PDF data from temp dashboard:", error)
-              }
-            }
+            // Get PDF data directly from widget (no TempDashboard needed)
+            const pdfData = pdf.pdfData || ''
 
             // Skip PDF notice creation during save to improve performance
             // PDF notices should be created when PDFs are added to widgets, not during save
@@ -2421,16 +1880,6 @@ function EditDashboardDemo() {
       const allSuccessful = dashboardResults.every(result => result.success)
       
       if (allSuccessful) {
-        // Clear TempDashboard after successful save
-        try {
-          await deleteAllTempDashboards()
-          setTempDashboardId(null)
-          setIsTempDashboardActive(false)
-          console.log("TempDashboard cleared after successful save")
-        } catch (error) {
-          console.warn("Error clearing TempDashboard:", error)
-        }
-        
         clearSavedState() // Clear saved state after successful save
         toast.success(`Dashboard saved successfully! ${screens.length} screen${screens.length > 1 ? 's' : ''} created.`, { duration: 2000 })
         console.log("All screens saved successfully:", dashboardResults)
@@ -2485,10 +1934,6 @@ function EditDashboardDemo() {
       })
     }
 
-    // Save to TemporaryDashboard after widget setting change
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
   }
 
   const getPresetColors = () => [
@@ -2679,10 +2124,6 @@ function EditDashboardDemo() {
           : widget
       ))
 
-        // Save to TemporaryDashboard after image upload
-        setTimeout(() => {
-          autoSaveToTempDashboard()
-        }, 100)
 
         toast.dismiss(loadingToast)
         toast.success(`Image uploaded successfully! (${img.width}×${img.height})`, {
@@ -2906,10 +2347,6 @@ function EditDashboardDemo() {
     }
     setScreens(newScreens)
     
-    // Save to TemporaryDashboard after applying template
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
     
     toast.success(`Applied "${template.name}" template. Notice widgets updated, PDF/Image positions adjusted.`, { duration: 1500 })
     } catch (error) {
@@ -2939,10 +2376,6 @@ function EditDashboardDemo() {
     }
     setScreens(newScreens)
 
-    // Save to TemporaryDashboard after creating from template
-    setTimeout(() => {
-      autoSaveToTempDashboard()
-    }, 100)
 
     // Wait a moment for the state to update
     setTimeout(async () => {
@@ -3315,7 +2748,6 @@ function EditDashboardDemo() {
         isAddingScreen={isAddingScreen}
         isClearingScreens={isClearingScreens}
         isRemovingScreen={isRemovingScreen}
-        autoSaveToTempDashboard={autoSaveToTempDashboard}
       />
 
       {/* Minimal Notice Categories Section */}
@@ -3687,9 +3119,6 @@ function EditDashboardDemo() {
                           setWidgets(prev => prev.map(w => w.id === widget.id ? { ...w, images } : w))
                         }}
                         onOpenSettings={() => toggleWidgetSettings(widget.id)}
-                        onAutoSave={() => {
-                          setTimeout(() => { autoSaveToTempDashboard() }, 100)
-                        }}
                       />
                     )}
 
@@ -3713,20 +3142,6 @@ function EditDashboardDemo() {
                                 }
                               : w
                           ))
-                          
-                          // Immediately save to TemporaryDashboard
-                          setTimeout(() => {
-                            autoSaveToTempDashboard()
-                          }, 100)
-                          
-                          // Also save the current widget state to ensure PDF data is included
-                          const currentWidget = widgets.find(w => w.id === widget.id)
-                          if (currentWidget && currentWidget.type === 'pdf' && currentWidget.pdfs && currentWidget.pdfs.length > 0) {
-                            // Force save the current state to include the new PDF data
-                            setTimeout(() => {
-                              autoSaveToTempDashboard()
-                            }, 500)
-                          }
                         }}
                       />
                     )}
@@ -4906,7 +4321,6 @@ function EditDashboardDemo() {
                                   dbId: n.id
                                 }]
                               } : w))
-                              setTimeout(() => { autoSaveToTempDashboard() }, 100)
                               setAnimateImageOpen(false)
                               setTimeout(() => {
                                 setIsImageSelectOpen(false)
