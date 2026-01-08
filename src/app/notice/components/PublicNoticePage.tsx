@@ -780,7 +780,14 @@ export default function PublicNoticePage() {
                           position: 'relative',
                           minHeight: isMobile ? 'auto' : (container.type === 'pdf' || container.type === 'image') ? '200px' : '150px',
                           maxHeight: isMobile ? 'none' : '100%',
-                          boxShadow: (container.type === 'pdf' || container.type === 'image') ? '0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -2px rgba(0,0,0,0.05)' : `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`
+                          boxShadow: (container.type === 'pdf' || container.type === 'image') ? '0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -2px rgba(0,0,0,0.05)' : `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`,
+                          // Ensure PDF containers fill completely and have white background
+                          ...(container.type === 'pdf' ? {
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: '#ffffff',
+                            overflow: 'hidden'
+                          } : {})
                         }}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1132,7 +1139,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                           )}
 
                           {container.type === 'pdf' && (container.pdfIds || container.pdfData) && (
-                            <div className="h-full flex flex-col" style={{ padding: '0' }}>
+                            <div className="h-full w-full flex flex-col" style={{ padding: '0', backgroundColor: '#ffffff', overflow: 'hidden' }}>
                                                             {/* Handle PDF widgets with pdfIds (from PDF table) */}
                               {container.pdfIds && container.pdfIds.slice(0, 1).map((pdfId: string) => {
                                 const pdf = getPdfById(pdfId)
@@ -1141,7 +1148,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                 return (
                                   <motion.div
                                     key={pdfId}
-                                    className="relative w-full h-full flex flex-col rounded-lg overflow-hidden shadow-lg"
+                                    className="relative w-full h-full flex flex-col overflow-hidden"
                                     initial={{ opacity: 0, scale: 0.9 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ duration: 0.3 }}
@@ -1149,9 +1156,10 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       height: '100%',
                                       width: '100%',
                                       margin: '0',
-                                      borderRadius: '12px',
-                                      boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
-                                      border: '1px solid rgba(229, 231, 235, 0.8)'
+                                      backgroundColor: '#ffffff',
+                                      borderRadius: '0',
+                                      boxShadow: 'none',
+                                      border: 'none'
                                     }}
                                   >
                                     <ClientOnly fallback={
@@ -1204,7 +1212,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                               {container.pdfData && typeof container.pdfData === 'string' && !container.pdfIds && (
                                 <motion.div
                                   key={`pdf-${container.id}`}
-                                  className="relative w-full h-full flex flex-col rounded-lg overflow-hidden shadow-lg"
+                                  className="relative w-full h-full flex flex-col overflow-hidden"
                                   initial={{ opacity: 0, scale: 0.9 }}
                                   animate={{ opacity: 1, scale: 1 }}
                                   transition={{ duration: 0.3 }}
@@ -1212,9 +1220,10 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     height: '100%',
                                     width: '100%',
                                     margin: '0',
-                                    borderRadius: '12px',
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
-                                    border: '1px solid rgba(229, 231, 235, 0.8)'
+                                    backgroundColor: '#ffffff',
+                                    borderRadius: '0',
+                                    boxShadow: 'none',
+                                    border: 'none'
                                   }}
                                 >
                                                                       <ClientOnly fallback={
