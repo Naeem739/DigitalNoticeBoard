@@ -218,6 +218,34 @@
       margin: 0 !important;
     }
   }
+  
+  /* Mobile-specific: Allow scrolling */
+  @media (max-width: 480px) {
+    .notice-page-container {
+      overflow-y: auto !important;
+      height: auto !important;
+      min-height: 100vh !important;
+      max-height: none !important;
+    }
+    
+    .notice-page-container main {
+      overflow-y: visible !important;
+      max-height: none !important;
+      height: auto !important;
+    }
+    
+    .notice-page-container .notice-grid-container {
+      overflow: visible !important;
+      max-height: none !important;
+      height: auto !important;
+    }
+    
+    .notice-grid-container > div {
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+  }
 
   /* Fixed QR Code sizing (square, scan-friendly on 75" display) */
   .responsive-qr-code {
