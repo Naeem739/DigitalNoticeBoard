@@ -538,7 +538,7 @@ export default function PublicNoticePage() {
 
   return (
     <div 
-      className="h-screen flex flex-col overflow-hidden notice-page-container"
+      className={`${isMobile ? 'min-h-screen' : 'h-screen'} flex flex-col overflow-hidden notice-page-container`}
       style={{
         ...getBackgroundStyle(),
         fontFamily: "'Tiro Bangla', 'Inter', sans-serif"
@@ -714,7 +714,7 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className={`flex-1 min-h-0 p-0 ${isMobile ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+      <main className={`${isMobile ? 'flex-auto' : 'flex-1'} ${isMobile ? 'min-h-0' : 'min-h-0'} p-0 ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}>
         <div className={`w-full ${isMobile ? 'h-auto' : 'h-full'} ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}>
           {/* Dashboard Content */}
           {dashboardLoading ? (
@@ -731,13 +731,13 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className={`w-full ${isMobile ? 'h-auto' : 'h-full'} rounded-lg shadow-lg ${isMobile ? 'p-0' : getResponsiveContentPadding()} ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}
+              className={`w-full ${isMobile ? 'h-auto' : 'h-full'} rounded-lg shadow-lg ${isMobile ? 'p-0' : getResponsiveContentPadding()} overflow-hidden`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
               <div 
-                className={`relative w-full ${isMobile ? 'h-auto' : 'h-full'} ${isMobile ? 'overflow-visible' : 'overflow-hidden'} rounded-lg shadow-lg`}
+                className={`relative w-full ${isMobile ? 'h-auto' : 'h-full'} overflow-hidden rounded-lg shadow-lg`}
                 style={{
                   minHeight: '0',
                   height: isMobile ? 'auto' : '100%'
@@ -750,8 +750,8 @@ export default function PublicNoticePage() {
                     gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)',
                     height: isMobile ? 'auto' : '100%',
                     maxHeight: isMobile ? 'none' : '100%',
-                    overflow: isMobile ? 'visible' : 'hidden',
-                    overflowY: isMobile ? 'auto' : 'hidden'
+                    overflow: 'hidden',
+                    overflowY: 'hidden'
                   }}
                 >
                   {currentDashboard.containers.map((container, index) => {
@@ -771,22 +771,24 @@ export default function PublicNoticePage() {
                       <motion.div
                         key={container.id}
                         id={container.id}
-                        className="relative rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
+                        className={`relative rounded-xl shadow-lg ${isMobile ? 'overflow-visible' : 'overflow-hidden'} flex flex-col backdrop-blur-sm`}
                         style={{
                           gridColumn: isMobile ? '1 / -1' : `${gridX + 1} / span ${gridW}`,
                           gridRow: isMobile ? 'auto' : `${gridY + 1} / span ${gridH}`,
                           backgroundColor: (container.type === 'pdf' || container.type === 'image') ? '#ffffff' : `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
                           border: (container.type === 'pdf' || container.type === 'image') ? '2px solid #e5e7eb' : `${borderWidth}px solid ${borderColor}`,
                           position: 'relative',
-                          minHeight: isMobile ? 'calc(100vh - 200px)' : (container.type === 'pdf' || container.type === 'image') ? '200px' : '150px',
-                          maxHeight: isMobile ? 'calc(100vh - 200px)' : '100%',
+                          minHeight: isMobile ? (container.type === 'pdf' || container.type === 'image') ? '200px' : 'auto' : (container.type === 'pdf' || container.type === 'image') ? '200px' : '150px',
+                          maxHeight: isMobile ? 'none' : '100%',
                           width: isMobile ? '100vw' : 'auto',
+                          height: isMobile ? 'auto' : 'auto',
                           marginBottom: isMobile ? '1rem' : '0',
                           boxShadow: (container.type === 'pdf' || container.type === 'image') ? '0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -2px rgba(0,0,0,0.05)' : `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`,
                           // Ensure PDF containers fill completely and have white background
                           ...(container.type === 'pdf' ? {
                             width: isMobile ? '100vw' : '100%',
-                            height: isMobile ? 'calc(100vh - 200px)' : '100%',
+                            height: isMobile ? 'auto' : '100%',
+                            minHeight: isMobile ? '200px' : 'auto',
                             backgroundColor: '#ffffff',
                             overflow: 'hidden'
                           } : {})
@@ -854,7 +856,7 @@ export default function PublicNoticePage() {
 
                         {/* Widget Content */}
                         <div 
-                          className="flex-1 flex flex-col justify-center overflow-hidden" 
+                          className={`flex-1 flex flex-col justify-center ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`} 
                           style={{ 
                             minHeight: isMobile ? 'auto' : '120px',
                             padding: (container.type === 'pdf' || container.type === 'image') ? '0' : (isMobile ? '0.75rem' : '1rem')
@@ -923,13 +925,13 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
                                       borderRadius: '20px',
-                                      // Dynamic height: grows with content, minimum greater than QR code (160px)
-                                      minHeight: '200px',
+                                      // Dynamic height: grows with content, minimum greater than QR code
+                                      minHeight: isMobile ? '120px' : '200px',
                                       width: '100%',
                                       position: 'relative',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      padding: '12px 16px'
+                                      padding: isMobile ? '8px 12px' : '12px 16px'
                                     }}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -939,18 +941,28 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                                     }}
                                   >
-                                    {/* QR Code - Fixed square, right-centered */}
-                                    <div className="qr-code-container responsive-qr-code">
-                                      <NoticeQRCode 
-                                        notice={notice}
-                                        imageData={notice.imageData}
-                                        imageTitle={notice.imageFileName || notice.title}
-                                        size={isMobile ? 40 : 160}
-                                        className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
-                                      />
-                                    </div>
                                     {/* Notice Header */}
-                                    <div className="p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 pr-24 sm:pr-28 md:pr-32 lg:pr-40 xl:pr-48">
+                                    <div className={`p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 ${isMobile ? 'pr-14' : 'pr-24 sm:pr-28 md:pr-32 lg:pr-40 xl:pr-48'}`}>
+                                      {/* QR Code - Rightmost side, vertically centered */}
+                                      <div 
+                                        style={{
+                                          position: 'absolute',
+                                          top: '50%',
+                                          right: isMobile ? '8px' : '24px',
+                                          transform: 'translateY(-50%)',
+                                          zIndex: 10,
+                                          width: isMobile ? '40px' : '160px',
+                                          height: isMobile ? '40px' : '160px'
+                                        }}
+                                      >
+                                        <NoticeQRCode 
+                                          notice={notice}
+                                          imageData={notice.imageData}
+                                          imageTitle={notice.imageFileName || notice.title}
+                                          size={isMobile ? 40 : 160}
+                                          className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
+                                        />
+                                      </div>
                                       {/* Notice Title */}
                                       <h4 
                                         className="text-xs md:text-sm font-semibold leading-tight mb-4 break-words"
@@ -1124,7 +1136,17 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     
                                     {/* QR Code - Fixed square, bottom right for image widgets */}
                                     <div className="absolute bottom-3 right-3">
-                                      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-2">
+                                      <div 
+                                        className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200"
+                                        style={{
+                                          padding: isMobile ? '4px' : '8px',
+                                          width: isMobile ? '40px' : 'auto',
+                                          height: isMobile ? '40px' : 'auto',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                      >
                                         <NoticeQRCode 
                                           notice={notice}
                                           imageData={notice.imageData}
@@ -1187,11 +1209,15 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                      {/* QR Code - Fixed square, bottom right - optimized for scanning */}
                                      <div className="absolute bottom-4 right-4 z-50">
                                        <div 
-                                         className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-3"
+                                         className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
                                          style={{
-                                           minWidth: isMobile ? '40px' : '160px',
-                                           minHeight: isMobile ? '40px' : '160px',
-                                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)'
+                                           width: isMobile ? '40px' : '160px',
+                                           height: isMobile ? '40px' : '160px',
+                                           padding: isMobile ? '4px' : '12px',
+                                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
+                                           display: 'flex',
+                                           alignItems: 'center',
+                                           justifyContent: 'center'
                                          }}
                                        >
                                          <NoticeQRCode 
@@ -1256,13 +1282,15 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                      {/* QR Code - Bottom Right - Optimized for Easy Scanning (unchanged) */}
                                      <div className="absolute bottom-4 right-4 z-50">
                                        <div 
-                                         className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-3"
+                                         className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
                                          style={{
                                            width: isMobile ? '40px' : getResponsiveQRContainerSize(),
                                            height: isMobile ? '40px' : getResponsiveQRContainerSize(),
-                                           minWidth: isMobile ? '40px' : '80px',
-                                           minHeight: isMobile ? '40px' : '80px',
-                                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)'
+                                           padding: isMobile ? '4px' : '12px',
+                                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
+                                           display: 'flex',
+                                           alignItems: 'center',
+                                           justifyContent: 'center'
                                          }}
                                        >
                                          <NoticeQRCode 
