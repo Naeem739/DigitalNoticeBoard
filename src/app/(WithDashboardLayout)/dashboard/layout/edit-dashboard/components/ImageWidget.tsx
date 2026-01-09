@@ -6,6 +6,8 @@ import { useState } from "react"
 import { createPortal } from "react-dom"
 import { Upload, Image as ImageIcon, Settings } from "lucide-react"
 import { toast } from "sonner"
+import { createNotice } from "@/app/actions/notice.action"
+import { getDefaultCategory, ensureDefaultCategories } from "@/app/actions/category.action"
 
 type WidgetSettings = any
 
@@ -77,38 +79,91 @@ export default function ImageWidget({
       const loadingToast = toast.loading('Processing image...')
 
       const reader = new FileReader()
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const img = new Image()
-        img.onload = () => {
-          const imageData: ImageData = {
-            id: `img-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            url: event.target?.result as string,
-            title: file.name,
-            file,
-            width: img.width,
-            height: img.height,
-            size: file.size,
-            type: file.type,
+        img.onload = async () => {
+          try {
+            const dataUrl = event.target?.result as string
+            // Extract base64 data (remove data URL prefix)
+            const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+            
+            // Ensure Default(Images) category exists
+            await ensureDefaultCategories()
+            
+            // Get the Default(Images) category
+            const defaultImageCategory: any = await getDefaultCategory('IMAGE')
+            let imageCategoryId = ""
+            
+            if (defaultImageCategory.success && defaultImageCategory.result) {
+              imageCategoryId = (defaultImageCategory.result as any).id
+            } else {
+              toast.dismiss(loadingToast)
+              toast.error('Failed to find Default(Images) category')
+              setIsUploading(false)
+              return
+            }
+
+            // Create notice data
+            const noticeData = {
+              title: file.name || "Dashboard Image",
+              content: `Dashboard Image: ${file.name}`,
+              category: "Default(Images)",
+              categoryId: imageCategoryId,
+              imageUrl: dataUrl, // Store the full data URL for display
+              imageFileName: file.name,
+              imageData: base64Data, // Store only the base64 data without the prefix
+            }
+
+            // Create the notice in the database
+            const noticeResult = await createNotice(noticeData)
+            
+            if (noticeResult.success && noticeResult.message && typeof noticeResult.message !== 'string' && (noticeResult.message as any).id) {
+              const noticeId = (noticeResult.message as any).id
+              
+              const imageData: ImageData = {
+                id: `img-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                url: dataUrl,
+                title: file.name,
+                file,
+                dbId: noticeId, // Store the notice ID
+                width: img.width,
+                height: img.height,
+                size: file.size,
+                type: file.type,
+              }
+              
+              onSetWidgetImages([imageData])
+              toast.dismiss(loadingToast)
+              toast.success(`Image uploaded and saved! (${img.width}×${img.height})`, { description: `${(file.size / 1024 / 1024).toFixed(1)}MB` })
+            } else {
+              toast.dismiss(loadingToast)
+              toast.error('Failed to save image to database')
+              console.error('Failed to create notice:', noticeResult)
+            }
+          } catch (error) {
+            console.error('Error creating notice for image:', error)
+            toast.dismiss(loadingToast)
+            toast.error('Failed to save image to database')
+          } finally {
+            setIsUploading(false)
           }
-          onSetWidgetImages([imageData])
-          toast.dismiss(loadingToast)
-          toast.success(`Image uploaded successfully! (${img.width}×${img.height})`, { description: `${(file.size / 1024 / 1024).toFixed(1)}MB` })
         }
         img.onerror = () => {
           toast.dismiss(loadingToast)
           toast.error('Failed to process image. Please try again.')
+          setIsUploading(false)
         }
         img.src = event.target?.result as string
       }
       reader.onerror = () => {
         toast.dismiss(loadingToast)
         toast.error('Failed to read image file. Please try again.')
+        setIsUploading(false)
       }
       reader.readAsDataURL(file)
     } catch (error) {
       console.error('Error uploading image:', error)
       toast.error('Failed to upload image')
-    } finally {
       setIsUploading(false)
     }
   }
