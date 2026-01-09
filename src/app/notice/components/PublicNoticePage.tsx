@@ -150,7 +150,8 @@ export default function PublicNoticePage() {
     if (w < 400) return 13 // 6.1"-6.3"
     if (w < 480) return 14 // ~6.4"-6.7" narrow
     if (w < 640) return 15 // Larger mobiles / small tablets
-    if (w < 1700) return 20 // Typical laptops (13–15.6")
+    if (w < 1366) return 18 // Small laptops (HD)
+    if (w < 1920) return 22 // Full HD laptops (1920px)
     if (w < 2560) return 28 // 2K displays
     if (w < 3400) return 36 // Medium monitors (32–44")
     if (w < 3840) return 42 // Large 4K displays (60-70")
@@ -165,8 +166,9 @@ export default function PublicNoticePage() {
     if (w < 400) return '7.5em' // ~120px
     if (w < 480) return '7.75em' // ~124px
     if (w <= 640) return '8.125em' // 130px equivalent
-    if (w <= 1366) return '9.0625em' // 145px equivalent
-    if (w <= 2560) return '10em' // 160px equivalent
+    if (w <= 1366) return '9.0625em' // 145px equivalent - HD laptops
+    if (w <= 1920) return '9.5em' // 152px equivalent - Full HD laptops
+    if (w <= 2560) return '10em' // 160px equivalent - 2K displays
     if (w <= 3400) return '11em' // 176px equivalent
     if (w < 3840) return '12em' // 192px equivalent
     return '13em' // 208px equivalent for 75" 4K
@@ -191,8 +193,9 @@ export default function PublicNoticePage() {
     if (!w) return 80
     if (w <= 480) return 40 // Mobile: very small QR code (40px)
     if (w <= 640) return 50
-    if (w <= 1366) return 60
-    if (w <= 2560) return 100
+    if (w <= 1366) return 60 // HD laptops
+    if (w <= 1920) return 80 // Full HD laptops
+    if (w <= 2560) return 100 // 2K displays
     if (w <= 3400) return 120
     if (w < 3840) return 140
     return 160 // Large QR codes for 75" 4K display
@@ -209,8 +212,9 @@ export default function PublicNoticePage() {
     const w = viewportWidth
     if (!w) return 'text-sm sm:text-lg'
     if (w < 640) return 'text-sm'
-    if (w < 1700) return 'text-lg'
-    if (w < 2560) return 'text-xl'
+    if (w < 1366) return 'text-base' // Small laptops
+    if (w < 1920) return 'text-lg' // Full HD laptops
+    if (w < 2560) return 'text-xl' // 2K displays
     if (w < 3840) return 'text-2xl'
     return 'text-3xl' // Large header for 75" display
   }
@@ -220,8 +224,9 @@ export default function PublicNoticePage() {
     const w = viewportWidth
     if (!w) return 'text-xs'
     if (w < 640) return 'text-xs'
-    if (w < 1700) return 'text-sm'
-    if (w < 2560) return 'text-base'
+    if (w < 1366) return 'text-xs' // Small laptops
+    if (w < 1920) return 'text-sm' // Full HD laptops
+    if (w < 2560) return 'text-base' // 2K displays
     if (w < 3840) return 'text-lg'
     return 'text-xl' // Large subtitle for 75" display
   }
@@ -231,8 +236,9 @@ export default function PublicNoticePage() {
     const w = viewportWidth
     if (!w) return 'text-sm sm:text-lg'
     if (w < 640) return 'text-sm'
-    if (w < 1700) return 'text-lg'
-    if (w < 2560) return 'text-xl'
+    if (w < 1366) return 'text-base' // Small laptops
+    if (w < 1920) return 'text-lg' // Full HD laptops
+    if (w < 2560) return 'text-xl' // 2K displays
     if (w < 3840) return 'text-2xl'
     return 'text-3xl' // Large time for 75" display
   }
@@ -242,8 +248,9 @@ export default function PublicNoticePage() {
     const w = viewportWidth
     if (!w) return 'px-2 sm:px-3 py-1 sm:py-2'
     if (w < 640) return 'px-2 sm:px-3 py-1 sm:py-2'
-    if (w < 1700) return 'px-4 py-2'
-    if (w < 2560) return 'px-6 py-3'
+    if (w < 1366) return 'px-3 py-2' // Small laptops
+    if (w < 1920) return 'px-4 py-2' // Full HD laptops
+    if (w < 2560) return 'px-6 py-3' // 2K displays
     if (w < 3840) return 'px-8 py-4'
     return 'px-10 py-5' // Large padding for 75" display
   }
@@ -253,8 +260,9 @@ export default function PublicNoticePage() {
     const w = viewportWidth
     if (!w) return 'gap-1 sm:gap-2 md:gap-4'
     if (w < 640) return 'gap-1 sm:gap-2'
-    if (w < 1700) return 'gap-2 md:gap-4'
-    if (w < 2560) return 'gap-4 lg:gap-6'
+    if (w < 1366) return 'gap-2' // Small laptops
+    if (w < 1920) return 'gap-3' // Full HD laptops
+    if (w < 2560) return 'gap-4 lg:gap-6' // 2K displays
     if (w < 3840) return 'gap-6 lg:gap-8'
     return 'gap-8 lg:gap-10' // Large gaps for 75" display
   }
@@ -264,8 +272,9 @@ export default function PublicNoticePage() {
     const w = viewportWidth
     if (!w) return 'p-1 sm:p-2 md:p-3'
     if (w < 640) return 'p-1 sm:p-2'
-    if (w < 1700) return 'p-2 md:p-3'
-    if (w < 2560) return 'p-3 md:p-4'
+    if (w < 1366) return 'p-2' // Small laptops
+    if (w < 1920) return 'p-2 md:p-3' // Full HD laptops
+    if (w < 2560) return 'p-3 md:p-4' // 2K displays
     if (w < 3840) return 'p-4 lg:p-6'
     return 'p-6 lg:p-8' // Large padding for 75" display
   }
@@ -572,7 +581,8 @@ export default function PublicNoticePage() {
                 </div>
                 <div className={`${
                   viewportWidth < 640 ? 'text-xs' :
-                  viewportWidth < 1700 ? 'text-sm' :
+                  viewportWidth < 1366 ? 'text-xs' :
+                  viewportWidth < 1920 ? 'text-sm' :
                   viewportWidth < 2560 ? 'text-base' :
                   viewportWidth < 3840 ? 'text-lg' : 'text-xl'
                 } font-mono opacity-90`}>
@@ -719,11 +729,11 @@ export default function PublicNoticePage() {
           {/* Dashboard Content */}
           {dashboardLoading ? (
             <motion.div 
-              className="flex items-center justify-center h-full"
+              className={`flex items-center justify-center ${isMobile ? 'min-h-[60vh] py-8' : 'h-full'}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <div className="text-center text-white px-4">
+              <div className="text-center text-white px-4 max-w-full w-full">
                 <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-white border-t-transparent mx-auto mb-3 sm:mb-4"></div>
                 <p className="text-lg sm:text-xl font-semibold">Loading Dashboard Content...</p>
                 <p className="text-xs sm:text-sm opacity-70 mt-2">Ordering: Latest first, then by screen order (1, 2, 3...)</p>
@@ -1351,11 +1361,11 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
             </motion.div>
           ) : (
             <motion.div 
-              className="flex items-center justify-center h-full"
+              className={`flex items-center justify-center ${isMobile ? 'min-h-[60vh] py-8' : 'h-full'}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <div className="text-center text-white px-4">
+              <div className="text-center text-white px-4 max-w-full w-full">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-4">No Dashboards Available</h2>
                 <p className="text-sm sm:text-base md:text-lg opacity-80 mb-1 sm:mb-2">Please create dashboard interfaces first.</p>
                 <p className="text-xs sm:text-sm opacity-60">Dashboards will be displayed with the latest created first, then by screen order (1, 2, 3...).</p>
@@ -1377,15 +1387,15 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
         transition={{ duration: 0.5, delay: 0.9 }}
       >
         <div className={`w-full ${getResponsivePadding()}`}>
-          <div className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-white/60 ${getResponsiveSubtitleFontSize()}`}>
-            <span>
+          <div className={`flex flex-col items-center justify-center gap-2 sm:gap-1 sm:flex-row text-white/60 ${getResponsiveSubtitleFontSize()}`}>
+            <span className="text-center sm:text-left break-words px-2">
               Project Superviser: Md. Rashid Al Asif, Assistant Professor, CSE,BU
             </span>
             <span className="hidden sm:inline">•</span>
-            <span>
+            <span className="text-center sm:text-left break-words px-2">
               Developers: Naeem – <a 
                 href="mailto:naeem.cse7.bu@gmail.com" 
-                className="hover:text-white/80 transition-colors"
+                className="hover:text-white/80 transition-colors break-all"
                 title="Email Naeem"
               >
                 naeem.cse7.bu@gmail.com
@@ -1393,7 +1403,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
               {' '}(20CSE008),{' '}
               Ashik – <a 
                 href="mailto:ashikghosh.cse7.bu@gmail.com" 
-                className=" hover:text-white/80 transition-colors"
+                className="hover:text-white/80 transition-colors break-all"
                 title="Email Ashik"
               >
                 ashikghosh.cse7.bu@gmail.com

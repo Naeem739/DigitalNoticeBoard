@@ -5,8 +5,8 @@ import type { NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const url = request.nextUrl;
 
-  // Skip authentication for notice page
-  if (url.pathname.startsWith('/notice')) {
+  // Skip authentication for notice page and public routes
+  if (url.pathname.startsWith('/notice') && !url.pathname.startsWith('/noticeboard')) {
     return NextResponse.next()
   }
 
@@ -26,7 +26,25 @@ export async function middleware(request: NextRequest) {
     origin: url.origin,
   });
 
-  if (!token && url.pathname.startsWith('/dashboard')) {
+  // Map short URLs to their actual routes for middleware checks
+  const routeMap: Record<string, string> = {
+    '/category': '/dashboard/category',
+    '/noticeboard/settings': '/dashboard/manage-public-notice',
+    '/layouts/all': '/dashboard/noticeInterfaces',
+    '/create/notice': '/dashboard/create-notice',
+    '/notices/all': '/dashboard/showNotices',
+    '/notices/images': '/dashboard/showImageNotices',
+    '/notices/pdfs': '/dashboard/showPDFNotices',
+    '/create-layout': '/dashboard/layout/edit-dashboard',
+    '/admin': '/dashboard/admin/showAllAdmin',
+    '/admin/make': '/dashboard/admin/make-admin',
+  }
+  
+  // Check if current path is a short URL that needs authentication
+  const actualPath = routeMap[url.pathname] || url.pathname
+  const isShortUrl = routeMap[url.pathname] !== undefined
+  
+  if (!token && (url.pathname.startsWith('/dashboard') || isShortUrl)) {
     console.log("No token - redirecting to login");
     return NextResponse.redirect(new URL('/login', request.nextUrl))
   }
@@ -42,35 +60,42 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Role-based access control for dashboard routes
-  if (token && url.pathname.startsWith('/dashboard')) {
+  // Role-based access control for dashboard routes and short URLs
+  if (token && (url.pathname.startsWith('/dashboard') || isShortUrl)) {
     const userRole = token.role;
     
-    // Define restricted routes for USER role
+    // Define restricted routes for USER role (both short and long URLs)
     const userRestrictedRoutes = [
       '/dashboard/admin',
       '/dashboard/category',
+      '/category',
       '/dashboard/manage-public-notice',
+      '/noticeboard/settings',
       '/dashboard/layout',
+      '/create-layout',
       '/dashboard/noticeInterfaces',
-      '/dashboard/create-notice'
+      '/layouts/all',
+      '/dashboard/create-notice',
+      '/create/notice'
     ];
     
     // Admin-only and Super Admin-only areas are always restricted for moderators
     const adminOnlyRoutes = [
       '/dashboard/admin/make-admin',
+      '/admin/make',
       '/dashboard/admin/showAllAdmin',
+      '/admin',
       '/dashboard/admin/delete'
     ];
     
     // If USER role tries to access restricted routes, redirect to showNotices
     if (userRole === 'USER') {
       const isRestrictedRoute = userRestrictedRoutes.some(route => 
-        url.pathname.startsWith(route)
+        url.pathname.startsWith(route) || actualPath.startsWith(route)
       );
       
       if (isRestrictedRoute) {
-        return NextResponse.redirect(new URL('/dashboard/showNotices', request.nextUrl))
+        return NextResponse.redirect(new URL('/notices/all', request.nextUrl))
       }
     }
     
@@ -108,11 +133,14 @@ export async function middleware(request: NextRequest) {
         // Allow access to dashboard root
       } else {
         // Only explicitly granted routes are allowed for other dashboard pages
+        // Map short URLs back to their original routes for permission checking
+        const checkPath = actualPath || url.pathname
         const canAccess = enforceableRoutes.some(route => {
           if (route === '/dashboard') {
             return url.pathname === '/dashboard';
           }
-          return url.pathname.startsWith(route);
+          // Check both the current path and the mapped path
+          return url.pathname.startsWith(route) || checkPath.startsWith(route);
         });
         if (!canAccess) {
           return NextResponse.redirect(new URL('/dashboard', request.nextUrl))
@@ -124,10 +152,12 @@ export async function middleware(request: NextRequest) {
     if (userRole === 'ADMIN') {
       const adminOnlySuperAdminRoutes = [
         '/dashboard/admin/make-admin',
-        '/dashboard/admin/showAllAdmin'
+        '/admin/make',
+        '/dashboard/admin/showAllAdmin',
+        '/admin'
       ];
       const isAdminOnlyRoute = adminOnlySuperAdminRoutes.some(route => 
-        url.pathname.startsWith(route)
+        url.pathname.startsWith(route) || actualPath.startsWith(route)
       );
       
       if (isAdminOnlyRoute) {
@@ -147,5 +177,12 @@ export const config = {
     '/signup',
     '/verifyemail',
     '/dashboard/:path*',
+    '/category',
+    '/noticeboard/:path*',
+    '/layouts/:path*',
+    '/create/:path*',
+    '/notices/:path*',
+    '/create-layout',
+    '/admin/:path*',
   ]
 }

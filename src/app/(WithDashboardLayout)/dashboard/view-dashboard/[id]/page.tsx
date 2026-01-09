@@ -145,7 +145,7 @@ export default function ViewDashboard() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Dashboard Not Found</h2>
           <p className="text-gray-600 mb-6">The dashboard you&apos;re looking for doesn&apos;t exist.</p>
-          <Link href="/dashboard/noticeInterfaces">
+          <Link href="/layouts/all">
             <Button className="bg-blue-600 hover:bg-blue-700">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Interfaces
@@ -162,7 +162,7 @@ export default function ViewDashboard() {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/noticeInterfaces">
+            <Link href="/layouts/all">
               <Button variant="outline" size="sm">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
@@ -180,7 +180,7 @@ export default function ViewDashboard() {
             <Badge variant="outline" className="bg-green-50 text-green-700">
               {dashboard.aspectRatio}
             </Badge>
-            <Link href={`/dashboard/layout/edit-dashboard?id=${dashboard.id}`}>
+            <Link href={`/create-layout?id=${dashboard.id}`}>
               <Button variant="outline" size="sm" className="bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100">
                 <Edit className="w-4 h-4 mr-2" />
                 Edit Interface

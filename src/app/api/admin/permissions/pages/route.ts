@@ -9,16 +9,16 @@ const MODERATOR_MANAGEABLE_PAGES = [
   { route: '/notice', label: 'Public Notices' },
   // Dashboard root and sections
   { route: '/dashboard', label: 'Dashboard' },
-  { route: '/dashboard/manage-public-notice', label: 'Notice Board Settings' },
-  { route: '/dashboard/category', label: 'Notice Categories Panel' },
+  { route: '/noticeboard/settings', label: 'Notice Board Settings' },
+  { route: '/category', label: 'Notice Categories Panel' },
   // Manage Notices
-  { route: '/dashboard/create-notice', label: 'Create Notice' },
-  { route: '/dashboard/showNotices', label: 'All Notices' },
-  { route: '/dashboard/showImageNotices', label: 'Image-Based Notices' },
-  { route: '/dashboard/showPDFNotices', label: 'PDF Notices' },
+  { route: '/create/notice', label: 'Create Notice' },
+  { route: '/notices/all', label: 'All Notices' },
+  { route: '/notices/images', label: 'Image-Based Notices' },
+  { route: '/notices/pdfs', label: 'PDF Notices' },
   // Interface Management
-  { route: '/dashboard/layout/edit-dashboard', label: 'Create New Dashboard' },
-  { route: '/dashboard/noticeInterfaces', label: 'All Interfaces' },
+  { route: '/create-layout', label: 'Create New Dashboard' },
+  { route: '/layouts/all', label: 'All Interfaces' },
   // User Management (moderator scope)
   { route: '/dashboard/admin/make-user', label: 'Create User' },
   { route: '/dashboard/admin/showAllUsers', label: 'Show All Users' },

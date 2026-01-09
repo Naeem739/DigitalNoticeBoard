@@ -32,22 +32,22 @@ const MENU_STRUCTURE = {
   home: { href: '/', icon: <Home className="h-5 w-5" />, label: 'Home' },
   dashboard: { href: '/dashboard', icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard' },
   publicNotices: { href: '/notice', icon: <Bell className="h-5 w-5" />, label: 'Public Notices' },
-  noticeBoardSettings: { href: '/dashboard/manage-public-notice', icon: <Settings className="h-5 w-5" />, label: 'Notice Board Settings' },
-  noticeCategories: { href: '/dashboard/category', icon: <FolderPlus className="h-5 w-5" />, label: 'Notice Categories' },
+  noticeBoardSettings: { href: '/noticeboard/settings', icon: <Settings className="h-5 w-5" />, label: 'Notice Board Settings' },
+  noticeCategories: { href: '/category', icon: <FolderPlus className="h-5 w-5" />, label: 'Notice Categories' },
   manageNotices: {
     title: 'Manage Notices',
     items: [
-      { href: '/dashboard/create-notice', icon: <Plus className="h-5 w-5" />, label: 'New Notice' },
-      { href: '/dashboard/showNotices', icon: <List className="h-5 w-5" />, label: 'All Notices' },
-      { href: '/dashboard/showImageNotices', icon: <Image className="h-5 w-5" />, label: 'Image-Based Notices' },
-      { href: '/dashboard/showPDFNotices', icon: <FilePenLine className="h-5 w-5" />, label: 'PDF Notices' },
+      { href: '/create/notice', icon: <Plus className="h-5 w-5" />, label: 'New Notice' },
+      { href: '/notices/all', icon: <List className="h-5 w-5" />, label: 'All Notices' },
+      { href: '/notices/images', icon: <Image className="h-5 w-5" />, label: 'Image-Based Notices' },
+      { href: '/notices/pdfs', icon: <FilePenLine className="h-5 w-5" />, label: 'PDF Notices' },
     ],
   },
   interfaceManagement: {
-    title: 'Interface Management',
+    title: 'Layout Management',
     items: [
-      { href: '/dashboard/layout/edit-dashboard', icon: <LayoutDashboard className="h-5 w-5" />, label: 'New Interface' },
-      { href: '/dashboard/noticeInterfaces', icon: <Grid3X3 className="h-5 w-5" />, label: 'All Interfaces' },
+      { href: '/create-layout', icon: <LayoutDashboard className="h-5 w-5" />, label: 'Create layout' },
+      { href: '/layouts/all', icon: <Grid3X3 className="h-5 w-5" />, label: 'Layouts' },
     ],
   },
   userManagement: {
@@ -62,8 +62,8 @@ const MENU_STRUCTURE = {
       { href: '/dashboard/admin/showAllUsers', icon: <UserCheck className="h-5 w-5" />, label: 'All Users' },
     ],
     superAdminItems: [
-      { href: '/dashboard/admin/make-admin', icon: <UserPlus className="h-5 w-5" />, label: 'Add Administrator' },
-      { href: '/dashboard/admin/showAllAdmin', icon: <UserCheck className="h-5 w-5" />, label: 'Administrators' },
+      { href: '/admin/make', icon: <UserPlus className="h-5 w-5" />, label: 'Add Administrator' },
+      { href: '/admin', icon: <UserCheck className="h-5 w-5" />, label: 'Administrators' },
     ],
   },
 } as const
@@ -99,8 +99,28 @@ export default function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen?
     if (userRole !== 'MODERATOR') return true
     if (href === '/dashboard') return true
     if (href === '/') return allowedRoutes.includes('/')
+    
+    // Map short URLs to their actual routes for permission checking
+    // Check both the short URL and the mapped route
+    const routeMap: Record<string, string> = {
+      '/create-layout': '/dashboard/layout/edit-dashboard',
+      '/category': '/dashboard/category',
+      '/noticeboard/settings': '/dashboard/manage-public-notice',
+      '/layouts/all': '/dashboard/noticeInterfaces',
+      '/create/notice': '/dashboard/create-notice',
+      '/notices/all': '/dashboard/showNotices',
+      '/notices/images': '/dashboard/showImageNotices',
+      '/notices/pdfs': '/dashboard/showPDFNotices',
+      '/admin': '/dashboard/admin/showAllAdmin',
+      '/admin/make': '/dashboard/admin/make-admin',
+    }
+    const actualRoute = routeMap[href] || href
+    
     const enforceable = allowedRoutes.filter(r => r && r !== '/' && r !== '/dashboard')
-    return enforceable.some(route => href.startsWith(route))
+    // Check if user has permission to either the short URL or the mapped route
+    return enforceable.some(route => 
+      href.startsWith(route) || (actualRoute !== href && actualRoute.startsWith(route))
+    )
   }
 
   const userManagementItems = useMemo(() => {
@@ -269,7 +289,7 @@ export default function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen?
           </div>
         )}
         {userRole === 'USER' && (
-          <SidebarLink link={{ href: '/dashboard/showNotices', icon: <List className="h-5 w-5" />, label: 'View Notices' }} className="text-white" />
+          <SidebarLink link={{ href: '/notices/all', icon: <List className="h-5 w-5" />, label: 'View Notices' }} className="text-white" />
         )}
       </SidebarBody>
     </UISidebar>

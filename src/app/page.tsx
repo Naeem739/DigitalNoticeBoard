@@ -185,27 +185,27 @@ export default function Home() {
           <div className="hidden md:flex space-x-6 items-center">
             <Link href="/" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               Home
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
             <Link href="/notice"  className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               Notice
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
             {session && (
               <>
                 <Link href="/dashboard"  className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
                   Dashboard
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-full"></span>
                 </Link>
               </>
             )}
             <Link href="#features" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               Features
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
             <Link href="#faq" className="text-gray-700 font-semibold hover:text-blue-600 transition-all duration-200 hover:scale-105 relative group">
               FAQ
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full"></span>
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
             
             <div className="flex space-x-4">
@@ -214,7 +214,7 @@ export default function Home() {
                 <div className="relative user-menu">
                   <button 
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center space-x-2 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 px-4 py-2 rounded-lg hover:border-blue-400 hover:shadow-md transition-all duration-200"
+                    className="flex items-center space-x-2 bg-blue-50 border-2 border-blue-200 px-4 py-2 rounded-lg hover:border-blue-400 hover:shadow-md transition-all duration-200"
                   >
                     <div className="relative">
                       <User className="w-5 h-5 text-blue-600" />
@@ -227,7 +227,7 @@ export default function Home() {
                   
                   {userMenuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white border-2 border-blue-200 rounded-lg shadow-xl shadow-blue-200/50 py-2 z-50 backdrop-blur-sm">
-                      <div className="px-4 py-3 border-b-2 border-blue-100 bg-gradient-to-r from-blue-50 to-transparent">
+                      <div className="px-4 py-3 border-b-2 border-blue-100 bg-blue-50">
                         <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">Account</p>
                         <p className="text-sm text-gray-700 font-medium">{session.user?.email}</p>
                       </div>
@@ -282,11 +282,11 @@ export default function Home() {
               <div className="flex flex-col space-y-3 pt-4">
                 {session ? (
                   <>
-                    <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
+                    <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
                       <p className="text-xs sm:text-sm font-semibold text-gray-800">Welcome, {session.user?.name || session.user?.email?.split('@')[0] || 'User'}!</p>
                     </div>
                     <Link href="/dashboard" target="_blank" onClick={() => setMobileMenuOpen(false)}>
-                      <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2.5 sm:py-3 rounded-lg transition-all duration-200 font-semibold text-sm sm:text-base shadow-lg shadow-blue-200">
+                      <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 sm:py-3 rounded-lg transition-all duration-200 font-semibold text-sm sm:text-base shadow-lg shadow-blue-200">
                         Go to Dashboard
                       </button>
                     </Link>
@@ -317,9 +317,9 @@ export default function Home() {
 
       <main className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 grid md:grid-cols-2 gap-8 sm:gap-12 md:gap-16 items-center relative mt-16 sm:mt-20">
         {/* Decorative background elements */}
-        <div className="absolute top-0 left-0 w-48 h-48 sm:w-72 sm:h-72 bg-purple-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
+        <div className="absolute top-0 left-0 w-48 h-48 sm:w-72 sm:h-72 bg-blue-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
         <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-blue-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 sm:w-96 sm:h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl -z-10 animate-pulse"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 sm:w-96 sm:h-96 bg-blue-500/10 rounded-full blur-3xl -z-10 animate-pulse"></div>
         
         <div className="relative z-10">
           {status === 'loading' ? null : session ? (
@@ -333,7 +333,7 @@ export default function Home() {
           ) : (
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-4 sm:mb-6 text-gray-900 leading-tight tracking-tight">
               <> 
-                Transform Your <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Digital Notice Board</span>
+                Transform Your <span className="text-blue-600">Digital Notice Board</span>
               </>
             </h1>
           )}
@@ -359,7 +359,7 @@ export default function Home() {
                       window.open('/dashboard', '_blank')
                     }
                   }}
-                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg transition-all duration-200 font-bold text-base sm:text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300"
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg transition-all duration-200 font-bold text-base sm:text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300"
                 >
                   Go to Dashboard
                 </motion.button>
@@ -382,7 +382,7 @@ export default function Home() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleGetStarted}
-                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg transition-all duration-200 font-bold text-base sm:text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300"
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg transition-all duration-200 font-bold text-base sm:text-lg shadow-xl shadow-blue-200 hover:shadow-2xl hover:shadow-blue-300"
                 >
                   Get Started
                 </motion.button>
@@ -410,7 +410,7 @@ export default function Home() {
             transition={{ duration: 0.5 }}
             className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 rounded-2xl overflow-hidden shadow-2xl shadow-blue-200/50 relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none z-10"></div>
+            <div className="absolute inset-0 bg-blue-100/20 pointer-events-none z-10"></div>
             <video
               className="w-full h-auto relative z-0"
               autoPlay
@@ -426,7 +426,7 @@ export default function Home() {
             
             {/* Decorative corner accents */}
             <div className="absolute top-0 left-0 w-20 h-20 border-t-4 border-l-4 border-blue-400 rounded-tl-2xl z-20"></div>
-            <div className="absolute bottom-0 right-0 w-20 h-20 border-b-4 border-r-4 border-purple-400 rounded-br-2xl z-20"></div>
+            <div className="absolute bottom-0 right-0 w-20 h-20 border-b-4 border-r-4 border-blue-400 rounded-br-2xl z-20"></div>
           </motion.div>
         </div>
       </main>
@@ -435,15 +435,15 @@ export default function Home() {
 
       <section id="features" className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 bg-gradient-to-b from-white via-blue-50/30 to-white relative overflow-hidden">
         {/* Decorative elements */}
-        <div className="absolute top-0 left-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-0 left-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-0 right-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
         
         <div className="text-center mb-10 sm:mb-12 md:mb-16 relative z-10">
-          <div className="inline-block mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full">
-            <span className="bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent font-bold text-xs sm:text-sm uppercase tracking-wider">Features</span>
+          <div className="inline-block mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-100 rounded-full">
+            <span className="text-blue-700 font-bold text-xs sm:text-sm uppercase tracking-wider">Features</span>
           </div>
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4 sm:mb-6 text-gray-900 tracking-tight px-2">
-            More Than Just a <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Notice Board</span>
+            More Than Just a <span className="text-blue-600">Notice Board</span>
           </h2>
           <p className="text-gray-700 text-base sm:text-lg md:text-xl lg:text-2xl font-semibold max-w-2xl mx-auto px-2">Comprehensive features for creating and managing digital notice boards</p>
         </div>
@@ -458,10 +458,10 @@ export default function Home() {
               className="bg-white border-2 border-blue-100 p-5 sm:p-6 md:p-8 rounded-2xl text-center hover:scale-105 hover:border-blue-300 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-blue-200/50 group relative overflow-hidden"
             >
               {/* Background gradient on hover */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/0 to-purple-50/0 group-hover:from-blue-50 group-hover:to-purple-50/50 transition-all duration-300 -z-10"></div>
+              <div className="absolute inset-0 bg-blue-50/0 group-hover:bg-blue-50 transition-all duration-300 -z-10"></div>
               
               <div className="relative z-10">
-                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 sm:mb-5 md:mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-blue-600 rounded-2xl mb-4 sm:mb-5 md:mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg">
                   <feature.icon className="text-white w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
                 </div>
                 <h3 className="text-lg sm:text-xl md:text-2xl font-extrabold mb-3 sm:mb-4 text-gray-900 tracking-tight">{feature.title}</h3>
@@ -482,14 +482,14 @@ export default function Home() {
         
         <div className="text-center mb-10 sm:mb-12 md:mb-16 relative z-10">
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4 sm:mb-6 text-gray-900 tracking-tight px-2">
-            How <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Admin</span> Creates a Notice
+            How <span className="text-blue-600">Admin</span> Creates a Notice
           </h2>
           <p className="text-gray-600 text-base sm:text-lg md:text-xl font-semibold max-w-2xl mx-auto px-2">Create professional notices in minutes with our intuitive drag-and-drop interface</p>
         </div>
 
         <div className="max-w-4xl mx-auto relative z-10 px-2 sm:px-0">
           {/* Vertical Timeline Line */}
-          <div className="absolute left-4 sm:left-6 md:left-8 lg:left-12 top-0 bottom-0 w-0.5 sm:w-1 bg-gradient-to-b from-blue-500 via-blue-500 to-purple-500 rounded-full"></div>
+          <div className="absolute left-4 sm:left-6 md:left-8 lg:left-12 top-0 bottom-0 w-0.5 sm:w-1 bg-blue-500 rounded-full"></div>
           
           {/* Timeline Steps */}
           <div className="space-y-8 sm:space-y-10 md:space-y-12">
@@ -535,7 +535,7 @@ export default function Home() {
               >
                 {/* Timeline Circle */}
                 <div className="relative z-10 flex-shrink-0">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg border-2 sm:border-3 md:border-4 border-white">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 bg-blue-600 rounded-full flex items-center justify-center shadow-lg border-2 sm:border-3 md:border-4 border-white">
                     <span className="text-white font-extrabold text-base sm:text-lg md:text-xl lg:text-2xl">{step.number}</span>
                   </div>
                   {/* Dotted connector line - only show if not last item */}
@@ -548,7 +548,7 @@ export default function Home() {
                 <div className="flex-1 bg-white rounded-xl p-4 sm:p-5 md:p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-blue-100 hover:border-blue-300 group ml-2 sm:ml-0">
                   <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                     {/* Icon */}
-                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-blue-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                       <step.icon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-white" />
                     </div>
                     
@@ -571,14 +571,14 @@ export default function Home() {
 
       <section id="faq" className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 bg-gradient-to-b from-white to-blue-50/20 relative overflow-hidden">
         {/* Decorative background */}
-        <div className="absolute top-1/4 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/4 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
         
         <div className="text-center mb-10 sm:mb-12 md:mb-16 relative z-10">
-          <div className="inline-block mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full">
-            <span className="bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent font-bold text-xs sm:text-sm uppercase tracking-wider">FAQ</span>
+          <div className="inline-block mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-100 rounded-full">
+            <span className="text-blue-700 font-bold text-xs sm:text-sm uppercase tracking-wider">FAQ</span>
           </div>
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4 sm:mb-6 text-gray-900 tracking-tight px-2">
-            Frequently <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Asked Questions</span>
+            Frequently <span className="text-blue-600">Asked Questions</span>
           </h2>
           <p className="text-gray-700 text-base sm:text-lg md:text-xl lg:text-2xl font-semibold px-2">Get quick answers to common queries</p>
         </div>
@@ -618,7 +618,7 @@ export default function Home() {
                 onClick={() => setActiveModal(activeModal === faq.question ? null : faq.question)}
               >
                   <div className="flex items-start sm:items-center space-x-2 sm:space-x-3 md:space-x-4 flex-1 min-w-0">
-                    <div className="flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
+                    <div className="flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-blue-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
                       <HelpCircle className="text-white w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5" />
                     </div>
                     <h3 className="text-sm sm:text-base md:text-lg lg:text-xl font-extrabold text-gray-900 tracking-tight flex-1">{faq.question}</h3>
@@ -660,7 +660,7 @@ export default function Home() {
       <footer className="bg-gray-900 border-t-4 border-blue-500 py-10 sm:py-12 md:py-16 relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-full h-full opacity-5">
-          <div className="absolute top-1/4 left-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-purple-500/20 rounded-full blur-3xl"></div>
+          <div className="absolute top-1/4 left-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-blue-500/20 rounded-full blur-3xl"></div>
           <div className="absolute bottom-1/4 right-1/4 w-48 h-48 sm:w-64 sm:h-64 bg-blue-500/20 rounded-full blur-3xl"></div>
         </div>
         
@@ -674,7 +674,7 @@ export default function Home() {
                   className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-lg"
                 />
               </div>
-              <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-white tracking-tight bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Digital Notice Board</span>
+              <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-white tracking-tight">Digital Notice Board</span>
             </Link>
             <p className="text-gray-300 font-medium leading-relaxed text-sm sm:text-base">Empowering organizations with efficient notice management, real-time updates, and seamless information sharing.</p>
           </div>

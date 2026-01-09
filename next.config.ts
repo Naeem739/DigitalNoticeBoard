@@ -5,6 +5,52 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  
+  // URL rewrites for cleaner, shorter URLs
+  async rewrites() {
+    return [
+      {
+        source: '/create-layout',
+        destination: '/dashboard/layout/edit-dashboard',
+      },
+      {
+        source: '/category',
+        destination: '/dashboard/category',
+      },
+      {
+        source: '/noticeboard/settings',
+        destination: '/dashboard/manage-public-notice',
+      },
+      {
+        source: '/layouts/all',
+        destination: '/dashboard/noticeInterfaces',
+      },
+      {
+        source: '/create/notice',
+        destination: '/dashboard/create-notice',
+      },
+      {
+        source: '/notices/all',
+        destination: '/dashboard/showNotices',
+      },
+      {
+        source: '/notices/images',
+        destination: '/dashboard/showImageNotices',
+      },
+      {
+        source: '/notices/pdfs',
+        destination: '/dashboard/showPDFNotices',
+      },
+      {
+        source: '/admin',
+        destination: '/dashboard/admin/showAllAdmin',
+      },
+      {
+        source: '/admin/make',
+        destination: '/dashboard/admin/make-admin',
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

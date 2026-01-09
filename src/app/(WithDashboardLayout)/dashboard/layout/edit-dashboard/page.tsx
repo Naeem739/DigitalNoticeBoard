@@ -131,7 +131,7 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   customCategoryName: "",
   
   // Image display settings (enhanced for professional use)
-  imageFit: "cover",
+  imageFit: "contain",
   imageBorderRadius: 8,
   showImageTitle: true,
   imageTitleColor: "#ffffff",
@@ -166,7 +166,7 @@ const RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> =
 const GRID_ROW_HEIGHT = 50
 const GRID_MARGIN: [number, number] = [12, 12]
 // Account for the padded/bordered dashboard container so maxRows matches visible space
-const DASHBOARD_VERTICAL_PADDING = 32 // p-4 top + bottom (16px each)
+const DASHBOARD_VERTICAL_PADDING = 24 // p-3 top + bottom (12px each)
 const DASHBOARD_VERTICAL_BORDER = 8   // border-4 top + bottom (4px each)
 
 // Helper function to convert hex color to rgba
@@ -334,10 +334,85 @@ function EditDashboardDemo() {
   const [categories, setCategories] = useState<TCategoriesWithNotices[]>([])
   const [activeSettingsWidget, setActiveSettingsWidget] = useState<string | null>(null)
 
+  // Responsive container width tracking
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState<number>(0)
+
+  // Track container width for responsive design
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const updateWidth = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.clientWidth
+        // Only update if width is valid and greater than 0
+        if (width > 0) {
+          setContainerWidth(width)
+        }
+      }
+    }
+
+    // Initial width - use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      updateWidth()
+      // Also try after a small delay to catch any layout shifts
+      setTimeout(updateWidth, 100)
+    })
+
+    // Use ResizeObserver for better performance
+    const resizeObserver = new ResizeObserver(() => {
+      updateWidth()
+    })
+
+    resizeObserver.observe(containerRef.current)
+
+    // Fallback to window resize listener
+    window.addEventListener('resize', updateWidth)
+
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', updateWidth)
+    }
+  }, [selectedRatio]) // Re-run when ratio changes
+
+  // Calculate responsive dimensions based on container width while maintaining aspect ratio
+  const responsiveDimensions = useMemo(() => {
+    if (!selectedRatio || containerWidth === 0) {
+      return { width: 0, height: 0 }
+    }
+
+    const aspectRatio = RATIO_DIMENSIONS[selectedRatio]
+    const aspectRatioValue = aspectRatio.width / aspectRatio.height
+
+    // Calculate max width (account for padding: 0.5rem = 8px on each side, so 16px total, plus container padding 12px on each side)
+    const maxWidth = containerWidth - 16
+    // Calculate max height (account for viewport and padding)
+    const maxHeight = Math.min(window.innerHeight * 0.85, containerWidth / aspectRatioValue)
+
+    // Calculate dimensions that fit within container while maintaining aspect ratio
+    let width = Math.min(maxWidth, aspectRatio.width)
+    let height = width / aspectRatioValue
+
+    // If height exceeds max height, scale down
+    if (height > maxHeight) {
+      height = maxHeight
+      width = height * aspectRatioValue
+    }
+
+    // Ensure minimum size
+    const minWidth = 320
+    if (width < minWidth) {
+      width = minWidth
+      height = width / aspectRatioValue
+    }
+
+    return { width: Math.floor(width), height: Math.floor(height) }
+  }, [selectedRatio, containerWidth])
+
   // Calculate the maximum rows the grid can fit inside the visible container
   const gridMaxRows = useMemo(() => {
-    if (!selectedRatio) return undefined
-    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height * 1.0
+    if (!selectedRatio || responsiveDimensions.height === 0) return undefined
+    const containerHeight = responsiveDimensions.height
     const innerHeight = Math.max(
       0,
       containerHeight - DASHBOARD_VERTICAL_PADDING - DASHBOARD_VERTICAL_BORDER,
@@ -345,7 +420,7 @@ function EditDashboardDemo() {
     const totalRowHeight = GRID_ROW_HEIGHT + GRID_MARGIN[1]
     const rows = Math.floor((innerHeight + GRID_MARGIN[1]) / totalRowHeight)
     return Math.max(1, rows)
-  }, [selectedRatio])
+  }, [selectedRatio, responsiveDimensions.height])
 
   // New state for draggable settings panel
   const [settingsPosition, setSettingsPosition] = useState({ x: 0, y: 0 })
@@ -1538,8 +1613,9 @@ function EditDashboardDemo() {
 
     // Convert pixel position to grid position
     // GridLayout configuration: cols=12, rowHeight=50, margin=[12,12]
-    const containerWidth = (RATIO_DIMENSIONS[selectedRatio].width * 1.3) - 32
-    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height * 1.0 // Fixed: Use 100% height instead of 130%
+    // Use actual container dimensions (accounting for padding: 12px on each side = 24px total)
+    const containerWidth = responsiveDimensions.width > 0 ? responsiveDimensions.width - 24 : rect.width - 24
+    const containerHeight = responsiveDimensions.height > 0 ? responsiveDimensions.height : rect.height
     
     // Calculate grid cell dimensions
     const colWidth = (containerWidth - 11 * 24) / 12 // 11 gaps between 12 columns, each gap is 24px (12px margin on each side)
@@ -1584,10 +1660,11 @@ function EditDashboardDemo() {
   }
 
   const calculateDimensionsPercentage = (widgetLayout: Layout) => {
-    if (!selectedRatio) return { width: "0%", height: "0%" }
+    if (!selectedRatio || responsiveDimensions.width === 0) return { width: "0%", height: "0%" }
 
-    const containerWidth = (RATIO_DIMENSIONS[selectedRatio].width * 1.3) - 32
-    const containerHeight = RATIO_DIMENSIONS[selectedRatio].height * 1.0 // Fixed: Use 100% height instead of 130%
+    // Use responsive dimensions (accounting for padding: 12px on each side = 24px total)
+    const containerWidth = responsiveDimensions.width - 24
+    const containerHeight = responsiveDimensions.height
 
     const colWidth = (containerWidth - 11 * 24) / 12 // Fixed: 11 gaps between 12 columns, each gap is 24px
     const rowHeight = 50 // Match the new rowHeight
@@ -1650,7 +1727,7 @@ function EditDashboardDemo() {
           const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
           if (!specificLayout) return null
 
-          const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
+          const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 24
           const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0 // Fixed: Use 100% height instead of 130%
 
           const colWidth = (containerWidth - 11 * 24) / 12
@@ -2398,7 +2475,7 @@ function EditDashboardDemo() {
             const specificLayout = screen.layout.filter((item) => widget.id === item.i)[0]
             if (!specificLayout) return null
 
-                      const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 32
+                      const containerWidth = (RATIO_DIMENSIONS[selectedRatio || "4:3"].width * 1.3) - 24
           const containerHeight = RATIO_DIMENSIONS[selectedRatio || "4:3"].height * 1.0 // Fixed: Use 100% height instead of 130%
 
             const colWidth = (containerWidth - 11 * 24) / 12
@@ -2870,16 +2947,17 @@ function EditDashboardDemo() {
           </div>
           
       {selectedRatio && (
-        <div className="dashboard-screen-container">
+        <div className="dashboard-screen-container" ref={containerRef}>
           <div
-            className={`border-4 border-dashed rounded-lg overflow-hidden bg-white p-4  relative transition-all duration-200 ${
+            className={`border-4 border-dashed rounded-lg overflow-hidden bg-white p-3 relative transition-all duration-200 ${
               isDragOverDashboard 
                 ? 'border-amber-500 bg-amber-50 shadow-lg' 
                 : 'border-amber-400'
             }`}
             style={{
-              width: RATIO_DIMENSIONS[selectedRatio].width * 1.0, // Increased screen size by 30% for better visibility
-              height: RATIO_DIMENSIONS[selectedRatio].height * 1.0, // Fixed: Use 100% height to maintain aspect ratio without exceeding 100%
+              width: responsiveDimensions.width > 0 ? `${responsiveDimensions.width}px` : '100%',
+              height: responsiveDimensions.height > 0 ? `${responsiveDimensions.height}px` : 'auto',
+              maxWidth: '100%',
             }}
             onDrop={(e) => handleDrop(e)}
             onDragOver={handleDragOver}
@@ -2902,7 +2980,7 @@ function EditDashboardDemo() {
             layout={layout}
             cols={12}
             rowHeight={GRID_ROW_HEIGHT}
-            width={(RATIO_DIMENSIONS[selectedRatio].width * 1.0) -136}
+            width={responsiveDimensions.width > 0 ? responsiveDimensions.width - 24 : 1200}
             onLayoutChange={handleLayoutChange}
             margin={GRID_MARGIN}
             {...(gridMaxRows ? { maxRows: gridMaxRows } : {})}
