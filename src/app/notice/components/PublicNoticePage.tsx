@@ -189,10 +189,9 @@ export default function PublicNoticePage() {
   const getResponsiveQRSize = () => {
     const w = viewportWidth
     if (!w) return 80
-    if (w <= 360) return 30
-    if (w <= 400) return 30
-    if (w <= 640) return 30
-    if (w <= 1366) return 30
+    if (w <= 480) return 40 // Mobile: very small QR code (40px)
+    if (w <= 640) return 50
+    if (w <= 1366) return 60
     if (w <= 2560) return 100
     if (w <= 3400) return 120
     if (w < 3840) return 140
@@ -715,8 +714,8 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-0 p-0 overflow-hidden">
-        <div className="w-full h-full overflow-hidden">
+      <main className={`flex-1 min-h-0 p-0 ${isMobile ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <div className={`w-full ${isMobile ? 'h-auto' : 'h-full'} ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}>
           {/* Dashboard Content */}
           {dashboardLoading ? (
             <motion.div 
@@ -732,26 +731,27 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className={`w-full h-full rounded-lg shadow-lg ${getResponsiveContentPadding()} overflow-hidden`}
+              className={`w-full ${isMobile ? 'h-auto' : 'h-full'} rounded-lg shadow-lg ${isMobile ? 'p-0' : getResponsiveContentPadding()} ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
               <div 
-                className="relative w-full h-full overflow-hidden rounded-lg shadow-lg"
+                className={`relative w-full ${isMobile ? 'h-auto' : 'h-full'} ${isMobile ? 'overflow-visible' : 'overflow-hidden'} rounded-lg shadow-lg`}
                 style={{
                   minHeight: '0',
-                  height: '100%'
+                  height: isMobile ? 'auto' : '100%'
                 }}
               >
                 {/* Grid Layout for Widgets */}
                 <div 
-                  className={`grid ${getResponsiveGridGap()} ${getResponsiveContentPadding()} notice-grid-container`} 
+                  className={`grid ${isMobile ? 'gap-0' : getResponsiveGridGap()} ${isMobile ? 'p-0' : getResponsiveContentPadding()} notice-grid-container`} 
                   style={{ 
                     gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)',
-                    height: '100%',
-                    maxHeight: '100%',
-                    overflow: 'hidden'
+                    height: isMobile ? 'auto' : '100%',
+                    maxHeight: isMobile ? 'none' : '100%',
+                    overflow: isMobile ? 'visible' : 'hidden',
+                    overflowY: isMobile ? 'auto' : 'hidden'
                   }}
                 >
                   {currentDashboard.containers.map((container, index) => {
@@ -778,13 +778,15 @@ export default function PublicNoticePage() {
                           backgroundColor: (container.type === 'pdf' || container.type === 'image') ? '#ffffff' : `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
                           border: (container.type === 'pdf' || container.type === 'image') ? '2px solid #e5e7eb' : `${borderWidth}px solid ${borderColor}`,
                           position: 'relative',
-                          minHeight: isMobile ? 'auto' : (container.type === 'pdf' || container.type === 'image') ? '200px' : '150px',
-                          maxHeight: isMobile ? 'none' : '100%',
+                          minHeight: isMobile ? 'calc(100vh - 200px)' : (container.type === 'pdf' || container.type === 'image') ? '200px' : '150px',
+                          maxHeight: isMobile ? 'calc(100vh - 200px)' : '100%',
+                          width: isMobile ? '100vw' : 'auto',
+                          marginBottom: isMobile ? '1rem' : '0',
                           boxShadow: (container.type === 'pdf' || container.type === 'image') ? '0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -2px rgba(0,0,0,0.05)' : `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`,
                           // Ensure PDF containers fill completely and have white background
                           ...(container.type === 'pdf' ? {
-                            width: '100%',
-                            height: '100%',
+                            width: isMobile ? '100vw' : '100%',
+                            height: isMobile ? 'calc(100vh - 200px)' : '100%',
                             backgroundColor: '#ffffff',
                             overflow: 'hidden'
                           } : {})
@@ -943,7 +945,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                         notice={notice}
                                         imageData={notice.imageData}
                                         imageTitle={notice.imageFileName || notice.title}
-                                        size={160}
+                                        size={isMobile ? 40 : 160}
                                         className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
                                       />
                                     </div>
@@ -1127,7 +1129,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           notice={notice}
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
-                                          size={160}
+                                          size={isMobile ? 40 : 160}
                                           className="w-full h-full responsive-qr-code"
                                         />
                                       </div>
@@ -1187,8 +1189,8 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                        <div 
                                          className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-3"
                                          style={{
-                                           minWidth: '160px',
-                                           minHeight: '160px',
+                                           minWidth: isMobile ? '40px' : '160px',
+                                           minHeight: isMobile ? '40px' : '160px',
                                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)'
                                          }}
                                        >
@@ -1199,7 +1201,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                              pdfData: pdf.pdfData,
                                              pdfFileName: pdf.fileName || pdf.title
                                            }}
-                                           size={160}
+                                           size={isMobile ? 40 : 160}
                                            className="w-full h-full responsive-qr-code"
                                          />
                                        </div>
@@ -1256,10 +1258,10 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                        <div 
                                          className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-3"
                                          style={{
-                                           width: getResponsiveQRContainerSize(),
-                                           height: getResponsiveQRContainerSize(),
-                                           minWidth: '80px',
-                                           minHeight: '80px',
+                                           width: isMobile ? '40px' : getResponsiveQRContainerSize(),
+                                           height: isMobile ? '40px' : getResponsiveQRContainerSize(),
+                                           minWidth: isMobile ? '40px' : '80px',
+                                           minHeight: isMobile ? '40px' : '80px',
                                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)'
                                          }}
                                        >
@@ -1270,7 +1272,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                              pdfData: container.pdfData,
                                              pdfFileName: container.pdfFileName
                                            }}
-                                           size={getResponsiveQRSize()}
+                                           size={isMobile ? 40 : getResponsiveQRSize()}
                                            className="w-full h-full"
                                          />
                                        </div>
