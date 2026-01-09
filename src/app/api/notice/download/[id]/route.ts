@@ -198,6 +198,102 @@ export async function GET(
             padding: 20mm 15mm;
           }
           
+          /* Mobile Responsive Styles */
+          @media screen and (max-width: 768px) {
+            .page-container {
+              max-width: 100%;
+              padding: 10mm 8mm;
+            }
+            
+            body {
+              font-size: 14px;
+            }
+            
+            .header-title h1 {
+              font-size: 18px;
+            }
+            
+            .header-title h2 {
+              font-size: 15px;
+            }
+            
+            .header-contact {
+              font-size: 10px;
+            }
+            
+            .reference-line {
+              flex-direction: column;
+              gap: 8px;
+            }
+            
+            .ref-number,
+            .ref-date {
+              text-align: left;
+              width: 100%;
+            }
+            
+            .notice-title h3 {
+              font-size: 18px;
+            }
+            
+            .notice-content h4 {
+              font-size: 14px;
+            }
+            
+            .notice-content .content-body {
+              font-size: 13px;
+              line-height: 1.6;
+            }
+            
+            .print-button {
+              top: 10px;
+              right: 10px;
+              padding: 10px 20px;
+              font-size: 12px;
+            }
+          }
+          
+          @media screen and (max-width: 480px) {
+            .page-container {
+              padding: 8mm 5mm;
+            }
+            
+            .header-title h1 {
+              font-size: 16px;
+            }
+            
+            .header-title h2 {
+              font-size: 13px;
+            }
+            
+            .header-contact {
+              font-size: 9px;
+            }
+            
+            .reference-line {
+              font-size: 11px;
+            }
+            
+            .notice-title h3 {
+              font-size: 16px;
+            }
+            
+            .notice-content h4 {
+              font-size: 13px;
+            }
+            
+            .notice-content .content-body {
+              font-size: 12px;
+            }
+            
+            .print-button {
+              padding: 8px 16px;
+              font-size: 11px;
+              top: 5px;
+              right: 5px;
+            }
+          }
+          
           /* Header Section */
           .header-section {
             border-bottom: 2px solid #000;

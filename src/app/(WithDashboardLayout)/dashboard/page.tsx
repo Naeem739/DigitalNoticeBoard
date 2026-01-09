@@ -259,8 +259,8 @@ export default function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6"
       >
-        {isAllowed('/dashboard/showNotices') && (
-          <Link href="/dashboard/showNotices">
+        {isAllowed('/notices/all') && (
+          <Link href="/notices/all">
             <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-4 sm:p-5 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -277,8 +277,8 @@ export default function DashboardPage() {
           </Link>
         )}
 
-        {session?.user?.role !== 'USER' && isAllowed('/dashboard/category') && (
-          <Link href="/dashboard/category">
+        {session?.user?.role !== 'USER' && isAllowed('/category') && (
+          <Link href="/category">
             <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-4 sm:p-5 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -295,8 +295,8 @@ export default function DashboardPage() {
           </Link>
         )}
 
-        {isAllowed('/dashboard/showImageNotices') && (
-          <Link href="/dashboard/showImageNotices">
+        {isAllowed('/notices/images') && (
+          <Link href="/notices/images">
             <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-4 sm:p-5 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -313,8 +313,8 @@ export default function DashboardPage() {
           </Link>
         )}
 
-        {isAllowed('/dashboard/showPDFNotices') && (
-          <Link href="/dashboard/showPDFNotices">
+        {isAllowed('/notices/pdfs') && (
+          <Link href="/notices/pdfs">
             <Card className="bg-gradient-to-br from-red-50 to-pink-50 border-red-200 hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-4 sm:p-5 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -331,8 +331,8 @@ export default function DashboardPage() {
           </Link>
         )}
 
-        {session?.user?.role !== 'USER' && isAllowed('/dashboard/noticeInterfaces') && (
-          <Link href="/dashboard/noticeInterfaces">
+        {session?.user?.role !== 'USER' && isAllowed('/layouts/all') && (
+          <Link href="/layouts/all">
             <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-orange-200 hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-4 sm:p-5 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -357,8 +357,8 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4"
         >
-          {(session?.user?.role !== 'MODERATOR' || isAllowed('/dashboard/create-notice')) && (
-            <Link href="/dashboard/create-notice">
+          {(session?.user?.role !== 'MODERATOR' || isAllowed('/create/notice')) && (
+            <Link href="/create/notice">
               <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 group">
                 <CardContent className="p-3 sm:p-4 text-center">
                   <div className="p-2 sm:p-3 bg-blue-100 rounded-lg w-fit mx-auto mb-2 sm:mb-3 group-hover:bg-blue-200 transition-colors">
@@ -371,8 +371,8 @@ export default function DashboardPage() {
             </Link>
           )}
 
-          {(session?.user?.role !== 'MODERATOR' || isAllowed('/dashboard/layout/edit-dashboard')) && (
-            <Link href="/dashboard/layout/edit-dashboard">
+          {(session?.user?.role !== 'MODERATOR' || isAllowed('/create-layout')) && (
+            <Link href="/create-layout">
               <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-green-300 group">
                 <CardContent className="p-3 sm:p-4 text-center">
                   <div className="p-2 sm:p-3 bg-green-100 rounded-lg w-fit mx-auto mb-2 sm:mb-3 group-hover:bg-green-200 transition-colors">
@@ -385,8 +385,8 @@ export default function DashboardPage() {
             </Link>
           )}
 
-          {(session?.user?.role !== 'MODERATOR' || isAllowed('/dashboard/showNotices')) && (
-            <Link href="/dashboard/showNotices">
+          {(session?.user?.role !== 'MODERATOR' || isAllowed('/notices/all')) && (
+            <Link href="/notices/all">
               <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-purple-300 group">
                 <CardContent className="p-3 sm:p-4 text-center">
                   <div className="p-2 sm:p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-2 sm:mb-3 group-hover:bg-purple-200 transition-colors">
@@ -405,7 +405,7 @@ export default function DashboardPage() {
                 ? "/dashboard/admin/make-moderator" 
                 : session?.user?.role === 'MODERATOR'
                 ? "/dashboard/admin/make-user"
-                : "/dashboard/admin/make-admin"
+                : "/admin/make"
             }>
               <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-orange-300 group">
                 <CardContent className="p-3 sm:p-4 text-center">
@@ -449,7 +449,7 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4"
         >
-          <Link href="/dashboard/showNotices">
+          <Link href="/notices/all">
             <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-300 group">
               <CardContent className="p-3 sm:p-4 text-center">
                 <div className="p-2 sm:p-3 bg-blue-100 rounded-lg w-fit mx-auto mb-2 sm:mb-3 group-hover:bg-blue-200 transition-colors">
@@ -461,7 +461,7 @@ export default function DashboardPage() {
             </Card>
           </Link>
 
-          <Link href="/dashboard/showImageNotices">
+          <Link href="/notices/images">
             <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-purple-300 group">
               <CardContent className="p-3 sm:p-4 text-center">
                 <div className="p-2 sm:p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-2 sm:mb-3 group-hover:bg-purple-200 transition-colors">
@@ -473,7 +473,7 @@ export default function DashboardPage() {
             </Card>
           </Link>
 
-          <Link href="/dashboard/showPDFNotices">
+          <Link href="/notices/pdfs">
             <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-red-300 group">
               <CardContent className="p-3 sm:p-4 text-center">
                 <div className="p-2 sm:p-3 bg-red-100 rounded-lg w-fit mx-auto mb-2 sm:mb-3 group-hover:bg-red-200 transition-colors">
@@ -490,7 +490,7 @@ export default function DashboardPage() {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Recent Notices */}
-        {isAllowed('/dashboard/showNotices') && (
+        {isAllowed('/notices/all') && (
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -509,8 +509,8 @@ export default function DashboardPage() {
                     <p className="text-gray-500 text-sm sm:text-base">
                       {session?.user?.role === 'USER' ? 'No notices available yet' : 'No notices yet'}
                     </p>
-                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/dashboard/create-notice'))) && (
-                      <Link href="/dashboard/create-notice">
+                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/create/notice'))) && (
+                      <Link href="/create/notice">
                         <Button variant="outline" size="sm" className="mt-2 text-xs sm:text-sm">
                           <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                           Create First Notice
@@ -556,7 +556,7 @@ export default function DashboardPage() {
                       );
                     })}
                     <div className="text-center pt-2">
-                      <Link href="/dashboard/showNotices">
+                      <Link href="/notices/all">
                         <Button variant="outline" size="sm" className="text-xs sm:text-sm">
                           View All Notices
                         </Button>
@@ -570,7 +570,7 @@ export default function DashboardPage() {
         )}
 
         {/* Recent Images */}
-        {isAllowed('/dashboard/showImageNotices') && (
+        {isAllowed('/notices/images') && (
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -589,8 +589,8 @@ export default function DashboardPage() {
                     <p className="text-gray-500 text-sm sm:text-base">
                       {session?.user?.role === 'USER' ? 'No images available yet' : 'No images uploaded yet'}
                     </p>
-                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/dashboard/layout/edit-dashboard'))) && (
-                      <Link href="/dashboard/layout/edit-dashboard">
+                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/create-layout'))) && (
+                      <Link href="/create-layout">
                         <Button variant="outline" size="sm" className="mt-2 text-xs sm:text-sm">
                           <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                           Add Images
@@ -624,7 +624,7 @@ export default function DashboardPage() {
                       </div>
                     ))}
                     <div className="text-center pt-2">
-                      <Link href="/dashboard/showImageNotices">
+                      <Link href="/notices/images">
                         <Button variant="outline" size="sm" className="text-xs sm:text-sm">
                           View All Images
                         </Button>
@@ -638,7 +638,7 @@ export default function DashboardPage() {
         )}
 
         {/* Recent PDFs */}
-        {isAllowed('/dashboard/showPDFNotices') && (
+        {isAllowed('/notices/pdfs') && (
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -657,8 +657,8 @@ export default function DashboardPage() {
                     <p className="text-gray-500 text-sm sm:text-base">
                       {session?.user?.role === 'USER' ? 'No PDFs available yet' : 'No PDFs uploaded yet'}
                     </p>
-                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/dashboard/create-notice'))) && (
-                      <Link href="/dashboard/create-notice">
+                    {(session?.user?.role === 'ADMIN' || (session?.user?.role === 'MODERATOR' && isAllowed('/create/notice'))) && (
+                      <Link href="/create/notice">
                         <Button variant="outline" size="sm" className="mt-2 text-xs sm:text-sm">
                           <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                           Add PDFs
@@ -688,7 +688,7 @@ export default function DashboardPage() {
                       </div>
                     ))}
                     <div className="text-center pt-2">
-                      <Link href="/dashboard/showPDFNotices">
+                      <Link href="/notices/pdfs">
                         <Button variant="outline" size="sm" className="text-xs sm:text-sm">
                           View All PDFs
                         </Button>

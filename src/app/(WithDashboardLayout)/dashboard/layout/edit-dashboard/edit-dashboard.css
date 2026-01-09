@@ -30,21 +30,30 @@
   justify-content: center;
   align-items: flex-start;
   min-height: 100vh;
-  padding: 1rem;
+  padding: 0.5rem;
   overflow-x: auto;
   overflow-y: auto;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Responsive adjustments for larger screen */
 @media (max-width: 1400px) {
   .dashboard-screen-container {
-    padding: 0.5rem;
+    padding: 0.25rem;
   }
 }
 
 @media (max-width: 1200px) {
   .dashboard-screen-container {
+    padding: 0.125rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-screen-container {
     padding: 0.25rem;
+    min-height: auto;
   }
 }
 

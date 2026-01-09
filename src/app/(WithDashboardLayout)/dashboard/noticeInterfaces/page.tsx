@@ -232,7 +232,7 @@ export default function NoticeInterfaces() {
                         size="sm"
                         onClick={() => {
                           if (typeof window !== 'undefined') {
-                            window.open(`/dashboard/layout/edit-dashboard?id=${dashboard.id}`, '_blank')
+                            window.open(`/create-layout?id=${dashboard.id}`, '_blank')
                           }
                         }}
                         className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-110"
