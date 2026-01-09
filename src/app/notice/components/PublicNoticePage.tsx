@@ -1223,30 +1223,35 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     backgroundColor: '#ffffff',
                                     borderRadius: '0',
                                     boxShadow: 'none',
-                                    border: 'none'
+                                    border: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
                                   }}
                                 >
-                                                                      <ClientOnly fallback={
-                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
-                                        <div className="text-center">
-                                          <div className="animate-pulse">
-                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
-                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
-                                          </div>
-                                          <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
-                                        </div>
-                                      </div>
-                                    }>
-                                      <LazyPdfWidget
-                                      pdfData={container.pdfData}
-                                      autoScroll={false}
-                                      className="h-full w-full"
-                                      showTitle={false}
-                                        containerId={container.id}
+                                  {/* Show first-page image from container.pdfimage if available.
+                                      Fallback to a simple PDF icon text if not present. */}
+                                  {container.pdfimage ? (
+                                    <img
+                                      src={container.pdfimage as string}
+                                      alt={container.title || container.pdfFileName || 'PDF'}
+                                      className="w-full h-full object-contain"
+                                      style={{
+                                        backgroundColor: '#ffffff'
+                                      }}
                                     />
-                                    </ClientOnly>
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center w-full h-full bg-gray-50">
+                                      <div className="w-16 h-16 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-semibold mb-2">
+                                        PDF
+                                      </div>
+                                      <p className="text-xs text-gray-500 px-4 text-center">
+                                        PDF preview not available. QR code will still open the full document.
+                                      </p>
+                                    </div>
+                                  )}
                                     
-                                     {/* QR Code - Bottom Right - Optimized for Easy Scanning */}
+                                     {/* QR Code - Bottom Right - Optimized for Easy Scanning (unchanged) */}
                                      <div className="absolute bottom-4 right-4 z-50">
                                        <div 
                                          className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-3"

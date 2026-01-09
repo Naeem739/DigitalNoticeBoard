@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/db/prisma'
 import puppeteer from 'puppeteer'
+import QRCode from 'qrcode'
 
 export async function GET(
   request: NextRequest,
@@ -122,6 +123,17 @@ export async function GET(
       formattedNoticeId = `BU/CSE/${categoryNameForId}/${currentYear}/${formattedNoticeNumber}`
     }
     
+    // Generate QR code data URL for this notice (used in print footer)
+    const baseUrl = request.nextUrl.origin
+    const qrContent = `${baseUrl}/api/notice/download/${notice.id}`
+    const qrDataUrl = await QRCode.toDataURL(qrContent, {
+      width: 50,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    })
     // Escape Notice ID to prevent XSS
     const escapedNoticeId = formattedNoticeId ? formattedNoticeId.replace(/[<>&'"]/g, (char) => {
       const entities: { [key: string]: string } = {
@@ -307,15 +319,6 @@ export async function GET(
             transform: translateY(-2px);
           }
           
-          .page-number {
-            position: fixed;
-            bottom: 15mm;
-            left: 15mm;
-            font-size: 12px;
-            color: #666;
-            text-align: left;
-          }
-          
           @media print {
             .print-button {
               display: none;
@@ -333,44 +336,45 @@ export async function GET(
             .header-section {
               break-after: avoid;
             }
+          }
+          
+          @page {
+            size: A4;
+            margin: 20mm 15mm 25mm 15mm;
+            counter-increment: page-counter;
             
-            .page-number {
-              position: fixed;
-              bottom: 15mm;
-              right: 15mm;
+            /* Left: QR code */
+            @bottom-left {
+              content: url('${qrDataUrl}');
+            }
+            
+            /* Center: digital notice text */
+            @bottom-center {
+              content: "This notice is issued digitally and does not require a physical signature.";
+              font-size: 12px;
+              color: #000;
+              text-align: center;
+              font-style: italic;
+              font-family: 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, sans-serif;
+            }
+            
+            /* Right: page number: Page X of Y */
+            @bottom-right {
+              content: "Page " counter(page-counter) " of " counter(pages);
               font-size: 12px;
               color: #666;
               text-align: right;
+              font-family: 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, sans-serif;
             }
-            
-            /* Hide the HTML page number element when printing - we use @page instead */
-            @media print {
-              .page-number {
-                display: none;
-              }
-            }
-            
-            @page {
-              size: A4;
-              margin: 20mm 15mm 25mm 15mm;
-              counter-increment: page-counter;
-              @bottom-right {
-                content: "Page " counter(page-counter);
-                font-size: 12px;
-                color: #666;
-                text-align: right;
-                font-family: 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, sans-serif;
-              }
-            }
-            
-            @page :first {
-              margin-top: 10mm;
-            }
+          }
+          
+          @page :first {
+            margin-top: 10mm;
           }
         </style>
       </head>
       <body>
-        <button class="print-button" onclick="window.print()">Print as PDF</button>
+        <button class="print-button" onclick="window.print()">Print</button>
         
         <div class="page-container">
           <!-- Header Section -->
@@ -411,9 +415,6 @@ export async function GET(
             </div>
           </div>
         </div>
-        
-        <!-- Page Number - Will be automatically numbered by CSS counter -->
-        <div class="page-number"></div>
       </body>
       </html>
     `

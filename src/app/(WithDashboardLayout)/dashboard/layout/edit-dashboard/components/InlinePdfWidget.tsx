@@ -8,7 +8,7 @@ import { Upload } from "lucide-react"
 import * as pdfjsLib from "pdfjs-dist"
 import { toast } from "sonner"
 
-function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfStored: (pdfId: string, pdfData: string, fileName: string) => void }) {
+function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfStored: (pdfId: string, pdfData: string, fileName: string, pdfimage?: string) => void }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -336,6 +336,55 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
     }
   }
 
+  // Generate first-page image from PDF data using PDF.js (client-side only)
+  const generateFirstPageImage = async (pdfData: string): Promise<string | undefined> => {
+    try {
+      if (!pdfData) return undefined
+
+      let pdfSource = pdfData
+      if (!pdfSource.startsWith("data:")) {
+        pdfSource = `data:application/pdf;base64,${pdfSource}`
+      }
+
+      const base64Data = pdfSource.includes(",")
+        ? pdfSource.split(",")[1]
+        : pdfSource.replace(/^data:application\/pdf;base64,/, "")
+
+      const binaryString = atob(base64Data)
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+
+      const pdf = await (pdfjsLib as any).getDocument({
+        data: bytes,
+        verbosity: 0,
+      }).promise
+
+      const page = await pdf.getPage(1)
+      const viewport = page.getViewport({ scale: 1.5 })
+
+      const canvas = document.createElement("canvas")
+      const context = canvas.getContext("2d")
+      if (!context) return undefined
+
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+
+      await page.render({
+        canvasContext: context,
+        viewport,
+      }).promise
+
+      const dataUrl = canvas.toDataURL("image/png")
+      console.log("[PDF IMAGE] Generated first-page image on client for widget", widgetId)
+      return dataUrl
+    } catch (err) {
+      console.error("[PDF IMAGE] Failed to generate first-page image on client", err)
+      return undefined
+    }
+  }
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || file.type !== "application/pdf") {
@@ -382,9 +431,12 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
           
           // Generate a unique ID for the PDF
           const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+          // Generate first page image on the client
+          const pdfimage = await generateFirstPageImage(pdfData)
           
-          // Notify parent component about the stored PDF with data
-          onPdfStored(pdfId, pdfData, file.name)
+          // Notify parent component about the stored PDF with data + image
+          onPdfStored(pdfId, pdfData, file.name, pdfimage)
           
           toast.dismiss(loadingToast)
           toast.success('PDF uploaded and stored successfully!')
@@ -607,7 +659,8 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
                             setCurrentPdfData(n.pdfData)
                             saveToLocalStorage(n.pdfData, n.pdfFileName || 'uploaded.pdf')
                             const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-                            onPdfStored(pdfId, n.pdfData, n.pdfFileName || 'uploaded.pdf')
+                            const pdfimage = await generateFirstPageImage(n.pdfData)
+                            onPdfStored(pdfId, n.pdfData, n.pdfFileName || 'uploaded.pdf', pdfimage)
                             setIsSelectModalOpen(false)
                             toast.success('PDF selected successfully')
                           } catch (err) {

@@ -220,6 +220,7 @@ interface ExtendedWidget extends Widget {
     pdfData: string
     fileName: string
     dbId?: string
+    pdfimage?: string // First page of PDF as image (base64)
   }>
 
 }
@@ -1752,6 +1753,8 @@ function EditDashboardDemo() {
             
             // Get PDF data directly from widget (no TempDashboard needed)
             const pdfData = pdf.pdfData || ''
+            // Get PDF image (first page converted to image)
+            const pdfimage = pdf.pdfimage || ''
 
             // Skip PDF notice creation during save to improve performance
             // PDF notices should be created when PDFs are added to widgets, not during save
@@ -1774,6 +1777,7 @@ function EditDashboardDemo() {
               type: "pdf",
               pdfData: pdfData || '',
               pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
+              pdfimage: pdfimage, // Store first page as image
               settings: {
                 backgroundColor: settings.backgroundColor,
                 backgroundOpacity: settings.backgroundOpacity,
@@ -3126,8 +3130,8 @@ function EditDashboardDemo() {
                     {widget.type === "pdf" && (
                       <InlinePdfWidget 
                         widgetId={widget.id}
-                        onPdfStored={(pdfId: string, pdfData: string, fileName: string) => {
-                          // Store PDF reference in widget with proper PDF data
+                        onPdfStored={(pdfId: string, pdfData: string, fileName: string, pdfimage?: string) => {
+                          // Store PDF reference in widget with PDF data and client-generated image
                           setWidgets(prev => prev.map(w => 
                             w.id === widget.id 
                               ? { 
@@ -3137,11 +3141,26 @@ function EditDashboardDemo() {
                                     title: fileName || 'PDF', 
                                     pdfData: pdfData, 
                                     fileName: fileName || 'uploaded.pdf', 
-                                    dbId: pdfId 
+                                    dbId: pdfId,
+                                    pdfimage: pdfimage
                                   }] 
                                 }
                               : w
                           ))
+
+                          if (pdfimage) {
+                            console.log('[PDF IMAGE] pdfimage stored on widget state (client-generated)', {
+                              widgetId: widget.id,
+                              pdfId,
+                              fileName,
+                            })
+                          } else {
+                            console.warn('[PDF IMAGE] No pdfimage provided from client generation', {
+                              widgetId: widget.id,
+                              pdfId,
+                              fileName,
+                            })
+                          }
                         }}
                       />
                     )}
