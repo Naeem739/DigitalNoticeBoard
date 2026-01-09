@@ -956,7 +956,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           color: settings.fontColor || '#1e293b',
                                           fontSize: `${getResponsiveTitleFontSize()}px`,
                                           fontWeight: settings.fontWeight || 'semibold',
-                                          fontFamily: settings.fontFamily || "'Tiro Bangla', 'Inter', sans-serif",
+                                          fontFamily: "'Times New Roman', 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, serif",
                                           lineHeight: '1.3',
                                           wordBreak: 'break-word',
                                           overflowWrap: 'break-word',
