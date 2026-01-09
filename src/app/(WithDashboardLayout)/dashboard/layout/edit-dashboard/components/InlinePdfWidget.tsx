@@ -44,143 +44,43 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
     }
   }, [])
 
-  // Load existing PDF data from TemporaryDashboard on mount and set up real-time updates
+  // Load existing PDF data from localStorage backup on mount
   useEffect(() => {
     const loadExistingPdf = async () => {
       try {
-        const response = await fetch('/api/temp-dashboard/get-all')
-        const result = await response.json()
-        
-        if (result.success && result.result.length > 0) {
-          // Find the temp dashboard that contains this widget
-          for (const tempDashboard of result.result) {
-            if (tempDashboard.containers) {
-              const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-              const widgetContainer = containers.find((container: any) => container.id === widgetId)
-              
-              if (widgetContainer && widgetContainer.pdfData) {
-                console.log("Found PDF data in temp dashboard for widget:", widgetId)
-                setCurrentPdfData(widgetContainer.pdfData)
-                try {
-                  await renderPdfFromData(widgetContainer.pdfData)
-                } catch (renderError) {
-                  console.error('Error rendering PDF from temp dashboard:', renderError)
-                  toast.error('Failed to load PDF from saved data. The file may be corrupted.')
-                }
-                break
-              }
+        // Try to recover from localStorage backup
+        const backupKey = `pdf-backup-${widgetId}`
+        const backupData = localStorage.getItem(backupKey)
+        if (backupData) {
+          const parsed = JSON.parse(backupData)
+          // Check if backup is recent (within last hour)
+          if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
+            setCurrentPdfData(parsed.pdfData)
+            try {
+              await renderPdfFromData(parsed.pdfData)
+              console.log("Recovered PDF data from localStorage backup")
+            } catch (renderError) {
+              console.error('Error rendering PDF from localStorage backup:', renderError)
+              toast.error('Failed to load PDF from backup. The file may be corrupted.')
             }
+          } else {
+            // Remove old backup
+            localStorage.removeItem(backupKey)
           }
         }
-        
-        // If no PDF data found in temp dashboard, try to recover from localStorage backup
-        if (!currentPdfData) {
-          try {
-            const backupKey = `pdf-backup-${widgetId}`
-            const backupData = localStorage.getItem(backupKey)
-            if (backupData) {
-              const parsed = JSON.parse(backupData)
-              // Check if backup is recent (within last hour)
-              if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
-                setCurrentPdfData(parsed.pdfData)
-                try {
-                  await renderPdfFromData(parsed.pdfData)
-                  console.log("Recovered PDF data from localStorage backup")
-                  
-                  // Try to save to temp dashboard again
-                  setTimeout(() => {
-                    saveToTempDashboard(parsed.pdfData, parsed.fileName)
-                  }, 1000)
-                } catch (renderError) {
-                  console.error('Error rendering PDF from localStorage backup:', renderError)
-                  toast.error('Failed to load PDF from backup. The file may be corrupted.')
-                }
-              } else {
-                // Remove old backup
-                localStorage.removeItem(backupKey)
-              }
-            }
-          } catch (backupError) {
-            console.error("Error recovering PDF data from backup:", backupError)
-          }
-        }
-      } catch (error) {
-        console.error("Error loading existing PDF from temp dashboard:", error)
-        
-        // Try to recover from localStorage backup as fallback
-        try {
-          const backupKey = `pdf-backup-${widgetId}`
-          const backupData = localStorage.getItem(backupKey)
-          if (backupData) {
-            const parsed = JSON.parse(backupData)
-            if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
-              setCurrentPdfData(parsed.pdfData)
-              try {
-                await renderPdfFromData(parsed.pdfData)
-                console.log("Recovered PDF data from localStorage backup after API error")
-              } catch (renderError) {
-                console.error('Error rendering PDF from localStorage backup after API error:', renderError)
-                toast.error('Failed to load PDF from backup. The file may be corrupted.')
-              }
-            }
-          }
-        } catch (backupError) {
-          console.error("Error recovering PDF data from backup after API error:", backupError)
-        }
+      } catch (backupError) {
+        console.error("Error recovering PDF data from backup:", backupError)
       }
     }
 
     // Load on mount
     loadExistingPdf()
     
-    // Set up real-time polling to check for updates every 2 seconds
-    const intervalId = setInterval(async () => {
-      try {
-        const response = await fetch('/api/temp-dashboard/get-all')
-        const result = await response.json()
-        
-        if (result.success && result.result.length > 0) {
-          for (const tempDashboard of result.result) {
-            if (tempDashboard.containers) {
-              const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-              const widgetContainer = containers.find((container: any) => container.id === widgetId)
-              
-              if (widgetContainer && widgetContainer.pdfData && widgetContainer.pdfData !== currentPdfData) {
-                console.log("PDF data updated in temp dashboard for widget:", widgetId)
-                setCurrentPdfData(widgetContainer.pdfData)
-                try {
-                  await renderPdfFromData(widgetContainer.pdfData)
-                } catch (renderError) {
-                  console.error('Error rendering updated PDF from temp dashboard:', renderError)
-                  toast.error('Failed to load updated PDF. The file may be corrupted.')
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error polling temp dashboard for updates:", error)
-      }
-    }, 2000) // Check every 2 seconds
-    
     return () => {
-      clearInterval(intervalId)
       stopAutoScroll()
     }
-  }, [widgetId, currentPdfData])
+  }, [widgetId])
 
-  // Auto-save to TemporaryDashboard whenever PDF data changes
-  useEffect(() => {
-    if (currentPdfData) {
-      const autoSaveTimer = setTimeout(() => {
-        saveToTempDashboard(currentPdfData, 'auto-saved.pdf')
-      }, 1000) // Save after 1 second of no changes
-      
-      return () => clearTimeout(autoSaveTimer)
-    }
-  }, [currentPdfData])
-
-  // Removed TempDashboard auto-save - using localStorage only for better performance
   // Auto-save dashboard state when component unmounts
   useEffect(() => {
     return () => {
@@ -420,131 +320,19 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
     }
   }
 
-  // Function to refresh dashboard state from TemporaryDashboard
-  const refreshFromTempDashboard = async () => {
+  // Save PDF data to localStorage as backup
+  const saveToLocalStorage = (pdfData: string, fileName: string) => {
     try {
-      console.log("Refreshing dashboard from TemporaryDashboard")
-      const response = await fetch('/api/temp-dashboard/get-all')
-      const result = await response.json()
-      
-      if (result.success && result.result.length > 0) {
-        const tempDashboard = result.result[0]
-        if (tempDashboard.containers && tempDashboard.containers.length > 0) {
-          const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-          const pdfContainers = containers.filter((container: any) => container.type === 'pdf' && container.pdfData)
-          
-          if (pdfContainers.length > 0) {
-            console.log("Refreshing PDF data for", pdfContainers.length, "widgets")
-            const pdfContainer = pdfContainers.find((container: any) => container.id === widgetId)
-            if (pdfContainer) {
-              const genId = `pdf-${Date.now()}`
-              onPdfStored(genId, pdfContainer.pdfData, pdfContainer.pdfFileName || 'uploaded.pdf')
-            }
-          }
-        }
+      const backupData = {
+        widgetId,
+        pdfData,
+        fileName,
+        timestamp: Date.now()
       }
-    } catch (error) {
-      console.error('Error refreshing from temp dashboard:', error)
-    }
-  }
-
-  const saveToTempDashboard = async (pdfData: string, fileName: string) => {
-    try {
-      // Get current temp dashboard data
-      const response = await fetch('/api/temp-dashboard/get-all')
-      const result = await response.json()
-      
-      if (result.success && result.result.length > 0) {
-        // Update the first temp dashboard with the new PDF data
-        const tempDashboard = result.result[0]
-        const containers = Array.isArray(tempDashboard.containers) ? tempDashboard.containers : JSON.parse(tempDashboard.containers)
-        
-        // Find and update the widget container
-        const updatedContainers = containers.map((container: any) => {
-          if (container.id === widgetId) {
-            return {
-              ...container,
-              pdfData: pdfData,
-              pdfFileName: fileName,
-              type: "pdf"
-            }
-          }
-          return container
-        })
-
-        // Update the temp dashboard
-        const updateResponse = await fetch(`/api/temp-dashboard/update/${tempDashboard.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            containers: updatedContainers
-          })
-        })
-
-        const updateResult = await updateResponse.json()
-        if (updateResult.success) {
-          console.log("PDF data saved to temp dashboard successfully")
-          // Trigger immediate refresh to display the updated PDF
-          setTimeout(() => {
-            refreshFromTempDashboard()
-          }, 500)
-        } else {
-          console.error("Failed to save PDF data to temp dashboard:", updateResult)
-        }
-              } else {
-        // No temp dashboard exists yet, create one with current widget data
-        console.log("No temp dashboard found, creating one with PDF data")
-        try {
-          const createResponse = await fetch('/api/temp-dashboard/create', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              aspectRatio: '16:9', // Default aspect ratio
-              containers: [{
-                id: widgetId,
-                type: 'pdf',
-                pdfData: pdfData,
-                pdfFileName: fileName
-              }],
-              screenName: 'Screen 1',
-              screenIndex: 0,
-              totalScreens: 1
-            })
-          })
-
-          const createResult = await createResponse.json()
-          if (createResult.success) {
-            console.log("Created new temp dashboard with PDF data")
-            // Trigger immediate refresh to display the PDF
-            setTimeout(() => {
-              refreshFromTempDashboard()
-            }, 500)
-          } else {
-            console.warn("Failed to create temp dashboard:", createResult.error)
-          }
-        } catch (error) {
-          console.error("Error creating temp dashboard:", error)
-          // Fallback: store PDF data in localStorage as backup
-          try {
-            const backupData = {
-              widgetId,
-              pdfData,
-              fileName,
-              timestamp: Date.now()
-            }
-            localStorage.setItem(`pdf-backup-${widgetId}`, JSON.stringify(backupData))
-            console.log("PDF data backed up to localStorage")
-          } catch (localStorageError) {
-            console.error("Failed to backup PDF data to localStorage:", localStorageError)
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error saving PDF to temp dashboard:", error)
+      localStorage.setItem(`pdf-backup-${widgetId}`, JSON.stringify(backupData))
+      console.log("PDF data backed up to localStorage")
+    } catch (localStorageError) {
+      console.error("Failed to backup PDF data to localStorage:", localStorageError)
     }
   }
 
@@ -589,8 +377,8 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
           // Render the uploaded PDF
           await renderPdfFromData(pdfData)
           
-          // Save to TemporaryDashboard immediately
-          await saveToTempDashboard(pdfData, file.name)
+          // Save to localStorage as backup
+          saveToLocalStorage(pdfData, file.name)
           
           // Generate a unique ID for the PDF
           const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -816,7 +604,8 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
                               return
                             }
                             
-                            await saveToTempDashboard(n.pdfData, n.pdfFileName || 'uploaded.pdf')
+                            setCurrentPdfData(n.pdfData)
+                            saveToLocalStorage(n.pdfData, n.pdfFileName || 'uploaded.pdf')
                             const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
                             onPdfStored(pdfId, n.pdfData, n.pdfFileName || 'uploaded.pdf')
                             setIsSelectModalOpen(false)
