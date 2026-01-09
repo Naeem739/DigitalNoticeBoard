@@ -153,6 +153,31 @@ export async function GET(
         <title>${escapedTitle}</title>
         <meta charset="utf-8">
         <style>
+          /* Local Fonts - Tiro Bangla and Times New Roman */
+          @font-face {
+            font-family: 'Tiro Bangla';
+            src: url('${baseUrl}/fonts/Tiro_Bangla/TiroBangla-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+          }
+
+          @font-face {
+            font-family: 'Tiro Bangla';
+            src: url('${baseUrl}/fonts/Tiro_Bangla/TiroBangla-Italic.ttf') format('truetype');
+            font-weight: 400;
+            font-style: italic;
+            font-display: swap;
+          }
+
+          @font-face {
+            font-family: 'Times New Roman';
+            src: url('${baseUrl}/fonts/times-new-roman/times.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+          }
+          
           * {
             margin: 0;
             padding: 0;
@@ -160,7 +185,7 @@ export async function GET(
           }
           
           body {
-            font-family: 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, sans-serif;
+            font-family: 'Times New Roman', 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, serif;
             padding: 0;
             line-height: 1.6;
             color: #000;
@@ -288,6 +313,7 @@ export async function GET(
             font-weight: 700;
             margin-bottom: 3mm;
             color: #000;
+            font-family: 'Times New Roman', 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, serif !important;
           }
           
           .notice-content .content-body {
@@ -295,6 +321,11 @@ export async function GET(
             line-height: 1.8;
             text-align: justify;
             color: #000;
+            font-family: 'Times New Roman', 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, serif !important;
+          }
+          
+          .notice-content .content-body * {
+            font-family: 'Times New Roman', 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, serif !important;
           }
           
           .print-button {

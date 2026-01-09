@@ -1,7 +1,45 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,100..900;1,100..900&display=swap');
 
-/* Tiro Bangla Font - Using CDN from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Tiro+Bangla:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+/* Local Fonts - Tiro Bangla and Times New Roman */
+@font-face {
+  font-family: 'Tiro Bangla';
+  src: url('/fonts/Tiro_Bangla/TiroBangla-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Tiro Bangla';
+  src: url('/fonts/Tiro_Bangla/TiroBangla-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Tiro Bangla';
+  src: url('/fonts/Tiro_Bangla/TiroBangla-Regular.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Tiro Bangla';
+  src: url('/fonts/Tiro_Bangla/TiroBangla-Italic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Times New Roman';
+  src: url('/fonts/times-new-roman/times.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
