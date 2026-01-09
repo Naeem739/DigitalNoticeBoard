@@ -1090,26 +1090,27 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                           {container.type === 'image' && (container.category || container.categoryId || container.noticeIds) && (
                             <div className="h-full flex items-center justify-center" style={{ padding: '0' }}>
                               {(() => {
-                                // Determine which notices to display based on category name (primary),
-                                // then categoryId, then noticeIds (fallback)
+                                // Determine which notices to display
+                                // PRIORITY: noticeIds (most specific) > categoryId > category name
+                                // This ensures each widget shows its own uploaded image(s)
                                 let imageNotices: TNotice[] = []
 
-                                if (container.category) {
-                                  // Primary: filter by category name and ensure notice has image data
-                                  imageNotices = allNotices
-                                    .filter((notice: TNotice) => notice.category === container.category)
-                                    .filter(notice => notice.imageUrl || notice.imageData || notice.imageFileName)
-                                } else if (container.categoryId) {
-                                  // Secondary: filter by categoryId if present
-                                  imageNotices = getNoticesByCategoryId(container.categoryId)
-                                    .filter(notice => notice.imageUrl || notice.imageData || notice.imageFileName)
-                                } else if (container.noticeIds) {
-                                  // Fallback to noticeIds for backward compatibility
+                                if (container.noticeIds && container.noticeIds.length > 0) {
+                                  // PRIMARY: Use noticeIds if available (most specific, ensures widget shows its own images)
                                   imageNotices = container.noticeIds
                                     .map((noticeId: string) => getNoticeById(noticeId))
                                     .filter((notice: TNotice | undefined) => 
                                       notice !== undefined && (notice.imageUrl || notice.imageData || notice.imageFileName)
                                     ) as TNotice[]
+                                } else if (container.categoryId) {
+                                  // SECONDARY: filter by categoryId if noticeIds not available
+                                  imageNotices = getNoticesByCategoryId(container.categoryId)
+                                    .filter(notice => notice.imageUrl || notice.imageData || notice.imageFileName)
+                                } else if (container.category) {
+                                  // TERTIARY: filter by category name (fallback for backward compatibility)
+                                  imageNotices = allNotices
+                                    .filter((notice: TNotice) => notice.category === container.category)
+                                    .filter(notice => notice.imageUrl || notice.imageData || notice.imageFileName)
                                 }
 
                                 // Get the first image notice
