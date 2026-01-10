@@ -1165,38 +1165,20 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       }}
                                     />
                                     
-                                    {/* QR Code - Fixed square, bottom right for image widgets */}
+                                    {/* QR Code - Bottom Right - Solid white background container with padding (same as PDF/text widgets) */}
                                     <div 
-                                      className={`absolute ${isMobile ? 'bottom-2 right-2' : 'bottom-3 right-3'} z-10`}
+                                      className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
                                       style={{
                                         pointerEvents: 'auto'
                                       }}
                                     >
-                                      {(() => {
-                                        const qrSize = isMobile ? 40 : getResponsiveQRSize()
-                                        const qrContainerSize = qrSize + 8 // room for padding + border
-                                        return (
-                                      <div 
-                                        className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200"
-                                        style={{
-                                          padding: '4px',
-                                          width: `${qrContainerSize}px`,
-                                          height: `${qrContainerSize}px`,
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center'
-                                        }}
-                                      >
-                                        <NoticeQRCode 
-                                          notice={notice}
-                                          imageData={notice.imageData}
-                                          imageTitle={notice.imageFileName || notice.title}
-                                          size={qrSize}
-                                          className="w-full h-full responsive-qr-code"
-                                        />
-                                      </div>
-                                        )
-                                      })()}
+                                      <NoticeQRCode 
+                                        notice={notice}
+                                        imageData={notice.imageData}
+                                        imageTitle={notice.imageFileName || notice.title}
+                                        size={isMobile ? 40 : getResponsiveQRSize()}
+                                        className=""
+                                      />
                                     </div>
                                   </motion.div>
                                 )
