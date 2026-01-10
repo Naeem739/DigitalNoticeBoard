@@ -369,48 +369,24 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
     )
   }
 
-  // Calculate sizes to fit both QR code and download button inside the box
-  const padding = 8 // Padding inside the border
-  const buttonHeight = 28 // Height of download button
-  const gap = 8 // Gap between QR code and button
-  const qrCodeSize = size - (padding * 2) - buttonHeight - gap // QR code size to fit both
-  const containerSize = size // Total container size
-
   return (
     <div className={`flex flex-col items-center ${className}`}>
-      <div 
-        className="border border-gray-200 rounded-lg shadow-sm bg-white flex flex-col items-center"
-        style={{ 
-          width: containerSize, 
-          padding: `${padding}px`,
-          boxSizing: 'border-box'
-        }}
-      >
-        {/* QR Code */}
+      <div className="relative group border border-gray-200 rounded-lg shadow-sm bg-white p-2">
         <img
           src={qrDataUrl}
           alt="QR Code"
-          style={{ width: qrCodeSize, height: qrCodeSize }}
+          style={{ width: size - 16, height: size - 16 }}
           className="rounded"
         />
-        
-        {/* Download Button - Always visible inside the box */}
-        <div style={{ marginTop: `${gap}px`, width: '100%' }}>
+        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
           <Button
             onClick={handleDownload}
             size="sm"
             variant="secondary"
-            className="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-medium text-xs"
-            style={{ 
-              height: `${buttonHeight}px`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
+            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 hover:bg-white"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download</span>
+            <Download className="w-3 h-3 mr-1" />
+            Download
           </Button>
         </div>
       </div>
