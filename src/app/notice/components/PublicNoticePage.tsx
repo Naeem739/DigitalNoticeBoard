@@ -251,16 +251,17 @@ export default function PublicNoticePage() {
     return 'px-10 py-5' // Large padding for 75" display
   }
 
-  // Get responsive grid gap
-  const getResponsiveGridGap = () => {
-    const w = viewportWidth
-    if (!w) return 'gap-1 sm:gap-2 md:gap-4'
-    if (w < 640) return 'gap-1 sm:gap-2'
-    if (w < 1366) return 'gap-2' // Small laptops
-    if (w < 1920) return 'gap-3' // Full HD laptops
-    if (w < 2560) return 'gap-4 lg:gap-6' // 2K displays
-    if (w < 3840) return 'gap-6 lg:gap-8'
-    return 'gap-8 lg:gap-10' // Large gaps for 75" display
+  // Aspect ratio dimensions matching the design tool
+  const RATIO_DIMENSIONS: Record<string, { width: number; height: number }> = {
+    "4:3": { width: 1200, height: 900 },
+    "16:9": { width: 1440, height: 810 },
+    "16:10": { width: 1440, height: 900 },
+  }
+
+  // Get exact aspect ratio dimensions from dashboard
+  const getAspectRatioDimensions = () => {
+    const aspectRatio = currentDashboard?.aspectRatio || "4:3"
+    return RATIO_DIMENSIONS[aspectRatio] || RATIO_DIMENSIONS["4:3"]
   }
 
   // Get responsive content padding
@@ -761,27 +762,33 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className={`w-full ${isMobile ? 'h-auto' : 'h-full'} rounded-lg shadow-lg ${isMobile ? 'p-0' : getResponsiveContentPadding()} overflow-hidden`}
+              className="w-full h-full overflow-hidden"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
               <div 
-                className={`relative w-full ${isMobile ? 'h-auto' : 'h-full'} overflow-hidden rounded-lg shadow-lg`}
+                className="relative w-full h-full overflow-hidden"
                 style={{
-                  minHeight: '0',
-                  height: isMobile ? 'auto' : '100%'
+                  // Maintain exact aspect ratio from database - no padding, no margins
+                  aspectRatio: currentDashboard?.aspectRatio ? 
+                    currentDashboard.aspectRatio.replace(':', '/') : '4/3',
+                  width: '100%',
+                  height: '100%',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  margin: 0,
+                  padding: 0
                 }}
               >
-                {/* Grid Layout for Widgets */}
+                {/* Absolute Positioning Layout - Uses exact stored positions */}
                 <div 
-                  className={`grid ${isMobile ? 'gap-0' : getResponsiveGridGap()} ${isMobile ? 'p-0' : getResponsiveContentPadding()} notice-grid-container`} 
+                  className="relative w-full h-full notice-grid-container"
                   style={{ 
-                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, 1fr)',
-                    height: isMobile ? 'auto' : '100%',
-                    maxHeight: isMobile ? 'none' : '100%',
-                    overflow: 'hidden',
-                    overflowY: 'hidden'
+                    width: '100%',
+                    height: '100%',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}
                 >
                   {currentDashboard.containers.map((container, index) => {
@@ -791,47 +798,36 @@ export default function PublicNoticePage() {
                     const borderColor = settings.borderColor || '#e2e8f0'
                     const borderWidth = settings.borderWidth || 1
                     
-                    // Calculate grid position using x, y coordinates from database
-                    const gridX = container.x || 0
-                    const gridY = container.y || 0
-                    const gridW = Math.min(container.w || 1, 12)
-                    const gridH = Math.min(container.h || 1, 6)
+                    // Use EXACT stored percentage values - no recalculation
+                    const leftPercent = container.leftPercent || '0%'
+                    const topPercent = container.topPercent || '0%'
+                    const width = container.width || '100%'
+                    const height = container.height || '100%'
                     
                     return (
                       <motion.div
                         key={container.id}
                         id={container.id}
-                        className={`relative rounded-xl shadow-lg ${isMobile ? 'overflow-visible' : 'overflow-hidden'} flex flex-col backdrop-blur-sm`}
+                        className="absolute rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
                         style={{
-                          gridColumn: isMobile ? '1 / -1' : `${gridX + 1} / span ${gridW}`,
-                          gridRow: isMobile ? 'auto' : `${gridY + 1} / span ${gridH}`,
+                          // Use exact stored positions and dimensions
+                          left: leftPercent,
+                          top: topPercent,
+                          width: width,
+                          height: height,
                           backgroundColor: (container.type === 'pdf' || container.type === 'image') ? '#ffffff' : `${bgColor}${Math.round(bgOpacity * 255).toString(16).padStart(2, '0')}`,
                           border: (container.type === 'pdf' || container.type === 'image') ? '2px solid #e5e7eb' : `${borderWidth}px solid ${borderColor}`,
-                          position: 'relative',
-                          minHeight: isMobile ? (container.type === 'pdf' || container.type === 'image') ? '200px' : 'auto' : (container.type === 'pdf' || container.type === 'image') ? '200px' : '150px',
-                          maxHeight: isMobile ? 'none' : '100%',
-                          width: isMobile ? '100vw' : 'auto',
-                          height: isMobile ? 'auto' : 'auto',
-                          marginBottom: isMobile ? '1rem' : '0',
                           boxShadow: (container.type === 'pdf' || container.type === 'image') ? '0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -2px rgba(0,0,0,0.05)' : `0 4px 6px -1px ${borderColor}20, 0 2px 4px -1px ${borderColor}10`,
                           // Ensure PDF containers fill completely and have white background
                           ...(container.type === 'pdf' ? {
-                            width: isMobile ? '100vw' : '100%',
-                            height: isMobile ? 'auto' : '100%',
-                            minHeight: isMobile ? '200px' : 'auto',
                             backgroundColor: '#ffffff',
                             overflow: 'hidden'
                           } : {})
                         }}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
                         transition={{ duration: 0.4, delay: index * 0.1 }}
-                        whileHover={{ 
-                          scale: container.type === 'image' ? 1.01 : 1.02,
-                          boxShadow: container.type === 'image' 
-                            ? '0 12px 30px -8px rgba(0,0,0,0.15), 0 6px 15px -3px rgba(0,0,0,0.1)' 
-                            : `0 10px 25px -3px ${borderColor}30, 0 4px 6px -2px ${borderColor}20`
-                        }}
+                        // Removed whileHover scale to prevent any layout shifts
                       >
                         {/* Widget Header - Hidden for PDF and Image widgets */}
                         {container.type !== 'pdf' && container.type !== 'image' && (

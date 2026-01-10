@@ -121,31 +121,27 @@
     box-sizing: border-box !important;
   }
 
-  /* Ensure grid fits within viewport height */
+  /* Absolute positioning layout - uses exact stored positions */
   .notice-grid-container {
     width: 100% !important;
     height: 100% !important;
     max-height: 100% !important;
     overflow: hidden !important;
-    display: grid !important;
-    grid-template-rows: repeat(auto-fit, minmax(0, 1fr)) !important;
-    grid-auto-rows: minmax(0, 1fr) !important;
-    grid-auto-flow: dense !important;
-    align-items: stretch !important;
+    position: relative !important;
+    /* Removed grid display - using absolute positioning instead */
   }
 
   .notice-grid-container * {
     max-width: 100% !important;
   }
 
-  /* Ensure widgets fill available space without exceeding viewport */
+  /* Absolutely positioned widgets use exact stored dimensions */
   .notice-grid-container > div {
-    min-height: 0 !important;
-    height: 100% !important;
-    max-height: 100% !important;
+    position: absolute !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
+    /* Dimensions come from inline styles (leftPercent, topPercent, width, height) */
   }
 
   /* Remove empty space between grid items */
@@ -153,39 +149,8 @@
     display: none !important;
   }
 
-  /* Responsive grid adjustments - fit to viewport */
-  @media (max-width: 640px) {
-    .notice-grid-container {
-      grid-template-rows: repeat(auto-fit, minmax(0, 1fr)) !important;
-    }
-    
-    .notice-grid-container > div {
-      min-height: 0 !important;
-      height: 100% !important;
-    }
-  }
-
-  @media (min-width: 641px) and (max-width: 1024px) {
-    .notice-grid-container {
-      grid-template-rows: repeat(auto-fit, minmax(0, 1fr)) !important;
-    }
-    
-    .notice-grid-container > div {
-      min-height: 0 !important;
-      height: 100% !important;
-    }
-  }
-
-  @media (min-width: 1025px) {
-    .notice-grid-container {
-      grid-template-rows: repeat(auto-fit, minmax(0, 1fr)) !important;
-    }
-    
-    .notice-grid-container > div {
-      min-height: 0 !important;
-      height: 100% !important;
-    }
-  }
+  /* No responsive adjustments - layout renders exactly as stored */
+  /* All dimensions come from database (leftPercent, topPercent, width, height) */
 
   /* Ensure inner containers fit within viewport - no page-level scrolling */
   .notice-page-container .motion-div,
@@ -240,10 +205,10 @@
       height: auto !important;
     }
     
+    /* Keep absolute positioning on mobile - layout must match design exactly */
     .notice-grid-container > div {
-      height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
+      position: absolute !important;
+      /* Dimensions from database (leftPercent, topPercent, width, height) */
     }
   }
 
