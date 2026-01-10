@@ -356,29 +356,50 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
   if (!qrDataUrl) {
     return (
       <div 
-        className={`flex flex-col items-center cursor-pointer hover:bg-gray-50 rounded-lg p-2 transition-colors ${className}`} 
-        style={{ width: size, height: size }}
+        className="bg-white rounded-lg shadow-xl border-2 border-gray-300 cursor-pointer hover:bg-gray-50 transition-colors"
+        style={{
+          width: size + 4,
+          height: size + 4,
+          padding: '2px',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
         onClick={generateQRCode}
         title="Click to generate QR code"
       >
-        <QrCode className="w-6 h-6 text-gray-400 mb-1" />
-        <div className="text-xs text-gray-500 text-center">
-          Click to generate
+        <div className={`flex flex-col items-center ${className}`}>
+          <QrCode className="w-6 h-6 text-gray-400 mb-1" />
+          <div className="text-xs text-gray-500 text-center">
+            Click to generate
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`flex flex-col items-center ${className}`}>
-      <div className="relative group border border-gray-200 rounded-lg shadow-sm bg-white p-2">
+    <div 
+      className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
+      style={{
+        width: size + 4,
+        height: size + 4,
+        padding: '2px',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      <div className={`relative group ${className}`}>
         <img
           src={qrDataUrl}
           alt="QR Code"
-          style={{ width: size - 16, height: size - 16 }}
+          style={{ width: size, height: size }}
           className="rounded"
         />
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
           <Button
             onClick={handleDownload}
             size="sm"

@@ -85,9 +85,26 @@ export const Dashboard = ({ data }:{data:TDashboard | null}) => {
       static: true 
     }));
   
-    // Calculate row height based on available height and maximum grid height
-    const maxGridHeight = layout? Math.max(...layout.map(item => item.h)): 100;
-    const rowHeight = dimensions.height / (maxGridHeight);
+    // Calculate row height based on saved layout dimensions
+    // Use reference dimensions matching the aspect ratio to calculate a base row height
+    // This ensures widgets respect their saved dimensions regardless of widget count
+    const RATIO_DIMENSIONS: Record<string, { width: number; height: number }> = {
+      "4:3": { width: 1200, height: 900 },
+      "16:9": { width: 1440, height: 810 },
+      "16:10": { width: 1440, height: 900 },
+    };
+    const referenceHeight = RATIO_DIMENSIONS[data?.aspectRatio || "4:3"]?.height || 900;
+    const GRID_ROW_HEIGHT = 50; // Base row height used when saving layouts
+    
+    // Calculate row height by scaling the base row height proportionally to current dimensions
+    // Use the maximum bottom position (y + h) to represent the total grid height
+    const maxGridHeight = layout && layout.length > 0 
+      ? Math.max(...layout.map(item => item.y + item.h))
+      : 100;
+    
+    // Scale row height based on the ratio between current dimensions and reference dimensions
+    // This maintains widget proportions regardless of container size
+    const rowHeight = (GRID_ROW_HEIGHT * dimensions.height) / referenceHeight;
   
     if (!isClient) {
       return (
