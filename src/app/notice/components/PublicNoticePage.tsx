@@ -400,6 +400,30 @@ export default function PublicNoticePage() {
     return allPdfs.find(pdf => pdf.id === pdfId)
   }
 
+  // Helper to find PDF by matching data (for containers with pdfData but no pdfIds)
+  const findPdfByData = (pdfData: string) => {
+    if (!pdfData) return null
+    // Extract base64 data for comparison
+    let base64Data = pdfData
+    if (base64Data.startsWith('data:application/pdf;base64,')) {
+      base64Data = base64Data.replace('data:application/pdf;base64,', '')
+    } else if (base64Data.startsWith('data:')) {
+      base64Data = base64Data.split(',')[1] || base64Data
+    }
+    // Find PDF by matching data (compare first 100 chars of base64 to avoid full comparison)
+    return allPdfs.find(pdf => {
+      if (!pdf.pdfData) return false
+      let pdfBase64 = pdf.pdfData
+      if (pdfBase64.startsWith('data:application/pdf;base64,')) {
+        pdfBase64 = pdfBase64.replace('data:application/pdf;base64,', '')
+      } else if (pdfBase64.startsWith('data:')) {
+        pdfBase64 = pdfBase64.split(',')[1] || pdfBase64
+      }
+      // Compare first 200 characters to identify matching PDFs efficiently
+      return base64Data.substring(0, 200) === pdfBase64.substring(0, 200)
+    })
+  }
+
   // Helper function to reconstruct image URL from notice data
   const reconstructImageUrl = (notice: TNotice) => {
     let imageUrl = notice.imageUrl
@@ -1249,76 +1273,85 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                               })}
                               
                                                             {/* Handle PDF widgets with pdfData directly in container */}
-                              {container.pdfData && typeof container.pdfData === 'string' && !container.pdfIds && (
-                                <motion.div
-                                  key={`pdf-${container.id}`}
-                                  className="relative w-full h-full flex flex-col overflow-hidden"
-                                  initial={{ opacity: 0, scale: 0.9 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ duration: 0.3 }}
-                                  style={{
-                                    height: '100%',
-                                    width: '100%',
-                                    margin: '0',
-                                    backgroundColor: '#ffffff',
-                                    borderRadius: '0',
-                                    boxShadow: 'none',
-                                    border: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}
-                                >
-                                  {/* Show first-page image from container.pdfimage if available.
-                                      Fallback to a simple PDF icon text if not present. */}
-                                  {container.pdfimage ? (
-                                    <img
-                                      src={container.pdfimage as string}
-                                      alt={container.title || container.pdfFileName || 'PDF'}
-                                      className="w-full h-full object-contain"
-                                      style={{
-                                        backgroundColor: '#ffffff'
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center w-full h-full bg-gray-50">
-                                      <div className="w-16 h-16 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-semibold mb-2">
-                                        PDF
+                              {container.pdfData && typeof container.pdfData === 'string' && !container.pdfIds && (() => {
+                                // Try to find the actual PDF ID from the Pdf table by matching PDF data
+                                // This ensures we use the correct PDF ID instead of container ID
+                                const matchingPdf = findPdfByData(container.pdfData)
+                                const pdfId = matchingPdf?.id || null
+                                // Use PDF ID if found, otherwise fall back to container PDF endpoint with container ID
+                                const qrCodeId = pdfId || container.id
+                                
+                                return (
+                                  <motion.div
+                                    key={`pdf-${container.id}`}
+                                    className="relative w-full h-full flex flex-col overflow-hidden"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                    style={{
+                                      height: '100%',
+                                      width: '100%',
+                                      margin: '0',
+                                      backgroundColor: '#ffffff',
+                                      borderRadius: '0',
+                                      boxShadow: 'none',
+                                      border: 'none',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                  >
+                                    {/* Show first-page image from container.pdfimage if available.
+                                        Fallback to a simple PDF icon text if not present. */}
+                                    {container.pdfimage ? (
+                                      <img
+                                        src={container.pdfimage as string}
+                                        alt={container.title || container.pdfFileName || 'PDF'}
+                                        className="w-full h-full object-contain"
+                                        style={{
+                                          backgroundColor: '#ffffff'
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="flex flex-col items-center justify-center w-full h-full bg-gray-50">
+                                        <div className="w-16 h-16 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-semibold mb-2">
+                                          PDF
+                                        </div>
+                                        <p className="text-xs text-gray-500 px-4 text-center">
+                                          PDF preview not available. QR code will still open the full document.
+                                        </p>
                                       </div>
-                                      <p className="text-xs text-gray-500 px-4 text-center">
-                                        PDF preview not available. QR code will still open the full document.
-                                      </p>
-                                    </div>
-                                  )}
-                                    
-                                     {/* QR Code - Bottom Right - Optimized for Easy Scanning (unchanged) */}
-                                     <div className="absolute bottom-4 right-4 z-50">
-                                       <div 
-                                         className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
-                                         style={{
-                                           width: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
-                                           height: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
-                                           padding: '2px',
-                                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
-                                           display: 'flex',
-                                           alignItems: 'center',
-                                           justifyContent: 'center'
-                                         }}
-                                       >
-                                         <NoticeQRCode 
-                                           notice={{
-                                             id: container.id,
-                                             title: container.settings?.customCategoryName || 'PDF Document',
-                                             pdfData: container.pdfData,
-                                             pdfFileName: container.pdfFileName
+                                    )}
+                                      
+                                       {/* QR Code - Bottom Right - Optimized for Easy Scanning */}
+                                       <div className="absolute bottom-4 right-4 z-50">
+                                         <div 
+                                           className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
+                                           style={{
+                                             width: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
+                                             height: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
+                                             padding: '2px',
+                                             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
+                                             display: 'flex',
+                                             alignItems: 'center',
+                                             justifyContent: 'center'
                                            }}
-                                           size={isMobile ? 40 : getResponsiveQRSize()}
-                                           className="w-full h-full"
-                                         />
+                                         >
+                                           <NoticeQRCode 
+                                             notice={{
+                                               id: qrCodeId, // Use actual PDF ID if found, otherwise container ID
+                                               title: container.settings?.customCategoryName || matchingPdf?.title || 'PDF Document',
+                                               pdfData: container.pdfData,
+                                               pdfFileName: container.pdfFileName || matchingPdf?.fileName
+                                             }}
+                                             size={isMobile ? 40 : getResponsiveQRSize()}
+                                             className="w-full h-full"
+                                           />
+                                         </div>
                                        </div>
-                                     </div>
-                                </motion.div>
-                              )}
+                                  </motion.div>
+                                )
+                              })()}
                             </div>
                           )}
 
