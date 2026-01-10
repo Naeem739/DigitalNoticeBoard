@@ -35,15 +35,25 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
     return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)
   }
 
+  // Helper to detect widget/container IDs (not PDF IDs)
+  const isWidgetId = (id: string | undefined | null) => {
+    if (!id) return false
+    // Widget IDs typically start with "widget-" or similar patterns
+    // Container IDs might be UUIDs but not PDF IDs from the Pdf table
+    return id.startsWith('widget-') || id.startsWith('container-') || id.startsWith('cid-')
+  }
+
   // Helper to detect PDF ids (from Pdf table, typically cuid-like, e.g. "clxyz...")
   // Prisma CUIDs are exactly 25 characters and start with 'c', followed by 24 alphanumeric chars
   const isPdfId = (id: string | undefined | null) => {
     if (!id) return false
+    // First check: if it's a widget/container ID, it's NOT a PDF ID
+    if (isWidgetId(id)) return false
     // Check if it's a valid Notice ID (UUID format) - if so, it's NOT a PDF ID
     if (isValidNoticeId(id)) return false
     // CUID format: starts with 'c' (lowercase) and has 24 more alphanumeric characters (total 25)
-    // Also accept other CUID-like formats: starts with letter, at least 20 chars, not a UUID
-    return /^c[a-z0-9]{24}$/.test(id) || (/^[a-zA-Z][a-zA-Z0-9_-]{19,}$/.test(id) && !isValidNoticeId(id))
+    // Also accept other CUID-like formats: starts with letter, at least 20 chars, not a UUID or widget ID
+    return /^c[a-z0-9]{24}$/.test(id) || (/^[a-zA-Z][a-zA-Z0-9_-]{19,}$/.test(id) && !isValidNoticeId(id) && !isWidgetId(id))
   }
 
   const generateQRCode = async () => {
@@ -63,8 +73,13 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
       // For PDF widgets: notice.id = pdf.id (from Pdf table), notice.pdfData = pdf.pdfData
       // The download button works by using /api/pdf/${id} for PDF widgets, so QR code should too
       if (notice.pdfData && notice.id) {
-        // If ID is clearly a PDF ID (CUID format), use PDF endpoint
-        if (isPdfId(notice.id)) {
+        // First check: if it's a widget/container ID (e.g., "widget-1767986202354-530"), use container PDF endpoint
+        if (isWidgetId(notice.id)) {
+          // Container/widget ID - use container PDF endpoint (legacy containers with pdfData stored in container)
+          qrContent = `${window.location.origin}/api/dashboard/container-pdf?containerId=${encodeURIComponent(notice.id)}`
+        }
+        // If ID is clearly a PDF ID (CUID format from Pdf table), use PDF endpoint
+        else if (isPdfId(notice.id)) {
           // PDF coming from Pdf table (used in PDF widgets) - use same API as download button
           qrContent = `${window.location.origin}/api/pdf/${notice.id}`
         } 
@@ -73,13 +88,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
           // PDF stored in Notice table (UUID format) - use notice download endpoint
           qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
         } 
-        // If ID doesn't match UUID format but we have pdfData, assume it's a PDF ID from Pdf table
-        // This is a fallback for PDF widgets where isPdfId might fail but ID is still a valid PDF ID
-        else if (!isValidNoticeId(notice.id) && notice.id.length >= 15) {
-          // Likely a PDF ID from Pdf table - try PDF endpoint (same as download button)
-          qrContent = `${window.location.origin}/api/pdf/${notice.id}`
-        } 
-        // Last resort: try container PDF endpoint for legacy containers
+        // Last resort: if we can't determine ID type, use container PDF endpoint for legacy containers
         else {
           qrContent = `${window.location.origin}/api/dashboard/container-pdf?containerId=${encodeURIComponent(notice.id)}`
         }
@@ -360,24 +369,48 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
     )
   }
 
+  // Calculate sizes to fit both QR code and download button inside the box
+  const padding = 8 // Padding inside the border
+  const buttonHeight = 28 // Height of download button
+  const gap = 8 // Gap between QR code and button
+  const qrCodeSize = size - (padding * 2) - buttonHeight - gap // QR code size to fit both
+  const containerSize = size // Total container size
+
   return (
     <div className={`flex flex-col items-center ${className}`}>
-      <div className="relative group">
+      <div 
+        className="border border-gray-200 rounded-lg shadow-sm bg-white flex flex-col items-center"
+        style={{ 
+          width: containerSize, 
+          padding: `${padding}px`,
+          boxSizing: 'border-box'
+        }}
+      >
+        {/* QR Code */}
         <img
           src={qrDataUrl}
           alt="QR Code"
-          style={{ width: size, height: size }}
-          className="border border-gray-200 rounded-lg shadow-sm"
+          style={{ width: qrCodeSize, height: qrCodeSize }}
+          className="rounded"
         />
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+        
+        {/* Download Button - Always visible inside the box */}
+        <div style={{ marginTop: `${gap}px`, width: '100%' }}>
           <Button
             onClick={handleDownload}
             size="sm"
             variant="secondary"
-            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 hover:bg-white"
+            className="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-medium text-xs"
+            style={{ 
+              height: `${buttonHeight}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
           >
-            <Download className="w-3 h-3 mr-1" />
-            Download
+            <Download className="w-3.5 h-3.5" />
+            <span>Download</span>
           </Button>
         </div>
       </div>
