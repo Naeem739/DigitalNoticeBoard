@@ -130,6 +130,9 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   categoryBorderWidth: 1,
   customCategoryName: "",
   
+  // Notice Card Settings
+  noticeCardHeight: 200, // Default notice card height in pixels
+  
   // Image display settings (enhanced for professional use)
   imageFit: "fill",
   imageBorderRadius: 8,
@@ -1822,6 +1825,7 @@ function EditDashboardDemo() {
                 imageGrayscale: settings.imageGrayscale,
                 imageSepia: settings.imageSepia,
                 imageInvert: settings.imageInvert,
+                noticeCardHeight: settings.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight,
               },
             }
           } else if (widget.type === "pdf" && widget.pdfs && widget.pdfs.length > 0) {
@@ -1877,6 +1881,7 @@ function EditDashboardDemo() {
                 categoryBorderColor: settings.categoryBorderColor,
                 categoryBorderWidth: settings.categoryBorderWidth,
                 customCategoryName: settings.customCategoryName,
+                noticeCardHeight: settings.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight,
               },
             }
           } else {
@@ -1921,6 +1926,7 @@ function EditDashboardDemo() {
                 categoryBorderColor: settings.categoryBorderColor,
                 categoryBorderWidth: settings.categoryBorderWidth,
                 customCategoryName: settings.customCategoryName,
+                noticeCardHeight: settings.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight,
               },
             }
           }
@@ -2646,14 +2652,15 @@ function EditDashboardDemo() {
                   categoryFontWeight: settings.categoryFontWeight,
                   categoryFontColor: settings.categoryFontColor,
                   categoryBackgroundColor: settings.categoryBackgroundColor,
-                  categoryHeight: settings.categoryHeight,
-                  categoryBorderColor: settings.categoryBorderColor,
-                  categoryBorderWidth: settings.categoryBorderWidth,
-                  customCategoryName: settings.customCategoryName,
-                },
-              }
+                categoryHeight: settings.categoryHeight,
+                categoryBorderColor: settings.categoryBorderColor,
+                categoryBorderWidth: settings.categoryBorderWidth,
+                customCategoryName: settings.customCategoryName,
+                noticeCardHeight: settings.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight,
+              },
             }
-          }))
+          }
+        }))
 
           // Filter out null positions
           const validPositions = positions.filter(Boolean)
@@ -3798,6 +3805,26 @@ function EditDashboardDemo() {
                       }
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     />
+                    </div>
+
+                    {/* Notice Card Height */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-500">Notice Card Height</span>
+                        <span className="text-xs text-gray-600">
+                          {widgetSettings[activeSettingsWidget]?.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="120"
+                        max="400"
+                        value={widgetSettings[activeSettingsWidget]?.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight}
+                        onChange={(e) =>
+                          updateWidgetSetting(activeSettingsWidget, "noticeCardHeight", Number.parseInt(e.target.value))
+                        }
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
                     </div>
                   </div>
                 </div>
