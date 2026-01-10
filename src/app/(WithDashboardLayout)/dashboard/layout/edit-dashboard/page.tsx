@@ -131,7 +131,7 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   customCategoryName: "",
   
   // Notice Card Settings
-  noticeCardHeight: 200, // Default notice card height in pixels
+  noticeCardHeight: 20, // Default notice card height as percentage of widget container height
   
   // Image display settings (enhanced for professional use)
   imageFit: "fill",
@@ -3812,19 +3812,21 @@ function EditDashboardDemo() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-gray-500">Notice Card Height</span>
                         <span className="text-xs text-gray-600">
-                          {widgetSettings[activeSettingsWidget]?.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight}px
+                          {widgetSettings[activeSettingsWidget]?.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight}%
                         </span>
                       </div>
                       <input
                         type="range"
-                        min="120"
-                        max="400"
+                        min="10"
+                        max="50"
+                        step="1"
                         value={widgetSettings[activeSettingsWidget]?.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight}
                         onChange={(e) =>
                           updateWidgetSetting(activeSettingsWidget, "noticeCardHeight", Number.parseInt(e.target.value))
                         }
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                       />
+                      <p className="text-xs text-gray-400 mt-1">Percentage of widget container height</p>
                     </div>
                   </div>
                 </div>

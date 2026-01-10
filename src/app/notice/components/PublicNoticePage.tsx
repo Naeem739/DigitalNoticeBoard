@@ -951,9 +951,9 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
                                       borderRadius: '20px',
-                                      // Use exact stored notice card height from database
-                                      height: `${settings.noticeCardHeight || 200}px`,
-                                      minHeight: `${settings.noticeCardHeight || 200}px`,
+                                      // Use exact stored notice card height as percentage of widget container height
+                                      height: `${settings.noticeCardHeight || 20}%`,
+                                      minHeight: `${settings.noticeCardHeight || 20}%`,
                                       width: '100%',
                                       position: 'relative',
                                       display: 'flex',
