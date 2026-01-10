@@ -1151,11 +1151,9 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       <div 
                                         className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200"
                                         style={{
-                                          padding: isMobile ? '4px' : '8px',
-                                          width: isMobile ? '48px' : 'auto',
-                                          height: isMobile ? '48px' : 'auto',
-                                          minWidth: isMobile ? '48px' : 'auto',
-                                          minHeight: isMobile ? '48px' : 'auto',
+                                          padding: '2px',
+                                          width: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
+                                          height: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center'
@@ -1225,9 +1223,9 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                        <div 
                                          className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
                                          style={{
-                                           width: isMobile ? '40px' : getResponsiveQRSize(),
-                                           height: isMobile ? '40px' : getResponsiveQRSize(),
-                                           padding: isMobile ? '4px' : '12px',
+                                           width: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
+                                           height: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
+                                           padding: '2px',
                                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
                                            display: 'flex',
                                            alignItems: 'center',
@@ -1298,9 +1296,9 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                        <div 
                                          className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
                                          style={{
-                                           width: isMobile ? '40px' : getResponsiveQRContainerSize(),
-                                           height: isMobile ? '40px' : getResponsiveQRContainerSize(),
-                                           padding: isMobile ? '4px' : '12px',
+                                           width: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
+                                           height: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
+                                           padding: '2px',
                                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
                                            display: 'flex',
                                            alignItems: 'center',

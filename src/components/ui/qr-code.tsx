@@ -36,10 +36,14 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
   }
 
   // Helper to detect PDF ids (from Pdf table, typically cuid-like, e.g. "clxyz...")
+  // Prisma CUIDs are exactly 25 characters and start with 'c', followed by 24 alphanumeric chars
   const isPdfId = (id: string | undefined | null) => {
     if (!id) return false
-    // Very loose CUID-style check: starts with a letter, then at least 10 more chars
-    return /^[a-zA-Z][a-zA-Z0-9_-]{10,}$/.test(id) && !isValidNoticeId(id)
+    // Check if it's a valid Notice ID (UUID format) - if so, it's NOT a PDF ID
+    if (isValidNoticeId(id)) return false
+    // CUID format: starts with 'c' (lowercase) and has 24 more alphanumeric characters (total 25)
+    // Also accept other CUID-like formats: starts with letter, at least 20 chars, not a UUID
+    return /^c[a-z0-9]{24}$/.test(id) || (/^[a-zA-Z][a-zA-Z0-9_-]{19,}$/.test(id) && !isValidNoticeId(id))
   }
 
   const generateQRCode = async () => {
@@ -52,15 +56,40 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
       // Create a simple, reliable QR content
       let qrContent = `Notice: ${notice.title}\nID: ${notice.id}`
       
-      // PRIORITY ORDER: Check for valid IDs first, then handle data-based cases
+      // PRIORITY ORDER: Check for PDF widgets first (same as download button), then handle other cases
+      // This ensures QR code uses the same API endpoints as the download button
       
-      // 1. If we have a PDF id (from Pdf table), point to PDF download endpoint (triggers automatic download)
-      // This must be checked BEFORE pdfData check to handle PDF widgets correctly
-      if (isPdfId(notice.id)) {
+      // 1. If we have PDF data, prioritize PDF widget handling (same as download button)
+      // For PDF widgets: notice.id = pdf.id (from Pdf table), notice.pdfData = pdf.pdfData
+      // The download button works by using /api/pdf/${id} for PDF widgets, so QR code should too
+      if (notice.pdfData && notice.id) {
+        // If ID is clearly a PDF ID (CUID format), use PDF endpoint
+        if (isPdfId(notice.id)) {
+          // PDF coming from Pdf table (used in PDF widgets) - use same API as download button
+          qrContent = `${window.location.origin}/api/pdf/${notice.id}`
+        } 
+        // If ID is a valid Notice ID (UUID format), use notice download endpoint
+        else if (isValidNoticeId(notice.id)) {
+          // PDF stored in Notice table (UUID format) - use notice download endpoint
+          qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
+        } 
+        // If ID doesn't match UUID format but we have pdfData, assume it's a PDF ID from Pdf table
+        // This is a fallback for PDF widgets where isPdfId might fail but ID is still a valid PDF ID
+        else if (!isValidNoticeId(notice.id) && notice.id.length >= 15) {
+          // Likely a PDF ID from Pdf table - try PDF endpoint (same as download button)
+          qrContent = `${window.location.origin}/api/pdf/${notice.id}`
+        } 
+        // Last resort: try container PDF endpoint for legacy containers
+        else {
+          qrContent = `${window.location.origin}/api/dashboard/container-pdf?containerId=${encodeURIComponent(notice.id)}`
+        }
+      }
+      // 2. If we have a PDF ID (from Pdf table) without pdfData in notice object, still use PDF endpoint
+      else if (isPdfId(notice.id)) {
         // PDF coming from Pdf table (used in PDF widgets) - triggers automatic download
         qrContent = `${window.location.origin}/api/pdf/${notice.id}`
       }
-      // 2. If we have a proper Notice id (from Notice table), generate download API URLs
+      // 3. If we have a proper Notice ID (UUID from Notice table), generate download API URLs
       else if (isValidNoticeId(notice.id)) {
         // If we have image data/URL, use image download URL (triggers automatic download)
         if (notice.imageUrl || imageData || notice.imageData) {
@@ -75,7 +104,8 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
           qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
         }
       }
-      // 3. Handle direct PDF data without valid ID (container-based PDFs) - use container PDF endpoint
+      // 4. Handle direct PDF data without valid ID (container-based PDFs) - use container PDF endpoint
+      // This is for legacy containers that have PDF data but no valid database ID
       else if (notice.pdfData) {
         // For container-based PDFs, use the container PDF download endpoint
         // This endpoint searches dashboards for the container and returns the PDF
@@ -240,12 +270,13 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
         // Images stored on Notice (UUID id) - use API
         if (!isValidNoticeId(notice.id)) return
         downloadUrl = `/api/notice/download-image/${notice.id}`
+      } else if (isPdfId(notice.id)) {
+        // PDF from Pdf table (PDF widget) - use same API as QR code
+        // This is the same API endpoint that works for download button
+        downloadUrl = `/api/pdf/${notice.id}`
       } else if (isValidNoticeId(notice.id)) {
         // Text/PDF stored on Notice model
         downloadUrl = `/api/notice/download/${notice.id}`
-      } else if (isPdfId(notice.id) && notice.pdfUrl) {
-        // PDF from Pdf table (PDF widget) - only if we have a valid PDF ID
-        downloadUrl = `/api/pdf/${notice.id}`
       } else {
         // Unknown id type – nothing to download
         console.warn('Cannot download: invalid ID or missing data', notice.id)
