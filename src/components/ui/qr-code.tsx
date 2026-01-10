@@ -52,34 +52,42 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
       // Create a simple, reliable QR content
       let qrContent = `Notice: ${notice.title}\nID: ${notice.id}`
       
-      // Handle direct PDF data (like images) - no API needed, use descriptive text
-      if (notice.pdfData) {
-        // For PDFs with direct data (widget-based), use descriptive text
-        // The download will work directly from the data
-        qrContent = `PDF: ${notice.title}\nScan to view details`
-      } 
-      // Handle direct image data - no API needed
-      else if (imageData || notice.imageData) {
-        // For images with direct data, use descriptive text
-        qrContent = `Image: ${notice.title}\nScan to view details`
+      // PRIORITY ORDER: Check for valid IDs first, then handle data-based cases
+      
+      // 1. If we have a PDF id (from Pdf table), point to PDF download endpoint (triggers automatic download)
+      // This must be checked BEFORE pdfData check to handle PDF widgets correctly
+      if (isPdfId(notice.id)) {
+        // PDF coming from Pdf table (used in PDF widgets) - triggers automatic download
+        qrContent = `${window.location.origin}/api/pdf/${notice.id}`
       }
-      // If we have a proper Notice id (from Notice table), generate API URLs
+      // 2. If we have a proper Notice id (from Notice table), generate download API URLs
       else if (isValidNoticeId(notice.id)) {
-        // If we have image URL, add image download URL
-        if (notice.imageUrl) {
+        // If we have image data/URL, use image download URL (triggers automatic download)
+        if (notice.imageUrl || imageData || notice.imageData) {
           qrContent = `${window.location.origin}/api/notice/download-image/${notice.id}`
-        } else if (notice.pdfUrl) {
+        } 
+        // If we have PDF data/URL, use PDF download URL (triggers automatic download)
+        else if (notice.pdfUrl || notice.pdfData) {
           qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
-        } else {
+        } 
+        // Fallback to notice download
+        else {
           qrContent = `${window.location.origin}/api/notice/download/${notice.id}`
         }
+      }
+      // 3. Handle direct PDF data without valid ID (container-based PDFs) - use container PDF endpoint
+      else if (notice.pdfData) {
+        // For container-based PDFs, use the container PDF download endpoint
+        // This endpoint searches dashboards for the container and returns the PDF
+        qrContent = `${window.location.origin}/api/dashboard/container-pdf?containerId=${encodeURIComponent(notice.id)}`
       } 
-      // If we have a PDF id (from Pdf table), point to /api/pdf/:id
-      else if (isPdfId(notice.id) && notice.pdfUrl) {
-        // PDF coming from Pdf table (used in PDF widgets) - only if valid PDF ID
-        qrContent = `${window.location.origin}/api/pdf/${notice.id}`
-      } 
-      // For widget-generated ids (like "widget-..."), use descriptive text
+      // 4. Handle direct image data without valid ID - use descriptive text
+      else if (imageData || notice.imageData) {
+        // For images without notice ID, we need the notice ID to download
+        // This case should not happen if images are properly stored as notices
+        qrContent = `Image: ${notice.title}\nPlease contact administrator for download`
+      }
+      // 5. For widget-generated ids (like "widget-..."), use descriptive text
       else {
         // Use a safe, descriptive text payload for non‑database IDs (e.g. widget IDs)
         qrContent = `Notice: ${notice.title}`

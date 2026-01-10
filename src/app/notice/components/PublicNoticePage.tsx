@@ -187,18 +187,14 @@ export default function PublicNoticePage() {
     return 7 // More notices for 75" display
   }
 
-  // Get responsive QR code size - Optimized for 75" 4K display
+  // Get responsive QR code size - Fixed 80px for laptops and large screens (75" displays)
   const getResponsiveQRSize = () => {
     const w = viewportWidth
     if (!w) return 80
     if (w <= 480) return 40 // Mobile: very small QR code (40px)
     if (w <= 640) return 50
-    if (w <= 1366) return 60 // HD laptops
-    if (w <= 1920) return 80 // Full HD laptops
-    if (w <= 2560) return 100 // 2K displays
-    if (w <= 3400) return 120
-    if (w < 3840) return 140
-    return 160 // Large QR codes for 75" 4K display
+    // For laptops (1366px+) and large screens (75" displays up to 3840px), use 80px
+    return 80 // Fixed size for laptops and large screens including Samsung QB75C 75"
   }
 
   // Get responsive QR code container size (includes padding) - Optimized for scanning
@@ -961,15 +957,15 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           right: isMobile ? '8px' : '24px',
                                           transform: 'translateY(-50%)',
                                           zIndex: 10,
-                                          width: isMobile ? '40px' : '160px',
-                                          height: isMobile ? '40px' : '160px'
+                                          width: isMobile ? '40px' : getResponsiveQRSize(),
+                                          height: isMobile ? '40px' : getResponsiveQRSize()
                                         }}
                                       >
                                         <NoticeQRCode 
                                           notice={notice}
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
-                                          size={isMobile ? 40 : 160}
+                                          size={isMobile ? 40 : getResponsiveQRSize()}
                                           className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
                                         />
                                       </div>
@@ -1146,13 +1142,20 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     />
                                     
                                     {/* QR Code - Fixed square, bottom right for image widgets */}
-                                    <div className="absolute bottom-3 right-3">
+                                    <div 
+                                      className={`absolute ${isMobile ? 'bottom-2 right-2' : 'bottom-3 right-3'} z-10`}
+                                      style={{
+                                        pointerEvents: 'auto'
+                                      }}
+                                    >
                                       <div 
                                         className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200"
                                         style={{
                                           padding: isMobile ? '4px' : '8px',
-                                          width: isMobile ? '40px' : 'auto',
-                                          height: isMobile ? '40px' : 'auto',
+                                          width: isMobile ? '48px' : 'auto',
+                                          height: isMobile ? '48px' : 'auto',
+                                          minWidth: isMobile ? '48px' : 'auto',
+                                          minHeight: isMobile ? '48px' : 'auto',
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center'
@@ -1162,7 +1165,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           notice={notice}
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
-                                          size={isMobile ? 40 : 160}
+                                          size={isMobile ? 40 : getResponsiveQRSize()}
                                           className="w-full h-full responsive-qr-code"
                                         />
                                       </div>
@@ -1222,8 +1225,8 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                        <div 
                                          className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
                                          style={{
-                                           width: isMobile ? '40px' : '160px',
-                                           height: isMobile ? '40px' : '160px',
+                                           width: isMobile ? '40px' : getResponsiveQRSize(),
+                                           height: isMobile ? '40px' : getResponsiveQRSize(),
                                            padding: isMobile ? '4px' : '12px',
                                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
                                            display: 'flex',
@@ -1238,7 +1241,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                              pdfData: pdf.pdfData,
                                              pdfFileName: pdf.fileName || pdf.title
                                            }}
-                                           size={isMobile ? 40 : 160}
+                                           size={isMobile ? 40 : getResponsiveQRSize()}
                                            className="w-full h-full responsive-qr-code"
                                          />
                                        </div>
