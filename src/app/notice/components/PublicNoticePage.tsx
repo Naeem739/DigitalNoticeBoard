@@ -882,14 +882,14 @@ export default function PublicNoticePage() {
 
                         {/* Widget Content */}
                         <div 
-                          className={`flex-1 flex flex-col justify-center ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`} 
+                          className={`flex-1 flex flex-col ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`} 
                           style={{ 
-                            minHeight: isMobile ? 'auto' : '120px',
+                            minHeight: 0, // Allow flex child to shrink
                             padding: (container.type === 'pdf' || container.type === 'image') ? '0' : (isMobile ? '0.75rem' : '1rem')
                           }}
                         >
                           {container.type === 'notice' && (container.category || container.categoryId || container.noticeIds) && (
-                            <div className="flex flex-col h-full gap-2">
+                            <div className="flex flex-col h-full min-h-0">
                               {(() => {
                                 // Determine which notices to display based on category name (primary),
                                 // then categoryId, then noticeIds (fallback)
@@ -939,20 +939,20 @@ const maxNotices = (typeof container.settings?.noticeCount === 'number' && conta
 const displayedNotices = widgetNotices.slice(0, maxNotices)
 
                                 return (
-                              <div className={`notices-container flex flex-col gap-2 overflow-auto scrollbar-hide`}>
+                              <div className={`notices-container flex flex-col gap-2 overflow-y-auto scrollbar-hide h-full min-h-0`}>
                                     {displayedNotices.map((notice: TNotice, noticeIndex: number) => {
                                 
                                 return (
                                   <motion.div
                                         key={notice.id}
-                                    className="group relative shadow-sm hover:shadow-md transition-all duration-200"
+                                    className="group relative shadow-sm hover:shadow-md transition-all duration-200 flex-shrink-0"
                                     style={{
                                       backgroundColor: `${bgColor}${Math.round((settings.cardOpacity || 0.95) * 255).toString(16).padStart(2, '0')}`,
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
                                       borderRadius: '20px',
-                                      // Dynamic height: grows with content, minimum greater than QR code
-                                      minHeight: isMobile ? '120px' : '200px',
+                                      // Dynamic height: grows with content, minimum to fit QR code
+                                      minHeight: isMobile ? '80px' : '100px',
                                       width: '100%',
                                       position: 'relative',
                                       display: 'flex',
@@ -968,7 +968,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     }}
                                   >
                                     {/* Notice Header */}
-                                    <div className={`p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 ${isMobile ? 'pr-14' : 'pr-24 sm:pr-28 md:pr-32 lg:pr-40 xl:pr-48'}`}>
+                                    <div className={`relative p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 ${isMobile ? 'pr-14' : 'pr-24 sm:pr-28 md:pr-32 lg:pr-40 xl:pr-48'}`}>
                                       {/* QR Code - Rightmost side, vertically centered */}
                                       <div 
                                         style={{
@@ -989,7 +989,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
                                         />
                                       </div>
-                                      {/* Notice Title */}
+                                      {/* Notice Title - Dynamic height based on content */}
                                       <h4 
                                         className="text-xs md:text-sm font-semibold leading-tight mb-4 break-words"
                                         style={{
