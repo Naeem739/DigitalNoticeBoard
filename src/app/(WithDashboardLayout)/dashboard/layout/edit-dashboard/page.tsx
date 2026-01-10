@@ -131,7 +131,7 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   customCategoryName: "",
   
   // Image display settings (enhanced for professional use)
-  imageFit: "contain",
+  imageFit: "fill",
   imageBorderRadius: 8,
   showImageTitle: true,
   imageTitleColor: "#ffffff",

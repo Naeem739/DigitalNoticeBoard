@@ -1172,12 +1172,16 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                         pointerEvents: 'auto'
                                       }}
                                     >
+                                      {(() => {
+                                        const qrSize = isMobile ? 40 : getResponsiveQRSize()
+                                        const qrContainerSize = qrSize + 8 // room for padding + border
+                                        return (
                                       <div 
                                         className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200"
                                         style={{
-                                          padding: '2px',
-                                          width: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
-                                          height: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
+                                          padding: '4px',
+                                          width: `${qrContainerSize}px`,
+                                          height: `${qrContainerSize}px`,
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center'
@@ -1187,10 +1191,12 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           notice={notice}
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
-                                          size={isMobile ? 40 : getResponsiveQRSize()}
+                                          size={qrSize}
                                           className="w-full h-full responsive-qr-code"
                                         />
                                       </div>
+                                        )
+                                      })()}
                                     </div>
                                   </motion.div>
                                 )
