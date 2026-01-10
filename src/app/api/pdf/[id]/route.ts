@@ -20,8 +20,20 @@ export async function GET(
       return NextResponse.json({ error: 'No PDF data available' }, { status: 404 })
     }
 
-    // pdfData is stored as a data URL: data:application/pdf;base64,XXXX
-    const base64Data = pdf.pdfData.replace(/^data:application\/pdf;base64,/, '')
+    // pdfData can be stored in different formats:
+    // 1. Data URL: data:application/pdf;base64,XXXX
+    // 2. Just base64: XXXX (raw base64 string)
+    let base64Data = pdf.pdfData
+    
+    // Remove data URL prefix if present
+    if (base64Data.startsWith('data:application/pdf;base64,')) {
+      base64Data = base64Data.replace('data:application/pdf;base64,', '')
+    } else if (base64Data.startsWith('data:')) {
+      // Handle other data URL formats
+      base64Data = base64Data.split(',')[1] || base64Data
+    }
+    // If it's already just base64, use it as-is
+    
     const pdfBuffer = Buffer.from(base64Data, 'base64')
 
     return new NextResponse(pdfBuffer, {
