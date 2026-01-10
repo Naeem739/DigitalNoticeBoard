@@ -1244,29 +1244,16 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     
                                      {/* QR Code - Fixed square, bottom right - optimized for scanning */}
                                      <div className="absolute bottom-4 right-4 z-50">
-                                       <div 
-                                         className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
-                                         style={{
-                                           width: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
-                                           height: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
-                                           padding: '2px',
-                                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
-                                           display: 'flex',
-                                           alignItems: 'center',
-                                           justifyContent: 'center'
+                                       <NoticeQRCode 
+                                         notice={{
+                                           id: pdf.id,
+                                           title: container.settings?.customCategoryName || pdf.title || 'PDF Document',
+                                           pdfData: pdf.pdfData,
+                                           pdfFileName: pdf.fileName || pdf.title
                                          }}
-                                       >
-                                         <NoticeQRCode 
-                                           notice={{
-                                             id: pdf.id,
-                                             title: container.settings?.customCategoryName || pdf.title || 'PDF Document',
-                                             pdfData: pdf.pdfData,
-                                             pdfFileName: pdf.fileName || pdf.title
-                                           }}
-                                           size={isMobile ? 40 : getResponsiveQRSize()}
-                                           className="w-full h-full responsive-qr-code"
-                                         />
-                                       </div>
+                                         size={isMobile ? 40 : getResponsiveQRSize()}
+                                         className="responsive-qr-code"
+                                       />
                                      </div>
                                   </motion.div>
                                 )
@@ -1325,29 +1312,16 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       
                                        {/* QR Code - Bottom Right - Optimized for Easy Scanning */}
                                        <div className="absolute bottom-4 right-4 z-50">
-                                         <div 
-                                           className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
-                                           style={{
-                                             width: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
-                                             height: isMobile ? '44px' : `${getResponsiveQRSize() + 4}px`,
-                                             padding: '2px',
-                                             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
-                                             display: 'flex',
-                                             alignItems: 'center',
-                                             justifyContent: 'center'
+                                         <NoticeQRCode 
+                                           notice={{
+                                             id: qrCodeId, // Use actual PDF ID if found, otherwise container ID
+                                             title: container.settings?.customCategoryName || matchingPdf?.title || 'PDF Document',
+                                             pdfData: container.pdfData,
+                                             pdfFileName: container.pdfFileName || matchingPdf?.fileName
                                            }}
-                                         >
-                                           <NoticeQRCode 
-                                             notice={{
-                                               id: qrCodeId, // Use actual PDF ID if found, otherwise container ID
-                                               title: container.settings?.customCategoryName || matchingPdf?.title || 'PDF Document',
-                                               pdfData: container.pdfData,
-                                               pdfFileName: container.pdfFileName || matchingPdf?.fileName
-                                             }}
-                                             size={isMobile ? 40 : getResponsiveQRSize()}
-                                             className="w-full h-full"
-                                           />
-                                         </div>
+                                           size={isMobile ? 40 : getResponsiveQRSize()}
+                                           className=""
+                                         />
                                        </div>
                                   </motion.div>
                                 )
