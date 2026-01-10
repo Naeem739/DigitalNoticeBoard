@@ -59,6 +59,8 @@ export type WidgetSettings = {
   categoryBorderWidth: number
   // Custom category name for display
   customCategoryName?: string
+  // Notice card height (where notice title is placed)
+  noticeCardHeight: number
   // Image widget settings
   imageFit: string
   imageBorderRadius: number
