@@ -116,8 +116,6 @@ export type TDashboard2 = {
       categoryBorderColor?: string;
       categoryBorderWidth?: number;
       customCategoryName?: string;
-      // Notice card height (where notice title is placed)
-      noticeCardHeight?: number;
       // Image-specific settings
       imageFit?: string;
       imageBorderRadius?: number;

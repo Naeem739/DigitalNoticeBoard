@@ -130,9 +130,6 @@ const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
   categoryBorderWidth: 1,
   customCategoryName: "",
   
-  // Notice Card Settings
-  noticeCardHeight: 20, // Default notice card height as percentage of widget container height
-  
   // Image display settings (enhanced for professional use)
   imageFit: "fill",
   imageBorderRadius: 8,
@@ -1825,7 +1822,6 @@ function EditDashboardDemo() {
                 imageGrayscale: settings.imageGrayscale,
                 imageSepia: settings.imageSepia,
                 imageInvert: settings.imageInvert,
-                noticeCardHeight: settings.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight,
               },
             }
           } else if (widget.type === "pdf" && widget.pdfs && widget.pdfs.length > 0) {
@@ -1881,7 +1877,6 @@ function EditDashboardDemo() {
                 categoryBorderColor: settings.categoryBorderColor,
                 categoryBorderWidth: settings.categoryBorderWidth,
                 customCategoryName: settings.customCategoryName,
-                noticeCardHeight: settings.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight,
               },
             }
           } else {
@@ -1926,7 +1921,6 @@ function EditDashboardDemo() {
                 categoryBorderColor: settings.categoryBorderColor,
                 categoryBorderWidth: settings.categoryBorderWidth,
                 customCategoryName: settings.customCategoryName,
-                noticeCardHeight: settings.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight,
               },
             }
           }
@@ -2652,15 +2646,14 @@ function EditDashboardDemo() {
                   categoryFontWeight: settings.categoryFontWeight,
                   categoryFontColor: settings.categoryFontColor,
                   categoryBackgroundColor: settings.categoryBackgroundColor,
-                categoryHeight: settings.categoryHeight,
-                categoryBorderColor: settings.categoryBorderColor,
-                categoryBorderWidth: settings.categoryBorderWidth,
-                customCategoryName: settings.customCategoryName,
-                noticeCardHeight: settings.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight,
-              },
+                  categoryHeight: settings.categoryHeight,
+                  categoryBorderColor: settings.categoryBorderColor,
+                  categoryBorderWidth: settings.categoryBorderWidth,
+                  customCategoryName: settings.customCategoryName,
+                },
+              }
             }
-          }
-        }))
+          }))
 
           // Filter out null positions
           const validPositions = positions.filter(Boolean)
@@ -3805,28 +3798,6 @@ function EditDashboardDemo() {
                       }
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     />
-                    </div>
-
-                    {/* Notice Card Height */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-gray-500">Notice Card Height</span>
-                        <span className="text-xs text-gray-600">
-                          {widgetSettings[activeSettingsWidget]?.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight}%
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="50"
-                        step="1"
-                        value={widgetSettings[activeSettingsWidget]?.noticeCardHeight || DEFAULT_WIDGET_SETTINGS.noticeCardHeight}
-                        onChange={(e) =>
-                          updateWidgetSetting(activeSettingsWidget, "noticeCardHeight", Number.parseInt(e.target.value))
-                        }
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                      />
-                      <p className="text-xs text-gray-400 mt-1">Percentage of widget container height</p>
                     </div>
                   </div>
                 </div>

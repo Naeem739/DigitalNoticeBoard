@@ -944,27 +944,28 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                 
                                 return (
                                   <motion.div
-                                    key={notice.id}
+                                        key={notice.id}
                                     className="group relative shadow-sm hover:shadow-md transition-all duration-200"
                                     style={{
                                       backgroundColor: `${bgColor}${Math.round((settings.cardOpacity || 0.95) * 255).toString(16).padStart(2, '0')}`,
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
                                       borderRadius: '20px',
-                                      // Use exact stored notice card height as percentage of widget container height
-                                      height: `${settings.noticeCardHeight || 20}%`,
-                                      minHeight: `${settings.noticeCardHeight || 20}%`,
+                                      // Dynamic height: grows with content, minimum greater than QR code
+                                      minHeight: isMobile ? '120px' : '200px',
                                       width: '100%',
                                       position: 'relative',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      padding: isMobile ? '8px 12px' : '12px 16px',
-                                      overflow: 'hidden'
+                                      padding: isMobile ? '8px 12px' : '12px 16px'
                                     }}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.2, delay: noticeIndex * 0.1 }}
-                                    // Removed whileHover scale to maintain exact height
+                                    whileHover={{ 
+                                      scale: 1.01,
+                                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                    }}
                                   >
                                     {/* Notice Header */}
                                     <div className={`p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 ${isMobile ? 'pr-14' : 'pr-24 sm:pr-28 md:pr-32 lg:pr-40 xl:pr-48'}`}>
