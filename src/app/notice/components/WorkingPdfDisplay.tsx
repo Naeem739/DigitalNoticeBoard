@@ -5,7 +5,8 @@ import { useRef, useEffect, useState, useCallback } from "react"
 import * as pdfjsLib from "pdfjs-dist"
 
 interface WorkingPdfDisplayProps {
-  pdfData: string
+  pdfData?: string
+  pdfUrl?: string
   title?: string
   autoScroll?: boolean
   className?: string
@@ -15,6 +16,7 @@ interface WorkingPdfDisplayProps {
 
 export default function WorkingPdfDisplay({
   pdfData,
+  pdfUrl,
   title,
   autoScroll = true,
   className = "",
@@ -132,8 +134,8 @@ export default function WorkingPdfDisplay({
     setTimeout(checkAndStart, 500)
   }
 
-  // Exact same rendering logic as InlinePdfWidget
-  const renderPdfFromData = useCallback(async (pdfData: string) => {
+  // Render PDF from either URL or base64 data
+  const renderPdfFromData = useCallback(async (pdfData?: string, pdfUrl?: string) => {
     const container = containerRef.current
     if (!container) {
       console.error('Container ref not available')
@@ -146,18 +148,58 @@ export default function WorkingPdfDisplay({
       setIsLoading(true)
       setError(null)
       
-      // Validate PDF data
-      if (!pdfData || pdfData.trim() === '') {
-        throw new Error('No PDF data provided')
+      // Priority 1: Use pdfUrl if available (fetch from Supabase bucket)
+      let pdfBytes: Uint8Array
+      
+      if (pdfUrl && typeof pdfUrl === 'string') {
+        try {
+          console.log('Fetching PDF from URL:', pdfUrl)
+          const response = await fetch(pdfUrl)
+          if (!response.ok) {
+            throw new Error(`Failed to fetch PDF from URL: ${response.statusText}`)
+          }
+          const arrayBuffer = await response.arrayBuffer()
+          pdfBytes = new Uint8Array(arrayBuffer)
+          console.log('PDF fetched successfully from URL, size:', pdfBytes.length)
+        } catch (fetchError) {
+          console.error('Error fetching PDF from URL:', fetchError)
+          // Fall through to try pdfData if available
+          if (!pdfData) {
+            throw new Error(`Failed to fetch PDF from URL: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
+          }
+        }
       }
       
-      // Check if PDF data is valid base64
-      const base64Regex = /^data:application\/pdf;base64,/
-      if (!base64Regex.test(pdfData) && !pdfData.startsWith('data:application/pdf')) {
-        // Try to add the data URL prefix if missing
-        if (!pdfData.startsWith('data:')) {
-          pdfData = `data:application/pdf;base64,${pdfData}`
+      // Priority 2: Use pdfData (base64) if pdfUrl failed or not available
+      if (!pdfBytes && pdfData) {
+        // Validate PDF data
+        if (!pdfData || pdfData.trim() === '') {
+          throw new Error('No PDF data provided')
         }
+        
+        // Check if PDF data is valid base64
+        const base64Regex = /^data:application\/pdf;base64,/
+        let processedPdfData = pdfData
+        if (!base64Regex.test(processedPdfData) && !processedPdfData.startsWith('data:application/pdf')) {
+          // Try to add the data URL prefix if missing
+          if (!processedPdfData.startsWith('data:')) {
+            processedPdfData = `data:application/pdf;base64,${processedPdfData}`
+          }
+        }
+        
+        // Extract base64 data from data URL
+        const base64Data = processedPdfData.includes(',') ? processedPdfData.split(',')[1] : processedPdfData.replace(/^data:application\/pdf;base64,/, '')
+        
+        // Convert base64 to Uint8Array for PDF.js
+        const binaryString = atob(base64Data)
+        pdfBytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          pdfBytes[i] = binaryString.charCodeAt(i)
+        }
+      }
+      
+      if (!pdfBytes) {
+        throw new Error('No PDF data or URL provided')
       }
 
       // Check if PDF.js worker is configured
@@ -170,28 +212,12 @@ export default function WorkingPdfDisplay({
         }
       }
 
-      // Load PDF document with error handling - exact same as InlinePdfWidget
+      // Load PDF document with error handling
       let pdf
       try {
-        // Ensure PDF data is properly formatted
-        let pdfSource = pdfData
-        if (!pdfSource.startsWith('data:')) {
-          pdfSource = `data:application/pdf;base64,${pdfSource}`
-        }
-        
-        // Extract base64 data from data URL
-        const base64Data = pdfSource.includes(',') ? pdfSource.split(',')[1] : pdfSource.replace(/^data:application\/pdf;base64,/, '')
-        
-        // Convert base64 to Uint8Array for PDF.js
-        const binaryString = atob(base64Data)
-        const bytes = new Uint8Array(binaryString.length)
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i)
-        }
-        
         // Load PDF using Uint8Array
         pdf = await (pdfjsLib as any).getDocument({
-          data: bytes,
+          data: pdfBytes,
           verbosity: 0
         }).promise
         
@@ -459,13 +485,13 @@ export default function WorkingPdfDisplay({
 
   // Render PDF when mounted and data is available
   useEffect(() => {
-    if (mounted && pdfData) {
-      renderPdfFromData(pdfData)
+    if (mounted && (pdfData || pdfUrl)) {
+      renderPdfFromData(pdfData, pdfUrl)
     }
     return () => {
       stopAutoScroll()
     }
-  }, [mounted, pdfData, renderPdfFromData])
+  }, [mounted, pdfData, pdfUrl, renderPdfFromData])
 
   // Don't render anything until mounted
   if (!mounted) {

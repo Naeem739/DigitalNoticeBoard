@@ -140,7 +140,12 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/category/get-all');
+        const response = await fetch('/api/category/get-all', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
         const result = await response.json();
         
         if (result.success) {

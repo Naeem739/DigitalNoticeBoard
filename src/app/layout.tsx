@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ClientLayout from './client-layout';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: 'Digital Notice Board',
   description: 'A modern digital notice board system with drag-and-drop layouts, rich text editing, template system, and role-based access control for efficient team communication.',
   icons: {

@@ -35,10 +35,8 @@ export type TNotice = {
   categoryId: string;
   pdfUrl?: string;
   pdfFileName?: string;
-  pdfData?: string;
   imageUrl?: string;
   imageFileName?: string;
-  imageData?: string;
   categoryName?: string;
   categoryType?: 'TEXT' | 'IMAGE' | 'PDF';
   createdAt?: Date;

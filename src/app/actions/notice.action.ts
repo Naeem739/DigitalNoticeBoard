@@ -1,15 +1,17 @@
 'use server'
 import { prisma } from "@/db/prisma"
 import { TNotice } from "@/types/types"
+import { uploadPDF, uploadImage } from "@/lib/supabase"
 
-export const createNotice = async(value: Omit<TNotice, "id">)=>{
+export const createNotice = async(value: Omit<TNotice, "id"> & { pdfData?: string; imageData?: string })=>{
     try{
         console.log("Creating notice with data:", {
             title: value.title,
             category: value.category,
             categoryId: value.categoryId,
             hasContent: !!value.content,
-            hasPdf: !!value.pdfData
+            hasPdf: !!value.pdfData,
+            hasImage: !!value.imageData
         });
 
         // Test database connection first
@@ -28,18 +30,67 @@ export const createNotice = async(value: Omit<TNotice, "id">)=>{
 
         console.log("Category found:", categoryExists);
 
+        // Handle PDF upload to Supabase Storage
+        let pdfUrl = value.pdfUrl || undefined
+        if (value.pdfData && value.pdfFileName && !pdfUrl) {
+            try {
+                const pdfBuffer = Buffer.from(value.pdfData, 'base64')
+                const uploadResult = await uploadPDF(pdfBuffer, value.pdfFileName)
+                if (uploadResult.error || !uploadResult.url) {
+                    const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+                    console.error("Error uploading PDF to Supabase:", errorMsg)
+                    // If Supabase is not configured, we can't proceed - return error
+                    if (errorMsg.includes('not configured')) {
+                        return {success: false, message: `Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env.local file.`}
+                    }
+                    return {success: false, message: `Failed to upload PDF: ${errorMsg}`}
+                }
+                pdfUrl = uploadResult.url
+                console.log("PDF uploaded to Supabase:", pdfUrl)
+            } catch (error) {
+                console.error("Error uploading PDF:", error)
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+                return {success: false, message: `Failed to upload PDF: ${errorMessage}`}
+            }
+        }
+
+        // Handle Image upload to Supabase Storage
+        let imageUrl = value.imageUrl || undefined
+        // Check if imageUrl is a base64 data URL - if so, ignore it and upload to Supabase
+        const isBase64DataUrl = imageUrl && imageUrl.startsWith('data:image/')
+        
+        if (value.imageData && value.imageFileName && (!imageUrl || isBase64DataUrl)) {
+            try {
+                const imageBuffer = Buffer.from(value.imageData, 'base64')
+                const uploadResult = await uploadImage(imageBuffer, value.imageFileName)
+                if (uploadResult.error || !uploadResult.url) {
+                    const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+                    console.error("Error uploading image to Supabase:", errorMsg)
+                    // If Supabase is not configured, we can't proceed - return error
+                    if (errorMsg.includes('not configured')) {
+                        return {success: false, message: `Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env.local file.`}
+                    }
+                    return {success: false, message: `Failed to upload image: ${errorMsg}`}
+                }
+                imageUrl = uploadResult.url
+                console.log("Image uploaded to Supabase:", imageUrl)
+            } catch (error) {
+                console.error("Error uploading image:", error)
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+                return {success: false, message: `Failed to upload image: ${errorMessage}`}
+            }
+        }
+
         const result = await prisma.notice.create({
             data:{
                 title : value.title,
                 content: value.content as string,
                 category : value.category,
                 categoryId: value.categoryId,
-                pdfUrl: value.pdfUrl,
+                pdfUrl: pdfUrl,
                 pdfFileName: value.pdfFileName,
-                pdfData: value.pdfData,
-                imageUrl: value.imageUrl,
-                imageFileName: value.imageFileName,
-                imageData: value.imageData
+                imageUrl: imageUrl,
+                imageFileName: value.imageFileName
             }
         })
         

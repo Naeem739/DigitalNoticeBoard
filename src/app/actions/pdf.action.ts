@@ -1,29 +1,47 @@
 'use server'
 
 import { prisma } from "@/db/prisma"
+import { uploadPDF } from "@/lib/supabase"
 
 export type TPdf = {
   id: string
   title: string
-  pdfData: string
+  pdfUrl: string
   fileName: string
   fileSize?: number
   createdAt?: Date
   updatedAt?: Date
 }
 
-export const createPdf = async (value: Omit<TPdf, "id" | "createdAt" | "updatedAt">) => {
+export const createPdf = async (value: Omit<TPdf, "id" | "createdAt" | "updatedAt"> & { pdfData?: string }) => {
   try {
     console.log("Creating PDF with data:", {
       title: value.title,
       fileName: value.fileName,
-      pdfDataLength: value.pdfData?.length || 0
+      hasUrl: !!value.pdfUrl,
+      hasData: !!value.pdfData
     })
+    
+    // Handle file upload if pdfData is provided but pdfUrl is not
+    let pdfUrl = value.pdfUrl
+    if (value.pdfData && !pdfUrl) {
+      const pdfBuffer = Buffer.from(value.pdfData, 'base64')
+      const uploadResult = await uploadPDF(pdfBuffer, value.fileName)
+      if (uploadResult.error) {
+        console.error("Error uploading PDF to Supabase:", uploadResult.error)
+        return { success: false, message: `Failed to upload PDF: ${uploadResult.error}` }
+      }
+      pdfUrl = uploadResult.url
+    }
+    
+    if (!pdfUrl) {
+      return { success: false, message: "PDF URL or data is required" }
+    }
     
     const result = await prisma.pdf.create({
       data: {
         title: value.title,
-        pdfData: value.pdfData,
+        pdfUrl: pdfUrl,
         fileName: value.fileName,
         fileSize: value.fileSize,
       }

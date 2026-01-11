@@ -116,7 +116,12 @@ export default function CategoryPage() {
   const fetchCategories = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/category/get-all')
+      const response = await fetch('/api/category/get-all', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      })
       const data = await response.json()
       
       if (data.success) {

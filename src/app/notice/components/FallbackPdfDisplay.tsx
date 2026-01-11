@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import PdfDisplay from "./PdfDisplay"
 
 interface FallbackPdfDisplayProps {
-  pdfData: string
+  pdfData?: string
+  pdfUrl?: string
   title?: string
   autoScroll?: boolean
   className?: string
@@ -12,7 +13,8 @@ interface FallbackPdfDisplayProps {
 }
 
 export default function FallbackPdfDisplay({ 
-  pdfData, 
+  pdfData,
+  pdfUrl,
   title, 
   autoScroll = true, 
   className = "", 
@@ -22,6 +24,12 @@ export default function FallbackPdfDisplay({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // If pdfUrl is provided, it's valid (no need to validate)
+    if (pdfUrl) {
+      setError(null)
+      return
+    }
+    
     // Try to validate PDF data
     if (!pdfData || typeof pdfData !== 'string') {
       setError("No PDF data provided")
@@ -39,7 +47,7 @@ export default function FallbackPdfDisplay({
 
     // If we get here, the data looks valid
     setError(null)
-  }, [pdfData])
+  }, [pdfData, pdfUrl])
 
   if (error) {
     return (

@@ -67,7 +67,8 @@ const ClientOnlyGridLayout = ({ children, ...props }: any) => {
 };
 
 // Client-only wrapper for the entire dashboard to prevent hydration issues
-const ClientOnlyDashboard = () => {
+// Accept props to prevent Next.js 15 params assignment error
+const ClientOnlyDashboard = (props: any) => {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -214,15 +215,7 @@ interface ExtendedWidget extends Widget {
     type?: string
     isPlaceholder?: boolean
   }>
-  pdfs?: Array<{
-    id: string
-    title: string
-    pdfData: string
-    fileName: string
-    dbId?: string
-    pdfimage?: string // First page of PDF as image (base64)
-  }>
-
+  // pdfs is inherited from Widget type (with pdfUrl)
 }
 
 // Add this before the EditDashboardDemo component
@@ -1825,11 +1818,11 @@ function EditDashboardDemo() {
               },
             }
           } else if (widget.type === "pdf" && widget.pdfs && widget.pdfs.length > 0) {
-            // For PDF widgets, save PDF data directly in the container
+            // For PDF widgets, save PDF URL in the container (file is stored in Supabase bucket)
             const pdf = widget.pdfs[0] // Take the first PDF for now
             
-            // Get PDF data directly from widget (no TempDashboard needed)
-            const pdfData = pdf.pdfData || ''
+            // Get PDF URL from widget (file is stored in Supabase bucket)
+            const pdfUrl = pdf.pdfUrl || ''
             // Get PDF image (first page converted to image)
             const pdfimage = pdf.pdfimage || ''
 
@@ -1852,7 +1845,7 @@ function EditDashboardDemo() {
               title: widget.content || widget.title || "Dashboard PDF Widget",
               category: "Default(Pdf)",
               type: "pdf",
-              pdfData: pdfData || '',
+              pdfUrl: pdfUrl || '',
               pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
               pdfimage: pdfimage, // Store first page as image
               settings: {
@@ -3208,8 +3201,8 @@ function EditDashboardDemo() {
                     {widget.type === "pdf" && (
                       <InlinePdfWidget 
                         widgetId={widget.id}
-                        onPdfStored={(pdfId: string, pdfData: string, fileName: string, pdfimage?: string) => {
-                          // Store PDF reference in widget with PDF data and client-generated image
+                        onPdfStored={(pdfId: string, pdfUrl: string, fileName: string, pdfimage?: string) => {
+                          // Store PDF reference in widget with PDF URL and client-generated image
                           setWidgets(prev => prev.map(w => 
                             w.id === widget.id 
                               ? { 
@@ -3217,7 +3210,7 @@ function EditDashboardDemo() {
                                   pdfs: [{ 
                                     id: pdfId, 
                                     title: fileName || 'PDF', 
-                                    pdfData: pdfData, 
+                                    pdfUrl: pdfUrl, 
                                     fileName: fileName || 'uploaded.pdf', 
                                     dbId: pdfId,
                                     pdfimage: pdfimage
