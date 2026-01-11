@@ -264,6 +264,44 @@ export default function PublicNoticePage() {
     return RATIO_DIMENSIONS[aspectRatio] || RATIO_DIMENSIONS["4:3"]
   }
 
+  // Get container style for mobile (calculate height based on aspect ratio)
+  const getMobileContainerStyle = () => {
+    if (!isMobile || !currentDashboard?.aspectRatio || !viewportWidth) {
+      return {}
+    }
+    
+    const aspectRatio = currentDashboard.aspectRatio
+    const [widthRatio, heightRatio] = aspectRatio.split(':').map(Number)
+    const calculatedHeight = (viewportWidth * heightRatio) / widthRatio
+    
+    // Ensure minimum height so widgets are visible on mobile
+    // Use at least 1.5x the calculated height or 500px, whichever is larger
+    // This ensures widgets are visible while maintaining reasonable proportions
+    const minHeight = Math.max(calculatedHeight * 1.5, 500)
+    
+    return {
+      width: '100%',
+      height: `${minHeight}px`,
+      maxWidth: '100%',
+      margin: 0,
+      padding: 0
+    }
+  }
+
+  // Get container style for desktop (use aspect ratio CSS property)
+  const getDesktopContainerStyle = () => {
+    return {
+      aspectRatio: currentDashboard?.aspectRatio ? 
+        currentDashboard.aspectRatio.replace(':', '/') : '4/3',
+      width: '100%',
+      height: '100%',
+      maxWidth: '100%',
+      maxHeight: '100%',
+      margin: 0,
+      padding: 0
+    }
+  }
+
   // Get responsive content padding
   const getResponsiveContentPadding = () => {
     const w = viewportWidth
@@ -762,33 +800,27 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className="w-full h-full overflow-hidden"
+              className={`w-full ${isMobile ? 'h-auto' : 'h-full'} ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
               <div 
-                className="relative w-full h-full overflow-hidden"
+                className={`relative w-full ${isMobile ? '' : 'overflow-hidden'}`}
                 style={{
-                  // Maintain exact aspect ratio from database - no padding, no margins
-                  aspectRatio: currentDashboard?.aspectRatio ? 
-                    currentDashboard.aspectRatio.replace(':', '/') : '4/3',
-                  width: '100%',
-                  height: '100%',
-                  maxWidth: '100%',
-                  maxHeight: '100%',
-                  margin: 0,
-                  padding: 0
+                  // On mobile: calculate height based on aspect ratio to ensure widgets are visible
+                  // On desktop: use CSS aspectRatio property
+                  ...(isMobile ? getMobileContainerStyle() : getDesktopContainerStyle())
                 }}
               >
                 {/* Absolute Positioning Layout - Uses exact stored positions */}
                 <div 
-                  className="relative w-full h-full notice-grid-container"
+                  className="relative w-full notice-grid-container"
                   style={{ 
                     width: '100%',
                     height: '100%',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: isMobile ? 'visible' : 'hidden'
                   }}
                 >
                   {currentDashboard.containers.map((container, index) => {
