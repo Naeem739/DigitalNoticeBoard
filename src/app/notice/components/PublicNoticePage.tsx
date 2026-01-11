@@ -70,8 +70,10 @@ export default function PublicNoticePage() {
   const [currentDashboard, setCurrentDashboard] = useState<TDashboard | null>(null)
   const [images, setImages] = useState<TImage[]>([])
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
-  const [countdown, setCountdown] = useState(120) // 2 minutes = 120 seconds
+  const [countdown, setCountdown] = useState(30) // 30 seconds
+  const DISPLAY_DURATION = 30000 // 30 seconds in milliseconds
   const [lastDataUpdate, setLastDataUpdate] = useState<number>(Date.now())
+  const [isMobile, setIsMobile] = useState(false)
 
   // TanStack Query hooks for real-time data fetching
   // Refetch every 3 seconds for real-time updates (works on Vercel)
@@ -127,7 +129,20 @@ export default function PublicNoticePage() {
     return () => clearInterval(timer)
   }, [mounted])
 
-  // Auto-pagination every 2 minutes
+  // Detect mobile screen size
+  useEffect(() => {
+    if (!mounted) return
+
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [mounted])
+
+  // Auto-pagination every 30 seconds
   useEffect(() => {
     if (!mounted || !autoPaginationEnabled || dashboards.length <= 1) return
 
@@ -136,7 +151,7 @@ export default function PublicNoticePage() {
         const nextIndex = (prevIndex + 1) % dashboards.length
         return nextIndex
       })
-    }, 120000) // 2 minutes (2 * 60 * 1000 ms)
+    }, DISPLAY_DURATION) // 30 seconds
 
     return () => clearInterval(interval)
   }, [mounted, autoPaginationEnabled, dashboards.length])
@@ -193,14 +208,14 @@ export default function PublicNoticePage() {
   // Countdown timer for auto-pagination
   useEffect(() => {
     if (!mounted || !autoPaginationEnabled || dashboards.length <= 1) {
-      setCountdown(120)
+      setCountdown(30)
       return
     }
 
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          return 120 // Reset to 2 minutes
+          return 30 // Reset to 30 seconds
         }
         return prev - 1
       })
@@ -286,21 +301,21 @@ export default function PublicNoticePage() {
   const goToNextDashboard = () => {
     if (currentDashboardIndex < dashboards.length - 1) {
       setCurrentDashboardIndex(currentDashboardIndex + 1)
-      setCountdown(120) // Reset countdown when manually changing
+      setCountdown(30) // Reset countdown when manually changing
     }
   }
 
   const goToPrevDashboard = () => {
     if (currentDashboardIndex > 0) {
       setCurrentDashboardIndex(currentDashboardIndex - 1)
-      setCountdown(120) // Reset countdown when manually changing
+      setCountdown(30) // Reset countdown when manually changing
     }
   }
 
   const goToDashboard = (index: number) => {
     if (index >= 0 && index < dashboards.length) {
       setCurrentDashboardIndex(index)
-      setCountdown(120) // Reset countdown when manually changing
+      setCountdown(30) // Reset countdown when manually changing
     }
   }
 
@@ -599,18 +614,19 @@ export default function PublicNoticePage() {
               transition={{ delay: 0.8 }}
             >
               <div 
-                className="relative w-full h-full overflow-hidden"
+                className="relative w-full overflow-hidden"
                 style={{
-                  // On mobile: fill viewport, on desktop: maintain aspect ratio
-                  aspectRatio: currentDashboard?.aspectRatio ? 
-                    currentDashboard.aspectRatio.replace(':', '/') : '4/3',
                   width: '100%',
-                  height: '100%',
-                  minHeight: '50vh',
+                  minHeight: isMobile ? 'calc(100vh - 200px)' : 'auto',
+                  height: isMobile ? 'auto' : '100%',
                   maxWidth: '100%',
-                  maxHeight: '100%',
                   margin: 0,
-                  padding: 0
+                  padding: 0,
+                  // Only apply aspect ratio on desktop, not mobile
+                  ...(!isMobile && currentDashboard?.aspectRatio ? {
+                    aspectRatio: currentDashboard.aspectRatio.replace(':', '/'),
+                    maxHeight: '100%'
+                  } : {})
                 }}
               >
                 {/* Absolute Positioning Layout - Uses exact stored positions */}
