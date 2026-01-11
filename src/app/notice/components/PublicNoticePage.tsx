@@ -71,11 +71,6 @@ export default function PublicNoticePage() {
   const [images, setImages] = useState<TImage[]>([])
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
   const [countdown, setCountdown] = useState(120) // 2 minutes = 120 seconds
-  const [viewportWidth, setViewportWidth] = useState(0)
-  const [viewportHeight, setViewportHeight] = useState(0)
-  const [scaleFactor, setScaleFactor] = useState(1)
-  const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 })
-  const isMobile = viewportWidth > 0 && viewportWidth <= 480
   const [lastDataUpdate, setLastDataUpdate] = useState<number>(Date.now())
 
   // TanStack Query hooks for real-time data fetching
@@ -131,193 +126,6 @@ export default function PublicNoticePage() {
 
     return () => clearInterval(timer)
   }, [mounted])
-
-  // Track viewport dimensions for responsive sizing and scaling
-  useEffect(() => {
-    if (!mounted) return
-
-    const updateViewportDimensions = () => {
-      setViewportWidth(window.innerWidth)
-      setViewportHeight(window.innerHeight)
-    }
-
-    updateViewportDimensions()
-    window.addEventListener('resize', updateViewportDimensions)
-    return () => window.removeEventListener('resize', updateViewportDimensions)
-  }, [mounted])
-
-  // Calculate scale factor to maintain aspect ratio on all screen sizes
-  useEffect(() => {
-    if (!mounted || !currentDashboard || viewportWidth === 0 || viewportHeight === 0) {
-      setScaleFactor(1)
-      setContainerDimensions({ width: 0, height: 0 })
-      return
-    }
-
-    const designDimensions = getAspectRatioDimensions()
-    const designWidth = designDimensions.width
-    const designHeight = designDimensions.height
-
-    // Get available space (viewport minus header/footer)
-    // Header and footer take approximately 120px and 80px respectively on mobile, more on desktop
-    const headerHeight = isMobile ? 120 : 150
-    const footerHeight = isMobile ? 80 : 100
-    const availableHeight = Math.max(viewportHeight - headerHeight - footerHeight, 100) // Minimum 100px
-    const availableWidth = Math.max(viewportWidth, 100) // Minimum 100px
-
-    // Calculate scale to fit within viewport while maintaining aspect ratio
-    // Use the smaller scale factor to ensure it fits both width and height
-    const scaleByWidth = availableWidth / designWidth
-    const scaleByHeight = availableHeight / designHeight
-    const scale = Math.min(scaleByWidth, scaleByHeight, 1) // Don't scale up beyond 1
-
-    // Set container to design dimensions (will be scaled via CSS transform)
-    setScaleFactor(scale)
-    setContainerDimensions({ width: designWidth, height: designHeight })
-  }, [mounted, currentDashboard, viewportWidth, viewportHeight, isMobile])
-
-  // Responsive font-size mapping for notice titles - Optimized for 75" 4K display
-  const getResponsiveTitleFontSize = () => {
-    const w = viewportWidth
-    if (!w) return 14 // default until measured
-    if (w < 360) return 12 // Very small phones
-    if (w < 400) return 13 // 6.1"-6.3"
-    if (w < 480) return 14 // ~6.4"-6.7" narrow
-    if (w < 640) return 15 // Larger mobiles / small tablets
-    if (w < 1366) return 18 // Small laptops (HD)
-    if (w < 1920) return 22 // Full HD laptops (1920px)
-    if (w < 2560) return 28 // 2K displays
-    if (w < 3400) return 36 // Medium monitors (32–44")
-    if (w < 3840) return 42 // Large 4K displays (60-70")
-    return 48 // 75" 4K display (3840px+)
-  }
-
-  // Responsive notice card height (in em) - Optimized for 75" 4K display
-  const getResponsiveNoticeHeight = () => {
-    const w = viewportWidth
-    if (!w) return '8.125em' // default until measured
-    if (w < 360) return '7.25em' // ~116px
-    if (w < 400) return '7.5em' // ~120px
-    if (w < 480) return '7.75em' // ~124px
-    if (w <= 640) return '8.125em' // 130px equivalent
-    if (w <= 1366) return '9.0625em' // 145px equivalent - HD laptops
-    if (w <= 1920) return '9.5em' // 152px equivalent - Full HD laptops
-    if (w <= 2560) return '10em' // 160px equivalent - 2K displays
-    if (w <= 3400) return '11em' // 176px equivalent
-    if (w < 3840) return '12em' // 192px equivalent
-    return '13em' // 208px equivalent for 75" 4K
-  }
-
-  // Limit number of notices per widget based on viewport for readability
-  const getMaxNoticesPerWidget = () => {
-    const w = viewportWidth
-    if (!w) return 5
-    if (w < 360) return 3
-    if (w < 400) return 3
-    if (w < 480) return 4
-    if (w <= 640) return 4
-    if (w <= 2560) return 5
-    if (w <= 3840) return 6
-    return 7 // More notices for 75" display
-  }
-
-  // Get responsive QR code size - Fixed 80px for laptops and large screens (75" displays)
-  const getResponsiveQRSize = () => {
-    const w = viewportWidth
-    if (!w) return 80
-    if (w <= 480) return 40 // Mobile: very small QR code (40px)
-    if (w <= 640) return 50
-    // For laptops (1366px+) and large screens (75" displays up to 3840px), use 80px
-    return 80 // Fixed size for laptops and large screens including Samsung QB75C 75"
-  }
-
-  // Get responsive QR code container size (includes padding) - Optimized for scanning
-  const getResponsiveQRContainerSize = () => {
-    const qrSize = getResponsiveQRSize()
-    return qrSize + 24 // Add more padding for better scanning visibility
-  }
-
-  // Get responsive header font size
-  const getResponsiveHeaderFontSize = () => {
-    const w = viewportWidth
-    if (!w) return 'text-sm sm:text-lg'
-    if (w < 640) return 'text-sm'
-    if (w < 1366) return 'text-base' // Small laptops
-    if (w < 1920) return 'text-lg' // Full HD laptops
-    if (w < 2560) return 'text-xl' // 2K displays
-    if (w < 3840) return 'text-2xl'
-    return 'text-3xl' // Large header for 75" display
-  }
-
-  // Get responsive subtitle font size
-  const getResponsiveSubtitleFontSize = () => {
-    const w = viewportWidth
-    if (!w) return 'text-xs'
-    if (w < 640) return 'text-xs'
-    if (w < 1366) return 'text-xs' // Small laptops
-    if (w < 1920) return 'text-sm' // Full HD laptops
-    if (w < 2560) return 'text-base' // 2K displays
-    if (w < 3840) return 'text-lg'
-    return 'text-xl' // Large subtitle for 75" display
-  }
-
-  // Get responsive time font size
-  const getResponsiveTimeFontSize = () => {
-    const w = viewportWidth
-    if (!w) return 'text-sm sm:text-lg'
-    if (w < 640) return 'text-sm'
-    if (w < 1366) return 'text-base' // Small laptops
-    if (w < 1920) return 'text-lg' // Full HD laptops
-    if (w < 2560) return 'text-xl' // 2K displays
-    if (w < 3840) return 'text-2xl'
-    return 'text-3xl' // Large time for 75" display
-  }
-
-  // Get responsive padding
-  const getResponsivePadding = () => {
-    const w = viewportWidth
-    if (!w) return 'px-2 sm:px-3 py-1 sm:py-2'
-    if (w < 640) return 'px-2 sm:px-3 py-1 sm:py-2'
-    if (w < 1366) return 'px-3 py-2' // Small laptops
-    if (w < 1920) return 'px-4 py-2' // Full HD laptops
-    if (w < 2560) return 'px-6 py-3' // 2K displays
-    if (w < 3840) return 'px-8 py-4'
-    return 'px-10 py-5' // Large padding for 75" display
-  }
-
-  // Aspect ratio dimensions matching the design tool
-  const RATIO_DIMENSIONS: Record<string, { width: number; height: number }> = {
-    "4:3": { width: 1200, height: 900 },
-    "16:9": { width: 1440, height: 810 },
-    "16:10": { width: 1440, height: 900 },
-  }
-
-  // Get exact aspect ratio dimensions from dashboard
-  const getAspectRatioDimensions = () => {
-    const aspectRatio = currentDashboard?.aspectRatio || "4:3"
-    return RATIO_DIMENSIONS[aspectRatio] || RATIO_DIMENSIONS["4:3"]
-  }
-
-  // Get responsive content padding
-  const getResponsiveContentPadding = () => {
-    const w = viewportWidth
-    if (!w) return 'p-1 sm:p-2 md:p-3'
-    if (w < 640) return 'p-1 sm:p-2'
-    if (w < 1366) return 'p-2' // Small laptops
-    if (w < 1920) return 'p-2 md:p-3' // Full HD laptops
-    if (w < 2560) return 'p-3 md:p-4' // 2K displays
-    if (w < 3840) return 'p-4 lg:p-6'
-    return 'p-6 lg:p-8' // Large padding for 75" display
-  }
-
-  // Ensure QR code fits comfortably on mobile by raising min height
-  const getMobileNoticeMinHeight = () => {
-    const w = viewportWidth
-    if (!w) return '9.5em'
-    if (w <= 360) return '9.5em'   // ~152px
-    if (w <= 400) return '10em'    // ~160px
-    return '10.5em'                // ~168px up to 480px
-  }
 
   // Auto-pagination every 2 minutes
   useEffect(() => {
@@ -602,7 +410,7 @@ export default function PublicNoticePage() {
 
   return (
     <div 
-      className={`${isMobile ? 'min-h-screen' : 'h-screen'} flex flex-col overflow-hidden notice-page-container`}
+      className="min-h-screen md:h-screen flex flex-col overflow-hidden notice-page-container"
       style={{
         ...getBackgroundStyle(),
         fontFamily: "'Tiro Bangla', 'Inter', sans-serif"
@@ -620,7 +428,7 @@ export default function PublicNoticePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className={`w-full ${getResponsivePadding()}`}>
+        <div className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 lg:px-6 lg:py-3 xl:px-8 xl:py-4 2xl:px-10 2xl:py-5">
           {/* Main Header Row */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
             {/* Left side - Last Updated */}
@@ -631,16 +439,10 @@ export default function PublicNoticePage() {
                 transition={{ delay: 0.3 }}
                 suppressHydrationWarning
               >
-                <div className={`${getResponsiveSubtitleFontSize()} opacity-75`}>
+                <div className="text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl opacity-75">
                   Last Refresh:
                 </div>
-                <div className={`${
-                  viewportWidth < 640 ? 'text-xs' :
-                  viewportWidth < 1366 ? 'text-xs' :
-                  viewportWidth < 1920 ? 'text-sm' :
-                  viewportWidth < 2560 ? 'text-base' :
-                  viewportWidth < 3840 ? 'text-lg' : 'text-xl'
-                } font-mono opacity-90`}>
+                <div className="text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl font-mono opacity-90">
                   {new Date(lastDataUpdate).toLocaleString('en-GB', {
                     day: '2-digit',
                     month: 'short',
@@ -658,12 +460,7 @@ export default function PublicNoticePage() {
               <div className="flex items-center space-x-2 sm:space-x-3 justify-center">
                 {settings?.logo && (
                   <motion.div 
-                    className={`rounded-lg flex items-center justify-center shadow-md overflow-hidden bg-white/10 backdrop-blur-sm ${
-                      viewportWidth < 640 ? 'w-6 h-6 sm:w-8 sm:h-8' :
-                      viewportWidth < 1700 ? 'w-10 h-10' :
-                      viewportWidth < 2560 ? 'w-12 h-12' :
-                      viewportWidth < 3840 ? 'w-14 h-14' : 'w-16 h-16'
-                    }`}
+                    className="rounded-lg flex items-center justify-center shadow-md overflow-hidden bg-white/10 backdrop-blur-sm w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 xl:w-14 xl:h-14 2xl:w-16 2xl:h-16"
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.2 }}
@@ -677,7 +474,7 @@ export default function PublicNoticePage() {
                 )}
                 <div className="min-w-0">
                   <motion.h1 
-                    className={`${getResponsiveHeaderFontSize()} font-bold`}
+                    className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl font-bold"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
@@ -685,7 +482,7 @@ export default function PublicNoticePage() {
                     {settings?.title || "Digital Notice Board"}
                   </motion.h1>
                   <motion.p 
-                    className={`${getResponsiveSubtitleFontSize()} opacity-90`}
+                    className="text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl opacity-90"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
@@ -713,13 +510,13 @@ export default function PublicNoticePage() {
                   
                   {/* Compact Screen Info and Countdown */}
                   <div className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-2.5 py-0.5 bg-white/5 rounded-md">
-                    <span className={`${getResponsiveSubtitleFontSize()} text-white/80`}>
+                    <span className="text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl text-white/80">
                       {currentDashboardIndex + 1}/{dashboards.length}
                     </span>
                     {autoPaginationEnabled && (
                       <>
                         <span className="text-white/40">•</span>
-                        <span className={`${getResponsiveSubtitleFontSize()} font-mono text-white/80`}>
+                        <span className="text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl font-mono text-white/80">
                           {formatCountdown(countdown)}
                         </span>
                       </>
@@ -754,7 +551,7 @@ export default function PublicNoticePage() {
             {/* Right side - Time and Date */}
             <div className="text-center sm:text-right flex-1">
               <motion.div 
-                className={`${getResponsiveTimeFontSize()} font-bold font-mono`}
+                className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl font-bold font-mono"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 }}
@@ -763,7 +560,7 @@ export default function PublicNoticePage() {
                 {formatTime(currentTime)}
               </motion.div>
               <motion.div 
-                className={`${getResponsiveSubtitleFontSize()} opacity-90`}
+                className="text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl opacity-90"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.4 }}
@@ -779,12 +576,12 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className={`${isMobile ? 'flex-auto' : 'flex-1'} ${isMobile ? 'min-h-0' : 'min-h-0'} p-0 ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}>
-        <div className={`w-full ${isMobile ? 'h-auto' : 'h-full'} ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <main className="flex-1 min-h-0 p-0 overflow-hidden md:overflow-hidden">
+        <div className="w-full h-full overflow-hidden">
           {/* Dashboard Content */}
           {dashboardLoading ? (
             <motion.div 
-              className={`flex items-center justify-center ${isMobile ? 'min-h-[60vh] py-8' : 'h-full'}`}
+              className="flex items-center justify-center h-full min-h-[60vh] py-8"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
@@ -801,38 +598,31 @@ export default function PublicNoticePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
-              {/* Scaling wrapper to maintain aspect ratio on all screen sizes */}
               <div 
-                className="relative w-full h-full flex items-center justify-center overflow-hidden"
+                className="relative w-full h-full overflow-hidden"
                 style={{
+                  // On mobile: fill viewport, on desktop: maintain aspect ratio
+                  aspectRatio: currentDashboard?.aspectRatio ? 
+                    currentDashboard.aspectRatio.replace(':', '/') : '4/3',
+                  width: '100%',
+                  height: '100%',
+                  minHeight: '50vh',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
                   margin: 0,
                   padding: 0
                 }}
               >
+                {/* Absolute Positioning Layout - Uses exact stored positions */}
                 <div 
-                  className="relative overflow-hidden"
-                  style={{
-                    // Use design dimensions (will be scaled via CSS transform)
-                    width: containerDimensions.width > 0 ? `${containerDimensions.width}px` : '100%',
-                    height: containerDimensions.height > 0 ? `${containerDimensions.height}px` : '100%',
-                    // Maintain exact aspect ratio from database
-                    aspectRatio: currentDashboard?.aspectRatio ? 
-                      currentDashboard.aspectRatio.replace(':', '/') : '4/3',
-                    // Apply scale transform to fit viewport while maintaining aspect ratio
-                    transform: scaleFactor > 0 && containerDimensions.width > 0 ? `scale(${scaleFactor})` : 'scale(1)',
-                    transformOrigin: 'center center'
+                  className="relative w-full h-full notice-grid-container"
+                  style={{ 
+                    width: '100%',
+                    height: '100%',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}
                 >
-                  {/* Absolute Positioning Layout - Uses exact stored positions */}
-                  <div 
-                    className="relative w-full h-full notice-grid-container"
-                    style={{ 
-                      width: '100%',
-                      height: '100%',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                  >
                   {currentDashboard.containers.map((container, index) => {
                     const settings = container.settings || {}
                     const bgColor = settings.backgroundColor || '#ffffff'
@@ -924,10 +714,10 @@ export default function PublicNoticePage() {
 
                         {/* Widget Content */}
                         <div 
-                          className={`flex-1 flex flex-col ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`} 
+                          className="flex-1 flex flex-col overflow-hidden md:overflow-hidden"
                           style={{ 
                             minHeight: 0, // Allow flex child to shrink
-                            padding: (container.type === 'pdf' || container.type === 'image') ? '0' : (isMobile ? '0.75rem' : '1rem')
+                            padding: (container.type === 'pdf' || container.type === 'image') ? '0' : '0.75rem md:p-4'
                           }}
                         >
                           {container.type === 'notice' && (container.category || container.categoryId || container.noticeIds) && (
@@ -977,7 +767,7 @@ export default function PublicNoticePage() {
                                 // Limit the number of notices displayed
 const maxNotices = (typeof container.settings?.noticeCount === 'number' && container.settings.noticeCount > 0)
   ? container.settings.noticeCount
-  : (isMobile ? getMaxNoticesPerWidget() : 5);
+  : 5;
 const displayedNotices = widgetNotices.slice(0, maxNotices)
 
                                 return (
@@ -987,19 +777,16 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                 return (
                                   <motion.div
                                         key={notice.id}
-                                    className="group relative shadow-sm hover:shadow-md transition-all duration-200 flex-shrink-0"
+                                    className="group relative shadow-sm hover:shadow-md transition-all duration-200 flex-shrink-0 min-h-[80px] md:min-h-[100px] p-3 md:p-4"
                                     style={{
                                       backgroundColor: `${bgColor}${Math.round((settings.cardOpacity || 0.95) * 255).toString(16).padStart(2, '0')}`,
                                       backdropFilter: 'blur(10px)',
                                       border: `1px solid ${borderColor}20`,
                                       borderRadius: '20px',
-                                      // Dynamic height: grows with content, minimum to fit QR code
-                                      minHeight: isMobile ? '80px' : '100px',
                                       width: '100%',
                                       position: 'relative',
                                       display: 'flex',
-                                      flexDirection: 'column',
-                                      padding: isMobile ? '8px 12px' : '12px 16px'
+                                      flexDirection: 'column'
                                     }}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -1010,33 +797,24 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     }}
                                   >
                                     {/* Notice Header */}
-                                    <div className={`relative p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 ${isMobile ? 'pr-14' : 'pr-24 sm:pr-28 md:pr-32 lg:pr-40 xl:pr-48'}`}>
+                                    <div className="relative p-1 sm:p-2 md:p-4 pb-1 sm:pb-2 pr-14 md:pr-24 lg:pr-32 xl:pr-40">
                                       {/* QR Code - Rightmost side, vertically centered */}
                                       <div 
-                                        style={{
-                                          position: 'absolute',
-                                          top: '50%',
-                                          right: isMobile ? '8px' : '24px',
-                                          transform: 'translateY(-50%)',
-                                          zIndex: 10,
-                                          width: isMobile ? '40px' : getResponsiveQRSize(),
-                                          height: isMobile ? '40px' : getResponsiveQRSize()
-                                        }}
+                                        className="absolute top-1/2 -translate-y-1/2 right-2 md:right-6 z-10 w-10 h-10 md:w-20 md:h-20"
                                       >
                                         <NoticeQRCode 
                                           notice={notice}
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
-                                          size={isMobile ? 40 : getResponsiveQRSize()}
-                                          className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
+                                          size={40}
+                                          className="opacity-80 hover:opacity-100 transition-opacity w-full h-full md:!w-20 md:!h-20"
                                         />
                                       </div>
                                       {/* Notice Title - Dynamic height based on content */}
                                       <h4 
-                                        className="text-xs md:text-sm font-semibold leading-tight mb-4 break-words"
+                                        className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl font-semibold leading-tight mb-4 break-words"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
-                                          fontSize: `${getResponsiveTitleFontSize()}px`,
                                           fontWeight: settings.fontWeight || 'semibold',
                                           fontFamily: "'Times New Roman', 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, serif",
                                           lineHeight: '1.3',
@@ -1205,7 +983,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     
                                     {/* QR Code - Bottom Right - Solid white background container with padding (same as PDF/text widgets) */}
                                     <div 
-                                      className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
+                                      className="absolute bottom-4 right-4 z-50"
                                       style={{
                                         pointerEvents: 'auto'
                                       }}
@@ -1214,8 +992,8 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                         notice={notice}
                                         imageData={notice.imageData}
                                         imageTitle={notice.imageFileName || notice.title}
-                                        size={isMobile ? 40 : getResponsiveQRSize()}
-                                        className=""
+                                        size={40}
+                                        className="md:!w-20 md:!h-20"
                                       />
                                     </div>
                                   </motion.div>
@@ -1277,8 +1055,8 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                            pdfData: pdf.pdfData,
                                            pdfFileName: pdf.fileName || pdf.title
                                          }}
-                                         size={isMobile ? 40 : getResponsiveQRSize()}
-                                         className="responsive-qr-code"
+                                         size={40}
+                                         className="md:!w-20 md:!h-20"
                                        />
                                      </div>
                                   </motion.div>
@@ -1345,8 +1123,8 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                              pdfData: container.pdfData,
                                              pdfFileName: container.pdfFileName || matchingPdf?.fileName
                                            }}
-                                           size={isMobile ? 40 : getResponsiveQRSize()}
-                                           className=""
+                                           size={40}
+                                           className="md:!w-20 md:!h-20"
                                          />
                                        </div>
                                   </motion.div>
@@ -1391,13 +1169,12 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                       </motion.div>
                     )
                   })}
-                  </div>
                 </div>
               </div>
             </motion.div>
           ) : (
             <motion.div 
-              className={`flex items-center justify-center ${isMobile ? 'min-h-[60vh] py-8' : 'h-full'}`}
+              className="flex items-center justify-center h-full min-h-[60vh] py-8"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
@@ -1422,8 +1199,8 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.9 }}
       >
-        <div className={`w-full ${getResponsivePadding()}`}>
-          <div className={`flex flex-col items-center justify-center gap-2 sm:gap-1 sm:flex-row text-white/60 ${getResponsiveSubtitleFontSize()}`}>
+        <div className="w-full px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 lg:px-6 lg:py-3 xl:px-8 xl:py-4 2xl:px-10 2xl:py-5">
+          <div className="flex flex-col items-center justify-center gap-2 sm:gap-1 sm:flex-row text-white/60 text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl">
             <span className="text-center sm:text-left break-words px-2">
               Project Superviser: Md. Rashid Al Asif, Assistant Professor, CSE,BU
             </span>
