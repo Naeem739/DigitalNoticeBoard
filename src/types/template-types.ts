@@ -28,9 +28,10 @@ export type Widget = {
   pdfs?: Array<{
     id: string
     title: string
-    pdfData: string
+    pdfUrl: string
     fileName: string
     dbId?: string
+    pdfimage?: string // First page of PDF as image (base64)
   }>
 }
 

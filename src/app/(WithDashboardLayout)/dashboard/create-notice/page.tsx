@@ -304,7 +304,6 @@ export default function NoticeEditor() {
     try {
       let pdfData = null;
       let imageData = null;
-      let imageUrl = null;
       
       if (pdfFile) {
         pdfData = await convertPdfToBase64(pdfFile);
@@ -312,7 +311,7 @@ export default function NoticeEditor() {
       
       if (imageFile) {
         imageData = await convertImageToBase64(imageFile);
-        imageUrl = imagePreview; // Use the preview URL as imageUrl
+        // Don't set imageUrl here - let the server action upload to Supabase and set it
       }
 
     const data = {
@@ -323,7 +322,7 @@ export default function NoticeEditor() {
       pdfData: pdfData || undefined,
       pdfFileName: pdfFileName,
       imageData: imageData || undefined,
-      imageUrl: imageUrl || undefined,
+      imageUrl: undefined, // Let server action upload to Supabase and set the URL
       imageFileName: imageFileName,
       createdAt: new Date()
     };

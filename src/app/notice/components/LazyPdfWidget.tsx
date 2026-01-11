@@ -5,7 +5,8 @@ import WorkingPdfDisplay from "./WorkingPdfDisplay"
 import FallbackPdfDisplay from "./FallbackPdfDisplay"
 
 interface LazyPdfWidgetProps {
-  pdfData: string
+  pdfData?: string
+  pdfUrl?: string
   title?: string
   autoScroll?: boolean
   className?: string
@@ -15,6 +16,7 @@ interface LazyPdfWidgetProps {
 
 const LazyPdfWidget = memo(function LazyPdfWidget({
   pdfData,
+  pdfUrl,
   title,
   autoScroll = true,
   className = "",
@@ -69,6 +71,7 @@ const LazyPdfWidget = memo(function LazyPdfWidget({
         useFallback ? (
           <FallbackPdfDisplay
             pdfData={pdfData}
+            pdfUrl={pdfUrl}
             title={title}
             autoScroll={autoScroll}
             className="h-full w-full"
@@ -77,6 +80,7 @@ const LazyPdfWidget = memo(function LazyPdfWidget({
         ) : (
           <WorkingPdfDisplay
             pdfData={pdfData}
+            pdfUrl={pdfUrl}
             title={title}
             autoScroll={autoScroll}
             className="h-full w-full"

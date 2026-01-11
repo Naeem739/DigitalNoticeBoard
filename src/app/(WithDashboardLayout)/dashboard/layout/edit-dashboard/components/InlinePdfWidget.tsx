@@ -8,7 +8,7 @@ import { Upload } from "lucide-react"
 import * as pdfjsLib from "pdfjs-dist"
 import { toast } from "sonner"
 
-function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfStored: (pdfId: string, pdfData: string, fileName: string, pdfimage?: string) => void }) {
+function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfStored: (pdfId: string, pdfUrl: string, fileName: string, pdfimage?: string) => void }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -402,15 +402,34 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
 
     try {
       setIsUploading(true)
-      const loadingToast = toast.loading('Uploading PDF...')
+      const loadingToast = toast.loading('Uploading PDF to storage...')
 
-      // Convert file to base64
+      // Upload PDF to Supabase bucket
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadResponse = await fetch('/api/pdf/upload-url', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const uploadResult = await uploadResponse.json()
+
+      if (!uploadResult.success || !uploadResult.url) {
+        throw new Error(uploadResult.error || 'Failed to upload PDF')
+      }
+
+      const pdfUrl = uploadResult.url
+      toast.dismiss(loadingToast)
+      toast.loading('Loading PDF for preview...')
+
+      // Convert file to base64 for preview/rendering
       const reader = new FileReader()
       
       reader.onerror = (error) => {
         console.error("FileReader error:", error)
-        toast.dismiss(loadingToast)
-        toast.error("Failed to read PDF file")
+        toast.dismiss()
+        toast.error("Failed to read PDF file for preview")
         setIsUploading(false)
       }
       
@@ -423,10 +442,10 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
           
           setCurrentPdfData(pdfData)
           
-          // Render the uploaded PDF
+          // Render the uploaded PDF for preview
           await renderPdfFromData(pdfData)
           
-          // Save to localStorage as backup
+          // Save to localStorage as backup (for preview purposes)
           saveToLocalStorage(pdfData, file.name)
           
           // Generate a unique ID for the PDF
@@ -435,14 +454,14 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
           // Generate first page image on the client
           const pdfimage = await generateFirstPageImage(pdfData)
           
-          // Notify parent component about the stored PDF with data + image
-          onPdfStored(pdfId, pdfData, file.name, pdfimage)
+          // Notify parent component about the stored PDF with URL (not base64 data)
+          onPdfStored(pdfId, pdfUrl, file.name, pdfimage)
           
-          toast.dismiss(loadingToast)
+          toast.dismiss()
           toast.success('PDF uploaded and stored successfully!')
         } catch (error) {
           console.error("Error processing PDF:", error)
-          toast.dismiss(loadingToast)
+          toast.dismiss()
           toast.error(error instanceof Error ? error.message : "Failed to process PDF")
         } finally {
           setIsUploading(false)
@@ -452,7 +471,8 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
       reader.readAsDataURL(file)
     } catch (error) {
       console.error("Error uploading PDF:", error)
-      toast.error("Failed to upload PDF")
+      toast.dismiss()
+      toast.error(error instanceof Error ? error.message : "Failed to upload PDF")
       setIsUploading(false)
     }
   }
@@ -481,21 +501,22 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
               setIsLoadingExisting(true)
               const resp = await fetch('/api/notice/get-all')
               const data = await resp.json()
-              // Filter notices that have pdfData
-              const pdfNotices = (data?.result || []).filter((n: any) => n?.pdfData)
+              // Filter notices that have pdfData or pdfUrl
+              const pdfNotices = (data?.result || []).filter((n: any) => n?.pdfData || n?.pdfUrl)
               console.log('Found PDF notices:', pdfNotices.length, pdfNotices.map((n: any) => ({ 
                 title: n.title, 
                 fileName: n.pdfFileName, 
                 hasPdfData: !!n.pdfData,
+                hasPdfUrl: !!n.pdfUrl,
                 pdfDataLength: n.pdfData?.length || 0,
-                pdfDataPrefix: n.pdfData?.substring(0, 50) || 'none'
+                pdfUrl: n.pdfUrl || 'none'
               })))
               
-              // Ensure PDF data has proper format for rendering
+              // Process PDF notices - preserve both pdfData and pdfUrl
               const processedPdfNotices = pdfNotices.map((n: any) => {
                 let pdfData = n.pdfData || ''
                 
-                // Ensure PDF data has data URL prefix for proper rendering
+                // Ensure PDF data has data URL prefix for proper rendering (if pdfData exists)
                 if (pdfData && !pdfData.startsWith('data:')) {
                   pdfData = `data:application/pdf;base64,${pdfData}`
                   console.log('Added data URL prefix to PDF:', n.pdfFileName)
@@ -503,7 +524,8 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
                 
                 return {
                   ...n,
-                  pdfData: pdfData
+                  pdfData: pdfData,
+                  pdfUrl: n.pdfUrl || undefined // Preserve pdfUrl if it exists
                 }
               })
               
@@ -626,45 +648,117 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
                         className="group text-left rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all bg-white p-4 flex items-start gap-3"
                         onClick={async () => {
                           try {
-                            console.log('Selecting PDF:', { 
-                              title: n.title, 
-                              fileName: n.pdfFileName, 
-                              hasPdfData: !!n.pdfData,
-                              pdfDataLength: n.pdfData?.length || 0,
-                              pdfDataPrefix: n.pdfData?.substring(0, 50) || 'none'
-                            })
+                            const loadingToast = toast.loading('Processing PDF...')
                             
-                            if (!n.pdfData) {
-                              toast.error('No PDF data found for this file')
-                              return
+                            let pdfUrl = n.pdfUrl
+                            let pdfDataForPreview = n.pdfData
+                            
+                            // If we have pdfUrl, use it directly (new format)
+                            if (pdfUrl && typeof pdfUrl === 'string') {
+                              // Fetch PDF for preview
+                              try {
+                                const response = await fetch(pdfUrl)
+                                if (response.ok) {
+                                  const blob = await response.blob()
+                                  const reader = new FileReader()
+                                  reader.onload = async (e) => {
+                                    const dataUrl = e.target?.result as string
+                                    pdfDataForPreview = dataUrl
+                                    setCurrentPdfData(dataUrl)
+                                    await renderPdfFromData(dataUrl)
+                                    saveToLocalStorage(dataUrl, n.pdfFileName || 'uploaded.pdf')
+                                    
+                                    const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+                                    const pdfimage = await generateFirstPageImage(dataUrl)
+                                    onPdfStored(pdfId, pdfUrl, n.pdfFileName || 'uploaded.pdf', pdfimage)
+                                    setIsSelectModalOpen(false)
+                                    toast.dismiss(loadingToast)
+                                    toast.success('PDF selected successfully')
+                                  }
+                                  reader.readAsDataURL(blob)
+                                  return
+                                }
+                              } catch (fetchError) {
+                                console.error('Error fetching PDF from URL:', fetchError)
+                                // Fall through to try pdfData
+                              }
                             }
                             
-                            // Validate PDF data before processing
-                            if (typeof n.pdfData !== 'string' || n.pdfData.trim() === '') {
-                              toast.error('Invalid PDF data format')
-                              return
+                            // Fallback: If we have pdfData (base64), upload it to Supabase first
+                            if (pdfDataForPreview && typeof pdfDataForPreview === 'string') {
+                              // Validate PDF data before processing
+                              if (pdfDataForPreview.trim() === '') {
+                                toast.dismiss(loadingToast)
+                                toast.error('Invalid PDF data format')
+                                return
+                              }
+                              
+                              // Try to render the PDF first to validate it
+                              try {
+                                await renderPdfFromData(pdfDataForPreview)
+                              } catch (renderError) {
+                                console.error('Error rendering selected PDF:', renderError)
+                                toast.dismiss(loadingToast)
+                                toast.error('Failed to load PDF. The file may be corrupted.')
+                                return
+                              }
+                              
+                              // Upload base64 PDF to Supabase to get URL
+                              try {
+                                // Extract base64 data
+                                let base64Data = pdfDataForPreview
+                                if (base64Data.startsWith('data:application/pdf;base64,')) {
+                                  base64Data = base64Data.replace('data:application/pdf;base64,', '')
+                                } else if (base64Data.startsWith('data:')) {
+                                  base64Data = base64Data.split(',')[1] || base64Data
+                                }
+                                
+                                // Convert base64 to blob and upload
+                                const binaryString = atob(base64Data)
+                                const bytes = new Uint8Array(binaryString.length)
+                                for (let i = 0; i < binaryString.length; i++) {
+                                  bytes[i] = binaryString.charCodeAt(i)
+                                }
+                                const blob = new Blob([bytes], { type: 'application/pdf' })
+                                const file = new File([blob], n.pdfFileName || 'uploaded.pdf', { type: 'application/pdf' })
+                                
+                                const formData = new FormData()
+                                formData.append('file', file)
+                                
+                                const uploadResponse = await fetch('/api/pdf/upload-url', {
+                                  method: 'POST',
+                                  body: formData,
+                                })
+                                
+                                const uploadResult = await uploadResponse.json()
+                                
+                                if (!uploadResult.success || !uploadResult.url) {
+                                  throw new Error(uploadResult.error || 'Failed to upload PDF')
+                                }
+                                
+                                pdfUrl = uploadResult.url
+                                
+                                setCurrentPdfData(pdfDataForPreview)
+                                saveToLocalStorage(pdfDataForPreview, n.pdfFileName || 'uploaded.pdf')
+                                
+                                const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+                                const pdfimage = await generateFirstPageImage(pdfDataForPreview)
+                                onPdfStored(pdfId, pdfUrl, n.pdfFileName || 'uploaded.pdf', pdfimage)
+                                setIsSelectModalOpen(false)
+                                toast.dismiss(loadingToast)
+                                toast.success('PDF selected and uploaded successfully!')
+                              } catch (uploadError) {
+                                console.error('Error uploading PDF to Supabase:', uploadError)
+                                toast.dismiss(loadingToast)
+                                toast.error('Failed to upload PDF to storage')
+                              }
+                            } else {
+                              toast.dismiss(loadingToast)
+                              toast.error('No PDF data or URL found for this file')
                             }
-                            
-                            setCurrentPdfData(n.pdfData)
-                            
-                            // Try to render the PDF first to validate it
-                            try {
-                              await renderPdfFromData(n.pdfData)
-                            } catch (renderError) {
-                              console.error('Error rendering selected PDF:', renderError)
-                              toast.error('Failed to load PDF. The file may be corrupted.')
-                              return
-                            }
-                            
-                            setCurrentPdfData(n.pdfData)
-                            saveToLocalStorage(n.pdfData, n.pdfFileName || 'uploaded.pdf')
-                            const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-                            const pdfimage = await generateFirstPageImage(n.pdfData)
-                            onPdfStored(pdfId, n.pdfData, n.pdfFileName || 'uploaded.pdf', pdfimage)
-                            setIsSelectModalOpen(false)
-                            toast.success('PDF selected successfully')
                           } catch (err) {
                             console.error('Error selecting existing PDF:', err)
+                            toast.dismiss()
                             toast.error('Failed to select PDF. Please try again.')
                           }
                         }}

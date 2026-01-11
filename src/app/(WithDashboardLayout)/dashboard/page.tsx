@@ -116,7 +116,12 @@ export default function DashboardPage() {
       const noticesData = await noticesResponse.json()
       
       // Fetch categories from Category table
-      const categoriesResponse = await fetch('/api/category/get-all')
+      const categoriesResponse = await fetch('/api/category/get-all', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      })
       const categoriesData = await categoriesResponse.json()
       
       // Fetch dashboards from Dashboard table

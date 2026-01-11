@@ -16,32 +16,31 @@ export async function GET(
       return NextResponse.json({ error: 'PDF not found' }, { status: 404 })
     }
 
-    if (!pdf.pdfData) {
-      return NextResponse.json({ error: 'No PDF data available' }, { status: 404 })
+    if (!pdf.pdfUrl) {
+      return NextResponse.json({ error: 'No PDF URL available' }, { status: 404 })
     }
 
-    // pdfData can be stored in different formats:
-    // 1. Data URL: data:application/pdf;base64,XXXX
-    // 2. Just base64: XXXX (raw base64 string)
-    let base64Data = pdf.pdfData
-    
-    // Remove data URL prefix if present
-    if (base64Data.startsWith('data:application/pdf;base64,')) {
-      base64Data = base64Data.replace('data:application/pdf;base64,', '')
-    } else if (base64Data.startsWith('data:')) {
-      // Handle other data URL formats
-      base64Data = base64Data.split(',')[1] || base64Data
-    }
-    // If it's already just base64, use it as-is
-    
-    const pdfBuffer = Buffer.from(base64Data, 'base64')
-
-    return new NextResponse(pdfBuffer, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${pdf.fileName || pdf.title || 'document'}.pdf"`
+    try {
+      // Fetch PDF from Supabase Storage
+      const response = await fetch(pdf.pdfUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.statusText}`)
       }
-    })
+      const arrayBuffer = await response.arrayBuffer()
+
+      return new NextResponse(arrayBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${pdf.fileName || pdf.title || 'document'}.pdf"`
+        }
+      })
+    } catch (error) {
+      console.error('Error fetching PDF from Supabase:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch PDF file' },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     console.error('Error handling PDF download:', error)
     return NextResponse.json(

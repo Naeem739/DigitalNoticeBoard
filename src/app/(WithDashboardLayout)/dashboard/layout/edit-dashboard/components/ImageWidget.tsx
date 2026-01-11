@@ -109,7 +109,7 @@ export default function ImageWidget({
               content: `Dashboard Image: ${file.name}`,
               category: "Default(Images)",
               categoryId: imageCategoryId,
-              imageUrl: dataUrl, // Store the full data URL for display
+              imageUrl: undefined, // Let server action upload to Supabase and set the URL
               imageFileName: file.name,
               imageData: base64Data, // Store only the base64 data without the prefix
             }

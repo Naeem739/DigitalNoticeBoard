@@ -28,15 +28,27 @@ export async function GET(
       return NextResponse.json({ error: 'Notice not found' }, { status: 404 })
     }
 
-    // If it's a PDF notice, return the PDF data
-    if (notice.pdfData) {
-      const pdfBuffer = Buffer.from(notice.pdfData, 'base64')
-      return new NextResponse(pdfBuffer, {
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="${notice.pdfFileName || notice.title}.pdf"`,
-        },
-      })
+    // If it's a PDF notice, fetch from Supabase Storage if URL exists
+    if (notice.pdfUrl) {
+      try {
+        const response = await fetch(notice.pdfUrl)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.statusText}`)
+        }
+        const arrayBuffer = await response.arrayBuffer()
+        return new NextResponse(arrayBuffer, {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${notice.pdfFileName || notice.title}.pdf"`,
+          },
+        })
+      } catch (error) {
+        console.error('Error fetching PDF from Supabase:', error)
+        return NextResponse.json(
+          { error: 'Failed to fetch PDF file' },
+          { status: 500 }
+        )
+      }
     }
 
     // For text notices, generate a simple HTML that can be converted to PDF

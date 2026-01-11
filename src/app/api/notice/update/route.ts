@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
+import { uploadPDF, uploadImage } from "@/lib/supabase";
 
 export async function PUT(request: Request) {
     try {
@@ -16,17 +17,69 @@ export async function PUT(request: Request) {
             );
         }
 
-        // Update the notice
+        // Handle PDF upload to Supabase Storage
+        let finalPdfUrl = pdfUrl || undefined
+        const isPdfBase64DataUrl = finalPdfUrl && finalPdfUrl.startsWith('data:application/pdf')
+        
+        if (pdfData && pdfFileName && (!finalPdfUrl || isPdfBase64DataUrl)) {
+            try {
+                const pdfBuffer = Buffer.from(pdfData, 'base64')
+                const uploadResult = await uploadPDF(pdfBuffer, pdfFileName)
+                if (uploadResult.error || !uploadResult.url) {
+                    const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+                    console.error("Error uploading PDF to Supabase:", errorMsg)
+                    return NextResponse.json(
+                        { success: false, message: `Failed to upload PDF: ${errorMsg}` },
+                        { status: 500 }
+                    )
+                }
+                finalPdfUrl = uploadResult.url
+                console.log("PDF uploaded to Supabase:", finalPdfUrl)
+            } catch (error) {
+                console.error("Error uploading PDF:", error)
+                return NextResponse.json(
+                    { success: false, message: `Failed to upload PDF: ${error instanceof Error ? error.message : 'Unknown error'}` },
+                    { status: 500 }
+                )
+            }
+        }
+
+        // Handle Image upload to Supabase Storage
+        let finalImageUrl = imageUrl || undefined
+        const isImageBase64DataUrl = finalImageUrl && finalImageUrl.startsWith('data:image/')
+        
+        if (imageData && imageFileName && (!finalImageUrl || isImageBase64DataUrl)) {
+            try {
+                const imageBuffer = Buffer.from(imageData, 'base64')
+                const uploadResult = await uploadImage(imageBuffer, imageFileName)
+                if (uploadResult.error || !uploadResult.url) {
+                    const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+                    console.error("Error uploading image to Supabase:", errorMsg)
+                    return NextResponse.json(
+                        { success: false, message: `Failed to upload image: ${errorMsg}` },
+                        { status: 500 }
+                    )
+                }
+                finalImageUrl = uploadResult.url
+                console.log("Image uploaded to Supabase:", finalImageUrl)
+            } catch (error) {
+                console.error("Error uploading image:", error)
+                return NextResponse.json(
+                    { success: false, message: `Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}` },
+                    { status: 500 }
+                )
+            }
+        }
+
+        // Update the notice - don't store imageData or pdfData, only URLs
         const updateData: any = {
             title: title,
             category: category,
             categoryId: categoryId,
-            imageData: imageData,
             imageFileName: imageFileName,
-            imageUrl: imageUrl,
-            pdfData: pdfData,
+            imageUrl: finalImageUrl,
             pdfFileName: pdfFileName,
-            pdfUrl: pdfUrl
+            pdfUrl: finalPdfUrl
         };
 
         // Only include content if it's provided
