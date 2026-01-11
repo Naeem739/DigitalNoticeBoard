@@ -149,7 +149,7 @@ export default function WorkingPdfDisplay({
       setError(null)
       
       // Priority 1: Use pdfUrl if available (fetch from Supabase bucket)
-      let pdfBytes: Uint8Array
+      let pdfBytes: Uint8Array | undefined = undefined
       
       if (pdfUrl && typeof pdfUrl === 'string') {
         try {
