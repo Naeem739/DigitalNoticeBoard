@@ -27,9 +27,10 @@ export const createPdf = async (value: Omit<TPdf, "id" | "createdAt" | "updatedA
     if (value.pdfData && !pdfUrl) {
       const pdfBuffer = Buffer.from(value.pdfData, 'base64')
       const uploadResult = await uploadPDF(pdfBuffer, value.fileName)
-      if (uploadResult.error) {
-        console.error("Error uploading PDF to Supabase:", uploadResult.error)
-        return { success: false, message: `Failed to upload PDF: ${uploadResult.error}` }
+      if (uploadResult.error || !uploadResult.url) {
+        const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+        console.error("Error uploading PDF to Supabase:", errorMsg)
+        return { success: false, message: `Failed to upload PDF: ${errorMsg}` }
       }
       pdfUrl = uploadResult.url
     }
