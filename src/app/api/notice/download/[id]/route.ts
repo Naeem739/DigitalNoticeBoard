@@ -568,8 +568,8 @@ export async function GET(
                 <strong>Category:</strong> ${escapedCategory}${formattedNoticeId ? `<br><strong>Notice ID:</strong> ${escapedNoticeId}` : ''}
               </div>
               <div class="ref-date">
-                <strong>Published Date:</strong> ${createdDate}<br>
-                <strong>Last Update:</strong> ${updatedDate}
+                <strong>Published:</strong> ${createdDate}<br>
+                <strong>Updated:</strong> ${updatedDate}
               </div>
             </div>
           </div>
@@ -595,7 +595,7 @@ export async function GET(
               <img src="${qrDataUrl}" alt="QR Code" style="width: 50px; height: 50px;" />
             </div>
             <div class="digital-text">
-              This notice is issued digitally and does not require a physical signature.
+              This document is electronically generated and does not require any signature
             </div>
           </div>
         </div>
