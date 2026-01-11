@@ -127,7 +127,7 @@ export async function GET(
     const baseUrl = request.nextUrl.origin
     const qrContent = `${baseUrl}/api/notice/download/${notice.id}`
     const qrDataUrl = await QRCode.toDataURL(qrContent, {
-      width: 50,
+      width: 30,
       margin: 1,
       color: {
         dark: '#000000',
@@ -477,7 +477,7 @@ export async function GET(
             
             /* Center: digital notice text */
             @bottom-center {
-              content: "This notice is issued digitally and does not require a physical signature.";
+              content: "This document is electronically generated and does not require any signature";
               font-size: 12px;
               color: #000;
               text-align: center;
