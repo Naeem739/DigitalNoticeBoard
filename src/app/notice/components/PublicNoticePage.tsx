@@ -72,6 +72,9 @@ export default function PublicNoticePage() {
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
   const [countdown, setCountdown] = useState(120) // 2 minutes = 120 seconds
   const [viewportWidth, setViewportWidth] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(0)
+  const [scaleFactor, setScaleFactor] = useState(1)
+  const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 })
   const isMobile = viewportWidth > 0 && viewportWidth <= 480
   const [lastDataUpdate, setLastDataUpdate] = useState<number>(Date.now())
 
@@ -129,18 +132,49 @@ export default function PublicNoticePage() {
     return () => clearInterval(timer)
   }, [mounted])
 
-  // Track viewport width for responsive font sizing
+  // Track viewport dimensions for responsive sizing and scaling
   useEffect(() => {
     if (!mounted) return
 
-    const updateViewportWidth = () => {
+    const updateViewportDimensions = () => {
       setViewportWidth(window.innerWidth)
+      setViewportHeight(window.innerHeight)
     }
 
-    updateViewportWidth()
-    window.addEventListener('resize', updateViewportWidth)
-    return () => window.removeEventListener('resize', updateViewportWidth)
+    updateViewportDimensions()
+    window.addEventListener('resize', updateViewportDimensions)
+    return () => window.removeEventListener('resize', updateViewportDimensions)
   }, [mounted])
+
+  // Calculate scale factor to maintain aspect ratio on all screen sizes
+  useEffect(() => {
+    if (!mounted || !currentDashboard || viewportWidth === 0 || viewportHeight === 0) {
+      setScaleFactor(1)
+      setContainerDimensions({ width: 0, height: 0 })
+      return
+    }
+
+    const designDimensions = getAspectRatioDimensions()
+    const designWidth = designDimensions.width
+    const designHeight = designDimensions.height
+
+    // Get available space (viewport minus header/footer)
+    // Header and footer take approximately 120px and 80px respectively on mobile, more on desktop
+    const headerHeight = isMobile ? 120 : 150
+    const footerHeight = isMobile ? 80 : 100
+    const availableHeight = Math.max(viewportHeight - headerHeight - footerHeight, 100) // Minimum 100px
+    const availableWidth = Math.max(viewportWidth, 100) // Minimum 100px
+
+    // Calculate scale to fit within viewport while maintaining aspect ratio
+    // Use the smaller scale factor to ensure it fits both width and height
+    const scaleByWidth = availableWidth / designWidth
+    const scaleByHeight = availableHeight / designHeight
+    const scale = Math.min(scaleByWidth, scaleByHeight, 1) // Don't scale up beyond 1
+
+    // Set container to design dimensions (will be scaled via CSS transform)
+    setScaleFactor(scale)
+    setContainerDimensions({ width: designWidth, height: designHeight })
+  }, [mounted, currentDashboard, viewportWidth, viewportHeight, isMobile])
 
   // Responsive font-size mapping for notice titles - Optimized for 75" 4K display
   const getResponsiveTitleFontSize = () => {
@@ -262,44 +296,6 @@ export default function PublicNoticePage() {
   const getAspectRatioDimensions = () => {
     const aspectRatio = currentDashboard?.aspectRatio || "4:3"
     return RATIO_DIMENSIONS[aspectRatio] || RATIO_DIMENSIONS["4:3"]
-  }
-
-  // Get container style for mobile (calculate height based on aspect ratio)
-  const getMobileContainerStyle = () => {
-    if (!isMobile || !currentDashboard?.aspectRatio || !viewportWidth) {
-      return {}
-    }
-    
-    const aspectRatio = currentDashboard.aspectRatio
-    const [widthRatio, heightRatio] = aspectRatio.split(':').map(Number)
-    const calculatedHeight = (viewportWidth * heightRatio) / widthRatio
-    
-    // Ensure minimum height so widgets are visible on mobile
-    // Use at least 1.5x the calculated height or 500px, whichever is larger
-    // This ensures widgets are visible while maintaining reasonable proportions
-    const minHeight = Math.max(calculatedHeight * 1.5, 500)
-    
-    return {
-      width: '100%',
-      height: `${minHeight}px`,
-      maxWidth: '100%',
-      margin: 0,
-      padding: 0
-    }
-  }
-
-  // Get container style for desktop (use aspect ratio CSS property)
-  const getDesktopContainerStyle = () => {
-    return {
-      aspectRatio: currentDashboard?.aspectRatio ? 
-        currentDashboard.aspectRatio.replace(':', '/') : '4/3',
-      width: '100%',
-      height: '100%',
-      maxWidth: '100%',
-      maxHeight: '100%',
-      margin: 0,
-      padding: 0
-    }
   }
 
   // Get responsive content padding
@@ -800,29 +796,43 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className={`w-full ${isMobile ? 'h-auto' : 'h-full'} ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}
+              className="w-full h-full overflow-hidden"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
+              {/* Scaling wrapper to maintain aspect ratio on all screen sizes */}
               <div 
-                className={`relative w-full ${isMobile ? '' : 'overflow-hidden'}`}
+                className="relative w-full h-full flex items-center justify-center overflow-hidden"
                 style={{
-                  // On mobile: calculate height based on aspect ratio to ensure widgets are visible
-                  // On desktop: use CSS aspectRatio property
-                  ...(isMobile ? getMobileContainerStyle() : getDesktopContainerStyle())
+                  margin: 0,
+                  padding: 0
                 }}
               >
-                {/* Absolute Positioning Layout - Uses exact stored positions */}
                 <div 
-                  className="relative w-full notice-grid-container"
-                  style={{ 
-                    width: '100%',
-                    height: '100%',
-                    position: 'relative',
-                    overflow: isMobile ? 'visible' : 'hidden'
+                  className="relative overflow-hidden"
+                  style={{
+                    // Use design dimensions (will be scaled via CSS transform)
+                    width: containerDimensions.width > 0 ? `${containerDimensions.width}px` : '100%',
+                    height: containerDimensions.height > 0 ? `${containerDimensions.height}px` : '100%',
+                    // Maintain exact aspect ratio from database
+                    aspectRatio: currentDashboard?.aspectRatio ? 
+                      currentDashboard.aspectRatio.replace(':', '/') : '4/3',
+                    // Apply scale transform to fit viewport while maintaining aspect ratio
+                    transform: scaleFactor > 0 && containerDimensions.width > 0 ? `scale(${scaleFactor})` : 'scale(1)',
+                    transformOrigin: 'center center'
                   }}
                 >
+                  {/* Absolute Positioning Layout - Uses exact stored positions */}
+                  <div 
+                    className="relative w-full h-full notice-grid-container"
+                    style={{ 
+                      width: '100%',
+                      height: '100%',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
                   {currentDashboard.containers.map((container, index) => {
                     const settings = container.settings || {}
                     const bgColor = settings.backgroundColor || '#ffffff'
@@ -1381,6 +1391,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                       </motion.div>
                     )
                   })}
+                  </div>
                 </div>
               </div>
             </motion.div>
