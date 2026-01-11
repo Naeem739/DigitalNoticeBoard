@@ -477,7 +477,7 @@ export async function GET(
             
             /* Center: digital notice text */
             @bottom-center {
-              content: "This document is electronically generated and does not require any signature";
+              content: "This notice is issued digitally and does not require a physical signature.";
               font-size: 12px;
               color: #000;
               text-align: center;
@@ -521,8 +521,8 @@ export async function GET(
                 <strong>Category:</strong> ${escapedCategory}${formattedNoticeId ? `<br><strong>Notice ID:</strong> ${escapedNoticeId}` : ''}
               </div>
               <div class="ref-date">
-                <strong>Published:</strong> ${createdDate}<br>
-                <strong>Updated:</strong> ${updatedDate}
+                <strong>Published Date:</strong> ${createdDate}<br>
+                <strong>Last Update:</strong> ${updatedDate}
               </div>
             </div>
           </div>
