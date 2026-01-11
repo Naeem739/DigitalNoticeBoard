@@ -60,6 +60,17 @@ export default function FallbackPdfDisplay({
     )
   }
 
+  // Only render PdfDisplay if pdfData is provided
+  if (!pdfData) {
+    return (
+      <div className={`flex items-center justify-center p-4 text-gray-500 ${className}`}>
+        <div className="text-center">
+          <p className="text-sm">No PDF data available</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <PdfDisplay
       pdfData={pdfData}
