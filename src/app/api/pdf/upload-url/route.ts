@@ -25,11 +25,12 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     const uploadResult = await uploadPDF(buffer, file.name)
 
-    if (uploadResult.error) {
-      console.error('Error uploading PDF to Supabase:', uploadResult.error)
+    if (uploadResult.error || !uploadResult.url) {
+      const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+      console.error('Error uploading PDF to Supabase:', errorMsg)
       return NextResponse.json({ 
         success: false, 
-        error: `Failed to upload PDF: ${uploadResult.error}` 
+        error: `Failed to upload PDF: ${errorMsg}` 
       }, { status: 500 })
     }
 

@@ -25,10 +25,11 @@ export async function PUT(request: Request) {
             try {
                 const pdfBuffer = Buffer.from(pdfData, 'base64')
                 const uploadResult = await uploadPDF(pdfBuffer, pdfFileName)
-                if (uploadResult.error) {
-                    console.error("Error uploading PDF to Supabase:", uploadResult.error)
+                if (uploadResult.error || !uploadResult.url) {
+                    const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+                    console.error("Error uploading PDF to Supabase:", errorMsg)
                     return NextResponse.json(
-                        { success: false, message: `Failed to upload PDF: ${uploadResult.error}` },
+                        { success: false, message: `Failed to upload PDF: ${errorMsg}` },
                         { status: 500 }
                     )
                 }
@@ -51,10 +52,11 @@ export async function PUT(request: Request) {
             try {
                 const imageBuffer = Buffer.from(imageData, 'base64')
                 const uploadResult = await uploadImage(imageBuffer, imageFileName)
-                if (uploadResult.error) {
-                    console.error("Error uploading image to Supabase:", uploadResult.error)
+                if (uploadResult.error || !uploadResult.url) {
+                    const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+                    console.error("Error uploading image to Supabase:", errorMsg)
                     return NextResponse.json(
-                        { success: false, message: `Failed to upload image: ${uploadResult.error}` },
+                        { success: false, message: `Failed to upload image: ${errorMsg}` },
                         { status: 500 }
                     )
                 }
