@@ -579,7 +579,7 @@ export default function PublicNoticePage() {
         className="bg-opacity-95 backdrop-blur-sm shadow-lg border-b border-blue-500/30 flex-shrink-0"
         style={{ 
           backgroundColor: settings?.headerBackgroundColor || '#1e293b',
-          borderBottomColor: settings?.accentColor || '#3b82f6',
+          borderBottomColor: '#A9A9A9',
           color: settings?.fontColor || '#ffffff'
         }}
         initial={{ opacity: 0, y: -20 }}
@@ -1373,7 +1373,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
         className="bg-opacity-95 backdrop-blur-sm shadow-lg border-t border-blue-500/30 flex-shrink-0"
         style={{ 
           backgroundColor: settings?.footerBackgroundColor || '#1e293b',
-          borderTopColor: settings?.accentColor || '#3b82f6'
+          borderTopColor:'#808080'
         }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
