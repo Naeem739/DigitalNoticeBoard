@@ -424,53 +424,6 @@ export async function GET(
             font-family: 'Times New Roman', 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, serif !important;
           }
           
-          .digital-notice-footer {
-            margin-top: 15mm;
-            padding-top: 8mm;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15mm;
-            border-top: 1px solid #e5e7eb;
-          }
-          
-          .digital-notice-footer .qr-code {
-            flex-shrink: 0;
-          }
-          
-          .digital-notice-footer .digital-text {
-            font-size: 12px;
-            font-style: italic;
-            color: #000;
-            text-align: center;
-            font-family: 'Times New Roman', 'Tiro Bangla', 'Kalpurush', 'SolaimanLipi', 'Segoe UI', Tahoma, sans-serif;
-          }
-          
-          @media screen and (max-width: 768px) {
-            .digital-notice-footer {
-              flex-direction: column;
-              gap: 10mm;
-              margin-top: 10mm;
-              padding-top: 6mm;
-            }
-            
-            .digital-notice-footer .digital-text {
-              font-size: 11px;
-            }
-          }
-          
-          @media screen and (max-width: 480px) {
-            .digital-notice-footer {
-              gap: 8mm;
-              margin-top: 8mm;
-              padding-top: 5mm;
-            }
-            
-            .digital-notice-footer .digital-text {
-              font-size: 10px;
-            }
-          }
-          
           .print-button {
             position: fixed;
             top: 20px;
@@ -524,7 +477,7 @@ export async function GET(
             
             /* Center: digital notice text */
             @bottom-center {
-              content: "This notice is issued digitally and does not require a physical signature.";
+              content: "This document is electronically generated and does not require any signature";
               font-size: 12px;
               color: #000;
               text-align: center;
@@ -586,16 +539,6 @@ export async function GET(
               <div class="content-body">
                 ${noticeContent}
               </div>
-            </div>
-          </div>
-          
-          <!-- Digital Notice Footer -->
-          <div class="digital-notice-footer">
-            <div class="qr-code">
-              <img src="${qrDataUrl}" alt="QR Code" style="width: 50px; height: 50px;" />
-            </div>
-            <div class="digital-text">
-              This document is electronically generated and does not require any signature
             </div>
           </div>
         </div>
