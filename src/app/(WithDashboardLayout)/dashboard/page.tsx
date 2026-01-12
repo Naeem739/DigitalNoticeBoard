@@ -943,7 +943,6 @@ export default function DashboardPage() {
                   {selectedPDF.pdfUrl ? (
                     <iframe
                       src={selectedPDF.pdfUrl}
-                      type="application/pdf"
                       className="w-full h-full rounded-lg min-h-[400px] border-0"
                       title={selectedPDF.title}
                     />
