@@ -1214,85 +1214,63 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     border: 'none'
                                   }}
                                 >
-                                  {/* Show preview image if available, otherwise show PDF renderer directly */}
-                                  {container.pdfimage ? (
-                                    <>
-                                      {/* Preview image background */}
+                                  {/* Use pdfimage (base64 PNG of first page) for Samsung QB75C compatibility */}
+                                  <div className="relative w-full h-full">
+                                    {container.pdfimage ? (
                                       <img
                                         src={container.pdfimage as string}
                                         alt={container.title || container.pdfFileName || 'PDF Preview'}
-                                        className="absolute inset-0 w-full h-full object-contain opacity-30"
+                                        className="w-full h-full object-contain"
                                         style={{
                                           backgroundColor: '#ffffff',
-                                          zIndex: 1
+                                          width: '100%',
+                                          height: '100%'
                                         }}
                                       />
-                                      {/* PDF renderer on top */}
-                                      <div className="relative z-10 w-full h-full">
-                                        <ClientOnly fallback={
-                                          <div className="flex items-center justify-center h-full bg-white/90 backdrop-blur-sm">
-                                            <div className="text-center">
-                                              <div className="animate-pulse">
-                                                <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
-                                                <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
-                                              </div>
-                                              <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
+                                    ) : (
+                                      <ClientOnly fallback={
+                                        <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+                                          <div className="text-center">
+                                            <div className="animate-pulse">
+                                              <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
+                                              <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
                                             </div>
+                                            <p className="text-xs text-gray-500 mt-2">PDF image not available</p>
                                           </div>
-                                        }>
-                                          <LazyPdfWidget
-                                            pdfUrl={container.pdfUrl}
-                                            autoScroll={false}
-                                            className="h-full w-full"
-                                            showTitle={false}
-                                            containerId={container.id}
-                                          />
-                                        </ClientOnly>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <ClientOnly fallback={
-                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
-                                        <div className="text-center">
-                                          <div className="animate-pulse">
-                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
-                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
-                                          </div>
-                                          <p className="text-xs text-gray-500 mt-2">Loading PDF from storage...</p>
                                         </div>
-                                      </div>
-                                    }>
-                                      <LazyPdfWidget
-                                        pdfUrl={container.pdfUrl}
-                                        autoScroll={false}
-                                        className="h-full w-full"
-                                        showTitle={false}
-                                        containerId={container.id}
-                                      />
-                                    </ClientOnly>
-                                  )}
-                                  
-                                  {/* QR Code - Bottom Right - White background container for visibility */}
-                                  <div 
-                                    className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
-                                    style={{
-                                      pointerEvents: 'auto',
-                                      backgroundColor: '#ffffff',
-                                      padding: '8px',
-                                      borderRadius: '8px',
-                                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
-                                    }}
-                                  >
-                                    <NoticeQRCode 
-                                      notice={{
-                                        id: container.id,
-                                        title: container.settings?.customCategoryName || container.title || 'PDF Document',
-                                        pdfUrl: container.pdfUrl,
-                                        pdfFileName: container.pdfFileName || container.title || 'document.pdf'
+                                      }>
+                                        <LazyPdfWidget
+                                          pdfUrl={container.pdfUrl}
+                                          autoScroll={false}
+                                          className="h-full w-full"
+                                          showTitle={false}
+                                          containerId={container.id}
+                                        />
+                                      </ClientOnly>
+                                    )}
+                                    
+                                    {/* QR Code - Bottom Right - White background container for visibility */}
+                                    <div 
+                                      className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
+                                      style={{
+                                        pointerEvents: 'auto',
+                                        backgroundColor: '#ffffff',
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
                                       }}
-                                      size={isMobile ? 40 : getResponsiveQRSize()}
-                                      className=""
-                                    />
+                                    >
+                                      <NoticeQRCode 
+                                        notice={{
+                                          id: container.id,
+                                          title: container.settings?.customCategoryName || container.title || 'PDF Document',
+                                          pdfUrl: container.pdfUrl,
+                                          pdfFileName: container.pdfFileName || container.title || 'document.pdf'
+                                        }}
+                                        size={isMobile ? 40 : getResponsiveQRSize()}
+                                        className=""
+                                      />
+                                    </div>
                                   </div>
                                 </motion.div>
                               )}
