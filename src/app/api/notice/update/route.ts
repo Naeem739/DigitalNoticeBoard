@@ -46,28 +46,34 @@ export async function PUT(request: Request) {
 
         // Handle Image upload to Supabase Storage
         let finalImageUrl = imageUrl || undefined
-        const isImageBase64DataUrl = finalImageUrl && finalImageUrl.startsWith('data:image/')
         
-        if (imageData && imageFileName && (!finalImageUrl || isImageBase64DataUrl)) {
-            try {
-                const imageBuffer = Buffer.from(imageData, 'base64')
-                const uploadResult = await uploadImage(imageBuffer, imageFileName)
-                if (uploadResult.error || !uploadResult.url) {
-                    const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
-                    console.error("Error uploading image to Supabase:", errorMsg)
+        // If imageData is provided, always upload to Supabase Storage and use that URL
+        // Only skip upload if imageUrl is already a valid Supabase Storage URL
+        if (imageData && imageFileName) {
+            const isSupabaseUrl = finalImageUrl && typeof finalImageUrl === 'string' && finalImageUrl.includes('supabase.co/storage')
+            
+            // Upload if no URL exists, URL is empty, URL is base64 data URL, or URL is not a Supabase URL
+            if (!isSupabaseUrl) {
+                try {
+                    const imageBuffer = Buffer.from(imageData, 'base64')
+                    const uploadResult = await uploadImage(imageBuffer, imageFileName)
+                    if (uploadResult.error || !uploadResult.url) {
+                        const errorMsg = uploadResult.error || 'Supabase upload returned no URL'
+                        console.error("Error uploading image to Supabase:", errorMsg)
+                        return NextResponse.json(
+                            { success: false, message: `Failed to upload image: ${errorMsg}` },
+                            { status: 500 }
+                        )
+                    }
+                    finalImageUrl = uploadResult.url
+                    console.log("Image uploaded to Supabase:", finalImageUrl)
+                } catch (error) {
+                    console.error("Error uploading image:", error)
                     return NextResponse.json(
-                        { success: false, message: `Failed to upload image: ${errorMsg}` },
+                        { success: false, message: `Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}` },
                         { status: 500 }
                     )
                 }
-                finalImageUrl = uploadResult.url
-                console.log("Image uploaded to Supabase:", finalImageUrl)
-            } catch (error) {
-                console.error("Error uploading image:", error)
-                return NextResponse.json(
-                    { success: false, message: `Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}` },
-                    { status: 500 }
-                )
             }
         }
 

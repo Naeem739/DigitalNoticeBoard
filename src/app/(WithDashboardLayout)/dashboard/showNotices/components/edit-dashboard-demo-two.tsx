@@ -554,7 +554,121 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     try {
       setIsLoading({ id: noticeId, operation: 'delete' });
       
-      // Delete notice from the Notice table in the database
+      // Find the notice to determine its type
+      const notice = notices.find(n => n.id === noticeId);
+      
+      // Check if this is a synthetic ID from Dashboard containers
+      // Format: ${dash.id}:${container.id}:pdfId:${pdfId}
+      if (noticeId.includes(':pdfId:')) {
+        // Extract the actual PDF ID and dashboard/container info from the synthetic ID
+        const parts = noticeId.split(':pdfId:');
+        const prefixParts = parts[0].split(':');
+        const dashboardId = prefixParts[0];
+        const containerId = prefixParts[1];
+        const actualPdfId = parts[parts.length - 1];
+        
+        // Delete from Pdf table (this also deletes from storage)
+        const response = await fetch(`/api/pdf/delete?id=${actualPdfId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete PDF');
+        }
+        
+        // Remove PDF reference from Dashboard container (pdfIds array)
+        if (dashboardId && containerId) {
+          try {
+            const removeResponse = await fetch(`/api/dashboard/remove-pdf?dashboardId=${dashboardId}&containerId=${containerId}&pdfId=${actualPdfId}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (!removeResponse.ok) {
+              const errorData = await removeResponse.json();
+              console.warn(`Failed to remove PDF from dashboard container: ${errorData.error || 'Unknown error'}`);
+              // Continue even if dashboard update fails
+            }
+          } catch (error) {
+            console.error('Error removing PDF from dashboard container:', error);
+            // Continue even if dashboard update fails
+          }
+        }
+        
+        // Remove notice from local state
+        const updatedNotices = notices.filter(notice => notice.id !== noticeId);
+        setNotices(updatedNotices);
+        
+        toast.success('PDF deleted successfully!');
+        return;
+      }
+      
+      // Check if this is a dashboard container PDF (synthetic ID without pdfId prefix)
+      // Format: ${dash.id}:${container.id}:pdf or ${dash.id}:${container.id}:pdf:${idx}
+      if (noticeId.includes(':') && noticeId.includes(':pdf') && !noticeId.includes(':pdfId:')) {
+        // Parse the synthetic ID to extract dashboard and container IDs
+        const parts = noticeId.split(':');
+        const dashboardId = parts[0];
+        const containerId = parts[1];
+        
+        // Delete file from Supabase Storage if it has a URL
+        if (notice && notice.pdfUrl) {
+          try {
+            // Delete file from Supabase Storage
+            const storageResponse = await fetch(`/api/storage/delete?url=${encodeURIComponent(notice.pdfUrl)}&bucket=pdfs`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (!storageResponse.ok) {
+              const errorData = await storageResponse.json();
+              console.warn(`Failed to delete PDF file from storage: ${errorData.error || 'Unknown error'}`);
+              // Continue with removal even if storage deletion fails
+            }
+          } catch (error) {
+            console.error('Error deleting PDF file from storage:', error);
+            // Continue with removal even if storage deletion fails
+          }
+        }
+        
+        // Remove PDF from Dashboard container
+        if (dashboardId && containerId && notice?.pdfUrl) {
+          try {
+            const removeResponse = await fetch(`/api/dashboard/remove-pdf?dashboardId=${dashboardId}&containerId=${containerId}&pdfUrl=${encodeURIComponent(notice.pdfUrl)}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (!removeResponse.ok) {
+              const errorData = await removeResponse.json();
+              console.warn(`Failed to remove PDF from dashboard container: ${errorData.error || 'Unknown error'}`);
+              // Continue with removal from view even if dashboard update fails
+            }
+          } catch (error) {
+            console.error('Error removing PDF from dashboard container:', error);
+            // Continue with removal from view even if dashboard update fails
+          }
+        }
+        
+        // Remove from local state
+        const updatedNotices = notices.filter(notice => notice.id !== noticeId);
+        setNotices(updatedNotices);
+        
+        toast.success('PDF deleted successfully!');
+        return;
+      }
+      
+      // Regular notice deletion from Notice table
       const response = await fetch(`/api/notice/delete?id=${noticeId}`, {
         method: 'DELETE',
         headers: {

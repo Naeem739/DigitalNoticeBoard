@@ -209,6 +209,8 @@ interface ExtendedWidget extends Widget {
     title: string
     file?: File
     dbId?: string
+    imageUrl?: string // Supabase Storage URL
+    imageFileName?: string // Image file name
     width?: number
     height?: number
     size?: number
@@ -1739,21 +1741,48 @@ function EditDashboardDemo() {
 
           // Handle different widget types
           if (widget.type === "image" && widget.images && widget.images.length > 0) {
-            // For image displays, collect image data but don't create notices during save
-            // Notices should be created when images are added to the widget, not during save
-            // This significantly improves save performance
+            // For image displays, collect image data and fetch image URLs from notices
             const imageNoticeIds: string[] = []
+            const imageUrls: any[] = []
             
-            // If images already have notice IDs (from previous saves), use those
-            widget.images.forEach((image: any) => {
+            // Collect image URLs from widget images (they should have imageUrl from Supabase Storage)
+            for (const image of widget.images) {
               if (image.dbId) {
                 imageNoticeIds.push(image.dbId)
+                
+                // Use imageUrl from widget if available (from Supabase Storage), otherwise fetch from notice
+                if (image.imageUrl) {
+                  // Image URL already available from widget (from Supabase Storage)
+                  imageUrls.push({
+                    id: image.dbId,
+                    imageUrl: image.imageUrl,
+                    imageFileName: image.imageFileName || image.title || 'image',
+                    title: image.title || 'Image'
+                  })
+                } else {
+                  // Fallback: Fetch the notice to get the imageUrl from Supabase Storage
+                  try {
+                    const noticeResponse = await fetch(`/api/notice/get-all`)
+                    const noticeData = await noticeResponse.json()
+                    if (noticeData.success && Array.isArray(noticeData.result)) {
+                      const notice = noticeData.result.find((n: any) => n.id === image.dbId)
+                      if (notice && notice.imageUrl) {
+                        // Store image URL and metadata in container (similar to PDFs)
+                        imageUrls.push({
+                          id: notice.id,
+                          imageUrl: notice.imageUrl,
+                          imageFileName: notice.imageFileName || image.title || 'image',
+                          title: notice.title || image.title || 'Image'
+                        })
+                      }
+                    }
+                  } catch (error) {
+                    console.error(`Error fetching notice ${image.dbId} for image URL:`, error)
+                    // Continue even if fetch fails
+                  }
+                }
               }
-            })
-            
-            // If no existing notice IDs, we'll need to create them, but do it in batch
-            // For now, skip notice creation during save to improve performance
-            // TODO: Create notices when images are added to widget, not during save
+            }
             
             return {
               id: specificLayout.i,
@@ -1770,7 +1799,8 @@ function EditDashboardDemo() {
               title: widget.content || widget.title || "Dashboard Image Display",
               category: "Default(Images)", // Use Default(Images) category name
               type: "image",
-              noticeIds: imageNoticeIds, // Use the created notice IDs
+              noticeIds: imageNoticeIds, // Keep notice IDs for backward compatibility
+              images: imageUrls.length > 0 ? imageUrls : undefined, // Store image URLs from Supabase Storage
               settings: {
                 backgroundColor: settings.backgroundColor,
                 backgroundOpacity: settings.backgroundOpacity,
