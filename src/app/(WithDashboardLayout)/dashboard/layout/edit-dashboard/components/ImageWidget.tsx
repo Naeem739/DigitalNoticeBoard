@@ -6,7 +6,6 @@ import { useState } from "react"
 import { createPortal } from "react-dom"
 import { Upload, Image as ImageIcon, Settings } from "lucide-react"
 import { toast } from "sonner"
-import { createNotice } from "@/app/actions/notice.action"
 import { getDefaultCategory, ensureDefaultCategories } from "@/app/actions/category.action"
 
 type WidgetSettings = any
@@ -111,15 +110,23 @@ export default function ImageWidget({
               content: `Dashboard Image: ${file.name}`,
               category: "Default(Images)",
               categoryId: imageCategoryId,
-              imageUrl: undefined, // Let server action upload to Supabase and set the URL
+              imageUrl: undefined, // Let server-side logic upload to Supabase and set the URL
               imageFileName: file.name,
               imageData: base64Data, // Store only the base64 data without the prefix
             }
 
-            // Create the notice in the database
-            const noticeResult = await createNotice(noticeData)
+            // Create the notice in the database via API
+            const response = await fetch("/api/notice/create", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(noticeData),
+            })
+
+            const noticeResult = await response.json()
             
-            if (noticeResult.success && noticeResult.message && typeof noticeResult.message !== 'string' && (noticeResult.message as any).id) {
+            if (response.ok && noticeResult.success && noticeResult.message && typeof noticeResult.message !== 'string' && (noticeResult.message as any).id) {
               const notice = noticeResult.message as any
               const noticeId = notice.id
               const imageUrlFromStorage = notice.imageUrl // Get the Supabase Storage URL

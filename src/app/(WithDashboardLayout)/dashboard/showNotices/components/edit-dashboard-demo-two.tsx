@@ -950,11 +950,18 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
         imageData: sampleImageData
       };
 
-      // Use the createNotice action directly
-      const { createNotice } = await import('@/app/actions/notice.action');
-      const result = await createNotice(testNotice);
+      // Create notice via API instead of importing server action in client
+      const response = await fetch('/api/notice/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testNotice),
+      });
+
+      const result = await response.json();
       
-      if (result.success) {
+      if (response.ok && result.success) {
         toast.success('Test notice with image created successfully!');
         // Refresh the notices list
         window.location.reload();
