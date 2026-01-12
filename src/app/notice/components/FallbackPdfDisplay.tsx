@@ -21,6 +21,8 @@ export default function FallbackPdfDisplay({
   showTitle = true 
 }: FallbackPdfDisplayProps) {
   const [error, setError] = useState<string | null>(null)
+  const [convertedPdfData, setConvertedPdfData] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     // Validate inputs
@@ -49,6 +51,39 @@ export default function FallbackPdfDisplay({
     setError(null)
   }, [pdfData, pdfUrl])
 
+  // Fetch PDF from URL and convert to base64 data URL for inline rendering
+  useEffect(() => {
+    if (pdfUrl && !pdfData && !convertedPdfData) {
+      setIsLoading(true)
+      setError(null)
+      
+      fetch(pdfUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed to fetch PDF: ${response.statusText}`)
+          }
+          return response.arrayBuffer()
+        })
+        .then(arrayBuffer => {
+          // Convert ArrayBuffer to base64
+          const bytes = new Uint8Array(arrayBuffer)
+          let binary = ''
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i])
+          }
+          const base64 = btoa(binary)
+          const dataUrl = `data:application/pdf;base64,${base64}`
+          setConvertedPdfData(dataUrl)
+          setIsLoading(false)
+        })
+        .catch(err => {
+          console.error('Error fetching PDF:', err)
+          setError(`Failed to load PDF: ${err.message}`)
+          setIsLoading(false)
+        })
+    }
+  }, [pdfUrl, pdfData, convertedPdfData])
+
   if (error) {
     return (
       <div className={`flex items-center justify-center p-4 text-red-500 ${className}`}>
@@ -60,26 +95,43 @@ export default function FallbackPdfDisplay({
     )
   }
 
-  // If pdfUrl is provided, use iframe for direct rendering (most efficient - no conversion needed!)
+  // If pdfUrl is provided, fetch and convert to base64, then use PdfDisplay for inline rendering
   if (pdfUrl && !pdfData) {
-    return (
-      <div className={`flex flex-col h-full ${className}`}>
-        {showTitle && title && (
-          <div className="text-sm font-medium text-gray-700 mb-2 truncate">
-            {title}
+    if (isLoading) {
+      return (
+        <div className={`flex flex-col h-full ${className}`}>
+          {showTitle && title && (
+            <div className="text-sm font-medium text-gray-700 mb-2 truncate">
+              {title}
+            </div>
+          )}
+          <div className="flex items-center justify-center flex-1">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-3 border-gray-300 border-t-blue-600 mx-auto mb-3"></div>
+              <p className="text-sm text-gray-600 font-medium">Loading PDF...</p>
+            </div>
           </div>
-        )}
-        <iframe
-          src={pdfUrl}
-          className="flex-1 w-full border-0 rounded-lg"
-          style={{
-            background: "#fff",
-            borderRadius: "8px",
-            boxShadow: "inset 0 2px 4px rgba(0,0,0,0.05)",
-            minHeight: "100%"
-          }}
-          title={title || "PDF Document"}
+        </div>
+      )
+    }
+    
+    if (convertedPdfData) {
+      return (
+        <PdfDisplay
+          pdfData={convertedPdfData}
+          title={title}
+          autoScroll={autoScroll}
+          className={className}
+          showTitle={showTitle}
         />
+      )
+    }
+    
+    return (
+      <div className={`flex items-center justify-center p-4 text-gray-500 ${className}`}>
+        <div className="text-center">
+          <p className="text-sm">Loading PDF...</p>
+        </div>
       </div>
     )
   }
