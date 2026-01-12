@@ -30,7 +30,6 @@ import type { AspectRatio, TNotice, Widget, WidgetSettings, DashboardTemplate } 
 import { getCategories, getDefaultCategory, ensureDefaultCategories, getTextCategoriesWithNotices } from "@/app/actions/category.action"
 import {  getAllDashboardTemplates, createDashboardTemplate, updateDashboardTemplate, deleteDashboardTemplate } from "@/app/actions/template.action"
 import { createDashboard } from "@/app/actions/dashboard.action"
-import { createNotice } from "@/app/actions/notice.action"
 import { createCategory } from "@/app/actions/category.action"
 // import { createImage } from "@/app/actions/image.action"
 import { toast } from "sonner"
@@ -2554,11 +2553,19 @@ function EditDashboardDemo() {
                     imageData: image.url.split(',')[1], // Store only the base64 data without the prefix (same as convertImageToBase64)
                   }
                   
-                  // Create the notice using the server action directly
-                  const noticeResult = await createNotice(noticeData)
+                  // Create the notice using the API endpoint
+                  const response = await fetch("/api/notice/create", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(noticeData),
+                  })
+
+                  const noticeResult = await response.json()
                   
                   const created: any = noticeResult as any
-                  if (created.success && created.message && typeof created.message !== 'string' && created.message.id) {
+                  if (response.ok && created.success && created.message && typeof created.message !== 'string' && created.message.id) {
                     imageNoticeIds.push(created.message.id as string)
                     console.log(`Created notice for image: ${image.title} with ID: ${created.message.id}`)
                   } else {

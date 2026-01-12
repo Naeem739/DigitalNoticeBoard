@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Category } from "@/types/types";
-import { createNotice } from "@/app/actions/notice.action";
 import { getCategories } from "@/app/actions/category.action";
 import { toast } from "sonner";
 import { 
@@ -314,23 +313,32 @@ export default function NoticeEditor() {
         // Don't set imageUrl here - let the server action upload to Supabase and set it
       }
 
-    const data = {
-      title: title.trim(),
-      content: content,
-      category: selectedCategory,
-      categoryId: specificCategory[0].id!,
-      pdfData: pdfData || undefined,
-      pdfFileName: pdfFileName,
-      imageData: imageData || undefined,
-      imageUrl: undefined, // Let server action upload to Supabase and set the URL
-      imageFileName: imageFileName,
-      createdAt: new Date()
-    };
-    
-      console.log("Sending data to server:", data);
-      const newNotice = await createNotice(data);
+      const data = {
+        title: title.trim(),
+        content: content,
+        category: selectedCategory,
+        categoryId: specificCategory[0].id!,
+        pdfData: pdfData || undefined,
+        pdfFileName: pdfFileName,
+        imageData: imageData || undefined,
+        imageUrl: undefined, // Let server-side logic upload to Supabase and set the URL
+        imageFileName: imageFileName,
+        createdAt: new Date()
+      };
 
-      if (newNotice.success) {
+      console.log("Sending data to server (API):", data);
+
+      const response = await fetch("/api/notice/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      const newNotice = await response.json();
+
+      if (response.ok && newNotice.success) {
         toast.success("Notice created successfully!");
         setTitle("");
         setContent("");
