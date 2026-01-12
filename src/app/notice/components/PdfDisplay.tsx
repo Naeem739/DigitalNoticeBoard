@@ -80,10 +80,19 @@ export default function PdfDisplay({ pdfData, title, autoScroll = true, classNam
         const fitScale = containerWidth / baseViewport.width
         const viewport = page.getViewport({ scale: fitScale })
         
-        // Render at higher pixel density for crisp text
-        const outputScale = typeof window !== "undefined" ? Math.max(2, window.devicePixelRatio || 1) : 2
+        // Render at higher pixel density for crisp text (improved quality)
+        const devicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1
+        const outputScale = Math.max(3, Math.min(4, devicePixelRatio * 2)) // 3-4x for high quality
         const canvas = document.createElement("canvas")
-        const context = canvas.getContext("2d")
+        const context = canvas.getContext("2d", {
+          alpha: false,
+          desynchronized: true,
+          willReadFrequently: false
+        })
+        
+        if (!context) {
+          throw new Error('Failed to get canvas context')
+        }
         
         // Set canvas size for high DPI rendering
         canvas.width = Math.floor(viewport.width * outputScale)
@@ -92,14 +101,20 @@ export default function PdfDisplay({ pdfData, title, autoScroll = true, classNam
         // Set CSS size to display size (no blur) - this ensures it fits the widget
         canvas.style.width = "100%"
         canvas.style.height = "auto"
+        canvas.style.imageRendering = "auto"
+        
+        // Configure context for optimal text rendering
+        context.imageSmoothingEnabled = true
+        context.imageSmoothingQuality = "high"
         
         // Scale context for high DPI rendering
-        context!.scale(outputScale, outputScale)
+        context.scale(outputScale, outputScale)
         
         await page.render({ 
           canvas: canvas,
-          canvasContext: context!,
-          viewport: viewport
+          canvasContext: context,
+          viewport: viewport,
+          intent: "display"
         }).promise
         container.appendChild(canvas)
       }
@@ -109,22 +124,23 @@ export default function PdfDisplay({ pdfData, title, autoScroll = true, classNam
       if (container) container.scrollTop = 0
       startAutoScroll()
     } catch (err) {
-      console.error("Error rendering PDF:", err)
-      setError("Failed to load PDF")
+      console.error("Error rendering PDF (logged only):", err)
+      // Don't set error state - only log to console to prevent error UI from showing
       setIsLoading(false)
     }
   }
 
-  if (error) {
-    return (
-      <div className={`flex items-center justify-center p-4 text-red-500 ${className}`}>
-        <div className="text-center">
-          <p className="text-sm">Error loading PDF</p>
-          <p className="text-xs opacity-75">{error}</p>
-        </div>
-      </div>
-    )
-  }
+  // Don't show error UI - errors are logged to console only
+  // if (error) {
+  //   return (
+  //     <div className={`flex items-center justify-center p-4 text-red-500 ${className}`}>
+  //       <div className="text-center">
+  //         <p className="text-sm">Error loading PDF</p>
+  //         <p className="text-xs opacity-75">{error}</p>
+  //       </div>
+  //     </div>
+  //   )
+  // }
 
   return (
     <div className={`flex flex-col h-full ${className}`}>

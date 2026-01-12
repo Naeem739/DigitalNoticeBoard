@@ -77,23 +77,24 @@ export default function FallbackPdfDisplay({
           setIsLoading(false)
         })
         .catch(err => {
-          console.error('Error fetching PDF:', err)
-          setError(`Failed to load PDF: ${err.message}`)
+          console.error('Error fetching PDF (logged only):', err)
+          // Don't set error state - only log to console
           setIsLoading(false)
         })
     }
   }, [pdfUrl, pdfData, convertedPdfData])
 
-  if (error) {
-    return (
-      <div className={`flex items-center justify-center p-4 text-red-500 ${className}`}>
-        <div className="text-center">
-          <p className="text-sm">Error loading PDF</p>
-          <p className="text-xs opacity-75">{error}</p>
-        </div>
-      </div>
-    )
-  }
+  // Don't show error UI - errors are logged to console only
+  // if (error) {
+  //   return (
+  //     <div className={`flex items-center justify-center p-4 text-red-500 ${className}`}>
+  //       <div className="text-center">
+  //         <p className="text-sm">Error loading PDF</p>
+  //         <p className="text-xs opacity-75">{error}</p>
+  //       </div>
+  //     </div>
+  //   )
+  // }
 
   // If pdfUrl is provided, fetch and convert to base64, then use PdfDisplay for inline rendering
   if (pdfUrl && !pdfData) {
