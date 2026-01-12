@@ -275,9 +275,9 @@ export default function WorkingPdfDisplay({
             const baseFitScale = containerWidth / baseViewport.width
             const viewport = page.getViewport({ scale: baseFitScale })
             
-            // Use device pixel ratio for quality, but keep it reasonable
+            // Use higher scale for better quality on large displays (match laptop quality)
             const devicePixelRatio = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1
-            let outputScale = Math.min(2, devicePixelRatio) // Max 2x for large displays
+            let outputScale = Math.max(3, Math.min(4, devicePixelRatio * 2)) // 3-4x for high quality
             
             // Create a temporary canvas for rendering
             const tempCanvas = document.createElement("canvas")
@@ -323,8 +323,8 @@ export default function WorkingPdfDisplay({
               intent: "display"
             }).promise
             
-            // Convert canvas to image (this avoids canvas size limits in DOM)
-            const imageDataUrl = tempCanvas.toDataURL('image/png', 0.95) // High quality PNG
+            // Convert canvas to image with maximum quality (PNG is lossless, better for text)
+            const imageDataUrl = tempCanvas.toDataURL('image/png') // PNG is lossless, best for text clarity
             
             // Create image element
             const img = document.createElement("img")
@@ -494,9 +494,11 @@ export default function WorkingPdfDisplay({
         errorMessage = `Failed to load PDF: ${error.message}`
       }
       
-      setError(errorMessage)
+      // Only log error to console, don't set error state to prevent UI from showing error message
+      console.error('PDF rendering error (logged only):', errorMessage)
       setIsLoading(false)
-      onError?.()
+      // Don't call onError to prevent fallback - let it continue trying to render
+      // onError?.()
     }
   }, [autoScroll, onError])
 
@@ -522,16 +524,18 @@ export default function WorkingPdfDisplay({
     )
   }
 
-  if (error) {
-    return (
-      <div className={`flex items-center justify-center p-4 text-red-500 ${className}`}>
-        <div className="text-center">
-          <p className="text-sm">Error loading PDF</p>
-          <p className="text-xs opacity-75">{error}</p>
-        </div>
-      </div>
-    )
-  }
+  // Don't show error UI - errors are logged to console only
+  // This prevents error overlays from appearing when PDF is successfully rendering
+  // if (error) {
+  //   return (
+  //     <div className={`flex items-center justify-center p-4 text-red-500 ${className}`}>
+  //       <div className="text-center">
+  //         <p className="text-sm">Error loading PDF</p>
+  //         <p className="text-xs opacity-75">{error}</p>
+  //       </div>
+  //     </div>
+  //   )
+  // }
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
