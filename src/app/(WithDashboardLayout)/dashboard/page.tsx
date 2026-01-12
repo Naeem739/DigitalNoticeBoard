@@ -40,6 +40,7 @@ type TDashboardStats = {
     id: string
     title: string
     imageFileName?: string
+    imageUrl?: string
     imageData?: string
     createdAt: Date
   }>
@@ -47,6 +48,7 @@ type TDashboardStats = {
     id: string
     title: string
     pdfFileName?: string
+    pdfUrl?: string
     createdAt: Date
   }>
   recentNoticeInterfaces: Array<{
@@ -98,7 +100,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardStats()
-  }, [session, router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id])
 
   const fetchDashboardStats = async () => {
     try {
@@ -118,28 +121,143 @@ export default function DashboardPage() {
       const categoriesData = await categoriesResponse.json()
       
       // Fetch dashboards from Dashboard table
-      const dashboardsResponse = await fetch('/api/dashboard/get-all')
+      const dashboardsResponse = await fetch('/api/dashboard/get-all', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
       const dashboardsData = await dashboardsResponse.json()
 
-      // Filter notices that have imageData for recent images
+      // Fetch PDFs from Pdf table (for cross-referencing legacy container ids)
+      const pdfsResponse = await fetch('/api/pdf/get-all')
+      const pdfsData = await pdfsResponse.json()
+
+      // Filter notices that have imageUrl (from Supabase Storage) for recent images
       const noticesWithImages = noticesData.success 
-        ? noticesData.result.filter((notice: any) => notice.imageData) 
+        ? noticesData.result.filter((notice: any) => notice.imageUrl || notice.imageFileName) 
         : []
 
-      // Filter notices that have pdfData for recent PDFs
+      // Extract PDFs from Notice table
       const noticesWithPDFs = noticesData.success 
-        ? noticesData.result.filter((notice: any) => notice.pdfData) 
+        ? noticesData.result.filter((notice: any) => notice.pdfUrl || notice.pdfFileName) 
         : []
+
+      // Helper function to extract PDFs from Dashboard containers (same as /notices/all)
+      const extractPdfNoticesFromDashboards = (): any[] => {
+        if (!dashboardsData?.success || !Array.isArray(dashboardsData.result)) return []
+        const out: any[] = []
+
+        const pdfById: Record<string, any> = {}
+        if (pdfsData?.success && Array.isArray(pdfsData.result)) {
+          for (const p of pdfsData.result) {
+            pdfById[p.id] = p
+          }
+        }
+
+        dashboardsData.result.forEach((dash: any) => {
+          const containers = dash?.containers
+          if (!containers || !Array.isArray(containers)) return
+
+          containers.forEach((container: any) => {
+            const type = container?.type || container?.widgetType
+            if (type !== 'pdf') return
+
+            // Case 1: new schema with container.pdfs array
+            if (Array.isArray(container.pdfs) && container.pdfs.length > 0) {
+              container.pdfs.forEach((pdf: any, idx: number) => {
+                if (!pdf?.pdfUrl && !pdf?.url) return
+                out.push({
+                  id: `${dash.id}:${container.id}:pdf:${pdf.id ?? idx}`,
+                  title: pdf.title || container.title || 'PDF Document',
+                  pdfUrl: pdf.pdfUrl || pdf.url,
+                  pdfFileName: pdf.fileName || pdf.title || 'document.pdf',
+                  createdAt: pdf.createdAt || dash.createdAt
+                })
+              })
+            }
+            // Case 2: container has a single pdfUrl/url
+            else if (container?.pdfUrl || container?.url) {
+              out.push({
+                id: `${dash.id}:${container.id}:pdf`,
+                title: container.title || 'PDF Document',
+                pdfUrl: container.pdfUrl || container.url,
+                pdfFileName: container.pdfFileName || (container.title ? `${container.title}.pdf` : 'document.pdf'),
+                createdAt: dash.createdAt
+              })
+            }
+            // Case 3: legacy ids referencing Pdf table
+            else if (Array.isArray(container?.pdfIds) && container.pdfIds.length > 0) {
+              container.pdfIds.forEach((id: string) => {
+                const p = pdfById[id]
+                if (!p) return
+                out.push({
+                  id: `${dash.id}:${container.id}:pdfId:${id}`,
+                  title: p.title || container.title || 'PDF Document',
+                  pdfUrl: p.pdfUrl,
+                  pdfFileName: p.fileName || p.title || 'document.pdf',
+                  createdAt: p.createdAt || dash.createdAt
+                })
+              })
+            }
+          })
+        })
+
+        return out
+      }
+
+      // Get PDFs from Dashboard containers
+      const dashboardPdfNotices = extractPdfNoticesFromDashboards()
+
+      // Get PDFs from Pdf table (standalone PDFs not in containers)
+      const pdfsFromTable = pdfsData.success && Array.isArray(pdfsData.result)
+        ? pdfsData.result.map((pdf: any) => ({
+            id: pdf.id,
+            title: pdf.title,
+            pdfUrl: pdf.pdfUrl,
+            pdfFileName: pdf.fileName,
+            createdAt: pdf.createdAt
+          }))
+        : []
+
+      // Combine all PDFs: from notices, dashboard containers, and Pdf table
+      const allPDFs = [...noticesWithPDFs, ...dashboardPdfNotices, ...pdfsFromTable]
+      
+      // Remove duplicates by pdfUrl (same PDF might appear in multiple places)
+      const uniquePDFs = Array.from(
+        new Map(allPDFs.map((pdf: any) => [pdf.pdfUrl || pdf.id, pdf])).values()
+      )
+
+      // Sort all PDFs by creation date (most recent first)
+      const sortedPDFs = uniquePDFs.sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAt || 0).getTime()
+        const dateB = new Date(b.createdAt || 0).getTime()
+        return dateB - dateA
+      })
+
+      // Sort notices by creation date (most recent first)
+      const sortedNotices = noticesData.success && Array.isArray(noticesData.result)
+        ? [...noticesData.result].sort((a: any, b: any) => {
+            const dateA = new Date(a.createdAt || 0).getTime()
+            const dateB = new Date(b.createdAt || 0).getTime()
+            return dateB - dateA
+          })
+        : []
+
+      // Sort images by creation date (most recent first)
+      const sortedImages = [...noticesWithImages].sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAt || 0).getTime()
+        const dateB = new Date(b.createdAt || 0).getTime()
+        return dateB - dateA
+      })
 
       setStats({
-        totalNotices: noticesData.success ? noticesData.result?.length || 0 : 0,
+        totalNotices: sortedNotices.length,
         totalCategories: categoriesData.success ? categoriesData.result?.length || 0 : 0,
-        totalImages: noticesWithImages.length,
-        totalPDFs: noticesWithPDFs.length,
+        totalImages: sortedImages.length,
+        totalPDFs: sortedPDFs.length,
         totalNoticeInterfaces: dashboardsData.success ? dashboardsData.result?.length || 0 : 0,
-        recentNotices: noticesData.success ? noticesData.result?.slice(0, 5) || [] : [],
-        recentImages: noticesWithImages.slice(0, 3),
-        recentPDFs: noticesWithPDFs.slice(0, 3),
+        recentNotices: sortedNotices.slice(0, 5),
+        recentImages: sortedImages.slice(0, 3),
+        recentPDFs: sortedPDFs.slice(0, 3),
         recentNoticeInterfaces: dashboardsData.success ? dashboardsData.result?.slice(0, 3) || [] : []
       })
     } catch (error) {
@@ -608,11 +726,25 @@ export default function DashboardPage() {
                               setShowImageModal(true)
                             }}
                           >
-                            <img 
-                              src={`data:image/jpeg;base64,${image.imageData}`}
-                              alt={image.title}
-                              className="w-full h-full object-cover"
-                            />
+                            {image.imageUrl ? (
+                              <img 
+                                src={image.imageUrl}
+                                alt={image.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to placeholder if image fails to load
+                                  (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="20" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3EImage%3C/text%3E%3C/svg%3E'
+                                }}
+                              />
+                            ) : image.imageData ? (
+                              <img 
+                                src={`data:image/jpeg;base64,${image.imageData}`}
+                                alt={image.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Image className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" />
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium text-sm sm:text-base text-gray-900 truncate">{image.imageFileName || image.title}</h4>
@@ -761,11 +893,27 @@ export default function DashboardPage() {
             <div className="p-3 sm:p-4">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 break-words">{selectedImage.title}</h3>
               <div className="overflow-auto max-h-[calc(95vh-80px)] sm:max-h-[70vh]">
-                <img
-                  src={`data:image/jpeg;base64,${selectedImage.imageData}`}
-                  alt={selectedImage.title}
-                  className="w-full h-auto object-contain rounded-lg"
-                />
+                {selectedImage.imageUrl ? (
+                  <img
+                    src={selectedImage.imageUrl}
+                    alt={selectedImage.title}
+                    className="w-full h-auto object-contain rounded-lg"
+                    onError={(e) => {
+                      // Fallback to placeholder if image fails to load
+                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="24" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3EImage Not Available%3C/text%3E%3C/svg%3E'
+                    }}
+                  />
+                ) : selectedImage.imageData ? (
+                  <img
+                    src={`data:image/jpeg;base64,${selectedImage.imageData}`}
+                    alt={selectedImage.title}
+                    className="w-full h-auto object-contain rounded-lg"
+                  />
+                ) : (
+                  <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <p className="text-gray-500">Image not available</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -789,16 +937,23 @@ export default function DashboardPage() {
                 <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </div>
-            <div className="p-2 sm:p-3 h-full flex flex-col">
-              <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-2 break-words pr-8 sm:pr-10">{selectedPDF.title}</h3>
-              <div className="flex-1 overflow-auto">
-                <embed
-                  src={`data:application/pdf;base64,${selectedPDF.pdfData}`}
-                  type="application/pdf"
-                  className="w-full h-full rounded-lg min-h-[400px]"
-                />
+              <div className="p-2 sm:p-3 h-full flex flex-col">
+                <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-2 break-words pr-8 sm:pr-10">{selectedPDF.title}</h3>
+                <div className="flex-1 overflow-auto">
+                  {selectedPDF.pdfUrl ? (
+                    <iframe
+                      src={selectedPDF.pdfUrl}
+                      type="application/pdf"
+                      className="w-full h-full rounded-lg min-h-[400px] border-0"
+                      title={selectedPDF.title}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
+                      <p className="text-gray-500">PDF not available</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
           </div>
         </div>
       )}

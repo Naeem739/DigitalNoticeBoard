@@ -148,60 +148,6 @@ export default function WorkingPdfDisplay({
       setIsLoading(true)
       setError(null)
       
-      // Priority 1: Use pdfUrl if available (fetch from Supabase bucket)
-      let pdfBytes: Uint8Array | undefined = undefined
-      
-      if (pdfUrl && typeof pdfUrl === 'string') {
-        try {
-          console.log('Fetching PDF from URL:', pdfUrl)
-          const response = await fetch(pdfUrl)
-          if (!response.ok) {
-            throw new Error(`Failed to fetch PDF from URL: ${response.statusText}`)
-          }
-          const arrayBuffer = await response.arrayBuffer()
-          pdfBytes = new Uint8Array(arrayBuffer)
-          console.log('PDF fetched successfully from URL, size:', pdfBytes.length)
-        } catch (fetchError) {
-          console.error('Error fetching PDF from URL:', fetchError)
-          // Fall through to try pdfData if available
-          if (!pdfData) {
-            throw new Error(`Failed to fetch PDF from URL: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
-          }
-        }
-      }
-      
-      // Priority 2: Use pdfData (base64) if pdfUrl failed or not available
-      if (!pdfBytes && pdfData) {
-        // Validate PDF data
-        if (!pdfData || pdfData.trim() === '') {
-          throw new Error('No PDF data provided')
-        }
-        
-        // Check if PDF data is valid base64
-        const base64Regex = /^data:application\/pdf;base64,/
-        let processedPdfData = pdfData
-        if (!base64Regex.test(processedPdfData) && !processedPdfData.startsWith('data:application/pdf')) {
-          // Try to add the data URL prefix if missing
-          if (!processedPdfData.startsWith('data:')) {
-            processedPdfData = `data:application/pdf;base64,${processedPdfData}`
-          }
-        }
-        
-        // Extract base64 data from data URL
-        const base64Data = processedPdfData.includes(',') ? processedPdfData.split(',')[1] : processedPdfData.replace(/^data:application\/pdf;base64,/, '')
-        
-        // Convert base64 to Uint8Array for PDF.js
-        const binaryString = atob(base64Data)
-        pdfBytes = new Uint8Array(binaryString.length)
-        for (let i = 0; i < binaryString.length; i++) {
-          pdfBytes[i] = binaryString.charCodeAt(i)
-        }
-      }
-      
-      if (!pdfBytes) {
-        throw new Error('No PDF data or URL provided')
-      }
-
       // Check if PDF.js worker is configured
       if (!(pdfjsLib as any).GlobalWorkerOptions.workerSrc) {
         console.warn('PDF.js worker not configured, attempting to configure...')
@@ -215,13 +161,52 @@ export default function WorkingPdfDisplay({
       // Load PDF document with error handling
       let pdf
       try {
-        // Load PDF using Uint8Array
-        pdf = await (pdfjsLib as any).getDocument({
-          data: pdfBytes,
-          verbosity: 0
-        }).promise
-        
-        console.log('PDF loaded successfully, pages:', pdf.numPages)
+        // Priority 1: Use pdfUrl directly if available (PDF.js supports URLs natively - more efficient!)
+        if (pdfUrl && typeof pdfUrl === 'string') {
+          console.log('Loading PDF directly from URL:', pdfUrl)
+          pdf = await (pdfjsLib as any).getDocument({
+            url: pdfUrl,
+            verbosity: 0
+          }).promise
+          console.log('PDF loaded successfully from URL, pages:', pdf.numPages)
+        }
+        // Priority 2: Use pdfData (base64) if pdfUrl not available
+        else if (pdfData) {
+          // Validate PDF data
+          if (!pdfData || pdfData.trim() === '') {
+            throw new Error('No PDF data provided')
+          }
+          
+          // Check if PDF data is valid base64
+          const base64Regex = /^data:application\/pdf;base64,/
+          let processedPdfData = pdfData
+          if (!base64Regex.test(processedPdfData) && !processedPdfData.startsWith('data:application/pdf')) {
+            // Try to add the data URL prefix if missing
+            if (!processedPdfData.startsWith('data:')) {
+              processedPdfData = `data:application/pdf;base64,${processedPdfData}`
+            }
+          }
+          
+          // Extract base64 data from data URL
+          const base64Data = processedPdfData.includes(',') ? processedPdfData.split(',')[1] : processedPdfData.replace(/^data:application\/pdf;base64,/, '')
+          
+          // Convert base64 to Uint8Array for PDF.js
+          const binaryString = atob(base64Data)
+          const pdfBytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            pdfBytes[i] = binaryString.charCodeAt(i)
+          }
+          
+          // Load PDF using Uint8Array
+          pdf = await (pdfjsLib as any).getDocument({
+            data: pdfBytes,
+            verbosity: 0
+          }).promise
+          
+          console.log('PDF loaded successfully from base64 data, pages:', pdf.numPages)
+        } else {
+          throw new Error('No PDF data or URL provided')
+        }
       } catch (loadError: any) {
         console.error('PDF.js load error details:', {
           error: loadError,
@@ -229,7 +214,31 @@ export default function WorkingPdfDisplay({
           name: loadError?.name,
           stack: loadError?.stack?.substring(0, 500)
         })
-        throw new Error(`Failed to load PDF: ${loadError?.message || 'Unknown error'}`)
+        
+        // If URL loading failed, try fallback: fetch and convert to Uint8Array
+        if (pdfUrl && typeof pdfUrl === 'string' && !pdfData) {
+          console.log('Direct URL loading failed, trying fetch fallback...')
+          try {
+            const response = await fetch(pdfUrl)
+            if (!response.ok) {
+              throw new Error(`Failed to fetch PDF from URL: ${response.statusText}`)
+            }
+            const arrayBuffer = await response.arrayBuffer()
+            const pdfBytes = new Uint8Array(arrayBuffer)
+            
+            pdf = await (pdfjsLib as any).getDocument({
+              data: pdfBytes,
+              verbosity: 0
+            }).promise
+            
+            console.log('PDF loaded successfully via fetch fallback, pages:', pdf.numPages)
+          } catch (fetchError) {
+            console.error('Fetch fallback also failed:', fetchError)
+            throw new Error(`Failed to load PDF: ${loadError?.message || 'Unknown error'}`)
+          }
+        } else {
+          throw new Error(`Failed to load PDF: ${loadError?.message || 'Unknown error'}`)
+        }
       }
       
       // Clear container
@@ -246,12 +255,20 @@ export default function WorkingPdfDisplay({
       if (isLargeDisplay) {
         console.log('Using image-based rendering for large display')
         
+        // Wait for container to have proper dimensions
+        let retries = 0
+        const maxRetries = 10
+        while ((!container.clientWidth || container.clientWidth === 0) && retries < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+          retries++
+        }
+        
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           try {
             const page = await pdf.getPage(pageNum)
             // Fit page width to container to avoid horizontal scroll
-            const rawContainerWidth = container.clientWidth || 600
-            const containerWidth = Math.min(rawContainerWidth, 4096) // Cap at 4K width for safety
+            const rawContainerWidth = container.clientWidth || window.innerWidth || 4096
+            const containerWidth = Math.min(Math.max(rawContainerWidth, 600), 4096) // Cap at 4K width for safety, min 600
             const baseViewport = page.getViewport({ scale: 1 })
             
             // Calculate appropriate scale for large displays

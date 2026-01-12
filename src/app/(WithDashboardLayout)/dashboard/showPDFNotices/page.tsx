@@ -11,12 +11,12 @@ import { useSession } from 'next-auth/react'
 type TPDF = {
   id: string
   title: string
-  pdfData: string
+  pdfUrl?: string
   pdfFileName?: string
   createdAt?: Date
   category?: string
   categoryName?: string
-  source?: 'notice' | 'pdf'
+  source?: 'notice' | 'pdf' | 'dashboard'
 }
 
 export default function ShowPDFNotices() {
@@ -30,26 +30,35 @@ export default function ShowPDFNotices() {
     fetchPDFs()
   }, [])
 
-  const stripDataUrlPrefix = (data: string) => {
-    return data.replace(/^data:application\/pdf;base64,/, '')
-  }
-
   const fetchPDFs = async () => {
     try {
       setLoading(true)
-      // Fetch PDFs from Notice model first
-      const noticeRes = await fetch('/api/notice/get-all')
-      const noticeJson = await noticeRes.json()
+      
+      // Fetch notices from Notice table
+      const noticeResponse = await fetch('/api/notice/get-all')
+      const noticeResult = await noticeResponse.json()
+
+      // Fetch dashboards to extract PDF widgets from containers
+      const dashboardsResponse = await fetch('/api/dashboard/get-all', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+      const dashboardsResult = await dashboardsResponse.json()
+
+      // Fetch PDFs table for cross-referencing legacy container ids
+      const pdfResponse = await fetch('/api/pdf/get-all')
+      const pdfResult = await pdfResponse.json()
 
       const aggregated: TPDF[] = []
 
-      if (noticeJson.success && Array.isArray(noticeJson.result)) {
-        const noticesWithPDFs = noticeJson.result
-          .filter((notice: any) => !!notice.pdfData)
+      // Add PDFs from Notice table
+      if (noticeResult.success && Array.isArray(noticeResult.result)) {
+        const noticesWithPDFs = noticeResult.result
+          .filter((notice: any) => notice.pdfUrl || notice.pdfFileName)
           .map((notice: any) => ({
             id: notice.id,
             title: notice.title,
-            pdfData: stripDataUrlPrefix(notice.pdfData),
+            pdfUrl: notice.pdfUrl,
             pdfFileName: notice.pdfFileName,
             createdAt: notice.createdAt,
             category: notice.category,
@@ -59,14 +68,88 @@ export default function ShowPDFNotices() {
         aggregated.push(...noticesWithPDFs)
       }
 
-      // Also fetch from legacy/separate PDF model to ensure nothing is missed
-      const pdfRes = await fetch('/api/pdf/get-all')
-      const pdfJson = await pdfRes.json()
-      if (pdfJson.success && Array.isArray(pdfJson.result)) {
-        const pdfsFromTable = pdfJson.result.map((p: any) => ({
+      // Helper to extract PDFs from Dashboard containers (same as /notices/all)
+      const extractPdfNoticesFromDashboards = (): TPDF[] => {
+        if (!dashboardsResult?.success || !Array.isArray(dashboardsResult.result)) return []
+        const out: TPDF[] = []
+
+        const pdfById: Record<string, any> = {}
+        if (pdfResult?.success && Array.isArray(pdfResult.result)) {
+          for (const p of pdfResult.result) {
+            pdfById[p.id] = p
+          }
+        }
+
+        dashboardsResult.result.forEach((dash: any) => {
+          const containers = dash?.containers
+          if (!containers || !Array.isArray(containers)) return
+
+          containers.forEach((container: any) => {
+            const type = container?.type || container?.widgetType
+            if (type !== 'pdf') return
+
+            // Case 1: new schema with container.pdfs array
+            if (Array.isArray(container.pdfs) && container.pdfs.length > 0) {
+              container.pdfs.forEach((pdf: any, idx: number) => {
+                if (!pdf?.pdfUrl && !pdf?.url) return
+                out.push({
+                  id: `${dash.id}:${container.id}:pdf:${pdf.id ?? idx}`,
+                  title: pdf.title || container.title || 'PDF Document',
+                  pdfUrl: pdf.pdfUrl || pdf.url,
+                  pdfFileName: pdf.fileName || pdf.title || 'document.pdf',
+                  createdAt: pdf.createdAt || dash.createdAt,
+                  category: 'PDF',
+                  categoryName: 'PDF',
+                  source: 'dashboard' as const
+                })
+              })
+            }
+            // Case 2: container has a single pdfUrl/url
+            else if (container?.pdfUrl || container?.url) {
+              out.push({
+                id: `${dash.id}:${container.id}:pdf`,
+                title: container.title || 'PDF Document',
+                pdfUrl: container.pdfUrl || container.url,
+                pdfFileName: container.pdfFileName || (container.title ? `${container.title}.pdf` : 'document.pdf'),
+                createdAt: dash.createdAt,
+                category: 'PDF',
+                categoryName: 'PDF',
+                source: 'dashboard' as const
+              })
+            }
+            // Case 3: legacy ids referencing Pdf table
+            else if (Array.isArray(container?.pdfIds) && container.pdfIds.length > 0) {
+              container.pdfIds.forEach((id: string) => {
+                const p = pdfById[id]
+                if (!p) return
+                out.push({
+                  id: `${dash.id}:${container.id}:pdfId:${id}`,
+                  title: p.title || container.title || 'PDF Document',
+                  pdfUrl: p.pdfUrl,
+                  pdfFileName: p.fileName || p.title || 'document.pdf',
+                  createdAt: p.createdAt || dash.createdAt,
+                  category: 'PDF',
+                  categoryName: 'PDF',
+                  source: 'dashboard' as const
+                })
+              })
+            }
+          })
+        })
+
+        return out
+      }
+
+      // Get PDFs from Dashboard containers
+      const dashboardPdfNotices = extractPdfNoticesFromDashboards()
+      aggregated.push(...dashboardPdfNotices)
+
+      // Add PDFs from Pdf table (standalone PDFs)
+      if (pdfResult.success && Array.isArray(pdfResult.result)) {
+        const pdfsFromTable = pdfResult.result.map((p: any) => ({
           id: p.id,
           title: p.title || p.fileName || 'PDF',
-          pdfData: stripDataUrlPrefix(p.pdfData),
+          pdfUrl: p.pdfUrl,
           pdfFileName: p.fileName,
           createdAt: p.createdAt,
           source: 'pdf' as const
@@ -74,12 +157,19 @@ export default function ShowPDFNotices() {
         aggregated.push(...pdfsFromTable)
       }
 
-      // Remove duplicates by id if any
-      const byId = new Map<string, TPDF>()
-      for (const item of aggregated) {
-        if (!byId.has(item.id)) byId.set(item.id, item)
-      }
-      setPdfs(Array.from(byId.values()))
+      // Remove duplicates by pdfUrl (same PDF might appear in multiple places)
+      const uniquePDFs = Array.from(
+        new Map(aggregated.map((pdf: TPDF) => [pdf.pdfUrl || pdf.id, pdf])).values()
+      )
+
+      // Sort by creation date (most recent first)
+      const sortedPDFs = uniquePDFs.sort((a: TPDF, b: TPDF) => {
+        const dateA = new Date(a.createdAt || 0).getTime()
+        const dateB = new Date(b.createdAt || 0).getTime()
+        return dateB - dateA
+      })
+
+      setPdfs(sortedPDFs)
     } catch (error) {
       console.error('Error fetching PDFs:', error)
       toast.error('Error fetching PDFs')
@@ -95,19 +185,68 @@ export default function ShowPDFNotices() {
 
     try {
       setDeletingId(pdfId)
-      // Decide delete endpoint by source
       const pdfItem = pdfs.find(p => p.id === pdfId)
-      const endpoint = pdfItem?.source === 'pdf' ? '/api/pdf/delete' : '/api/notice/delete'
-      const response = await fetch(`${endpoint}?id=${pdfId}`, {
-        method: 'DELETE'
-      })
-      const result = await response.json()
       
-      if (result.success) {
+      // Handle different PDF sources (same logic as /notices/all)
+      if (pdfId.includes(':pdfId:')) {
+        // Extract the actual PDF ID from the synthetic ID
+        const parts = pdfId.split(':pdfId:')
+        const actualPdfId = parts[parts.length - 1]
+        const response = await fetch(`/api/pdf/delete?id=${actualPdfId}`, {
+          method: 'DELETE'
+        })
+        const result = await response.json()
+        
+        if (result.success) {
+          setPdfs(prev => prev.filter(pdf => pdf.id !== pdfId))
+          toast.success('PDF deleted successfully')
+        } else {
+          toast.error('Failed to delete PDF')
+        }
+      } else if (pdfId.includes(':') && pdfId.includes(':pdf')) {
+        // Dashboard container PDF - delete from storage and container
+        const parts = pdfId.split(':')
+        const dashboardId = parts[0]
+        const containerId = parts[1]
+        
+        if (pdfItem?.pdfUrl) {
+          // Delete from storage
+          try {
+            await fetch(`/api/storage/delete?url=${encodeURIComponent(pdfItem.pdfUrl)}&bucket=pdfs`, {
+              method: 'DELETE'
+            })
+          } catch (error) {
+            console.error('Error deleting PDF from storage:', error)
+          }
+          
+          // Remove from dashboard container
+          if (dashboardId && containerId) {
+            try {
+              await fetch(`/api/dashboard/remove-pdf?dashboardId=${dashboardId}&containerId=${containerId}&pdfUrl=${encodeURIComponent(pdfItem.pdfUrl)}`, {
+                method: 'DELETE'
+              })
+            } catch (error) {
+              console.error('Error removing PDF from dashboard:', error)
+            }
+          }
+        }
+        
         setPdfs(prev => prev.filter(pdf => pdf.id !== pdfId))
         toast.success('PDF deleted successfully')
       } else {
-        toast.error('Failed to delete PDF')
+        // Regular notice or Pdf table PDF
+        const endpoint = pdfItem?.source === 'pdf' ? '/api/pdf/delete' : '/api/notice/delete'
+        const response = await fetch(`${endpoint}?id=${pdfId}`, {
+          method: 'DELETE'
+        })
+        const result = await response.json()
+        
+        if (result.success) {
+          setPdfs(prev => prev.filter(pdf => pdf.id !== pdfId))
+          toast.success('PDF deleted successfully')
+        } else {
+          toast.error('Failed to delete PDF')
+        }
       }
     } catch (error) {
       console.error('Error deleting PDF:', error)
@@ -119,27 +258,19 @@ export default function ShowPDFNotices() {
 
   const handleDownloadPDF = (pdf: TPDF) => {
     try {
-      // Create a blob from the base64 data
-      const base64 = stripDataUrlPrefix(pdf.pdfData)
-      const byteCharacters = atob(base64)
-      const byteNumbers = new Array(byteCharacters.length)
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      if (pdf.pdfUrl) {
+        // Download from Supabase Storage URL
+        const link = document.createElement('a')
+        link.href = pdf.pdfUrl
+        link.download = pdf.pdfFileName || `${pdf.title}.pdf`
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        toast.success('PDF download started!')
+      } else {
+        toast.error('PDF URL not available')
       }
-      const byteArray = new Uint8Array(byteNumbers)
-      const blob = new Blob([byteArray], { type: 'application/pdf' })
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = pdf.pdfFileName || `${pdf.title}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-      
-      toast.success('PDF downloaded successfully')
     } catch (error) {
       console.error('Error downloading PDF:', error)
       toast.error('Error downloading PDF')
@@ -148,70 +279,11 @@ export default function ShowPDFNotices() {
 
   const handleViewFullSize = (pdf: TPDF) => {
     try {
-      // Create a new window with the PDF
-      const newWindow = window.open('', '_blank')
-      if (newWindow) {
-        const base64 = stripDataUrlPrefix(pdf.pdfData)
-        newWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>${pdf.title}</title>
-              <style>
-                body {
-                  margin: 0;
-                  padding: 20px;
-                  background: #f5f5f5;
-                  font-family: Arial, sans-serif;
-                  display: flex;
-                  flex-direction: column;
-                  align-items: center;
-                  min-height: 100vh;
-                }
-                .pdf-container {
-                  background: white;
-                  padding: 20px;
-                  border-radius: 8px;
-                  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                  width: 95vw;
-                  height: 95vh;
-                  overflow: auto;
-                }
-                embed {
-                  width: 100%;
-                  height: 90vh;
-                  border-radius: 4px;
-                }
-                .pdf-info {
-                  margin-top: 15px;
-                  text-align: center;
-                  color: #666;
-                }
-                .pdf-title {
-                  font-size: 18px;
-                  font-weight: bold;
-                  margin-bottom: 5px;
-                  color: #333;
-                }
-                .pdf-details {
-                  font-size: 14px;
-                  color: #888;
-                }
-              </style>
-            </head>
-            <body>
-              <div class="pdf-container">
-                <embed src="data:application/pdf;base64,${base64}" type="application/pdf" />
-                <div class="pdf-info">
-                </div>
-              </div>
-            </body>
-          </html>
-        `)
-        newWindow.document.close()
+      if (pdf.pdfUrl) {
+        // Open PDF from Supabase Storage URL in new window
+        window.open(pdf.pdfUrl, '_blank')
       } else {
-        // Fallback if popup is blocked
-        toast.error('Please allow popups to view full-size PDFs')
+        toast.error('PDF URL not available')
       }
     } catch (error) {
       console.error('Error opening full-size PDF:', error)

@@ -17,6 +17,8 @@ type ImageData = {
   title: string
   file?: File
   dbId?: string
+  imageUrl?: string // Supabase Storage URL
+  imageFileName?: string // Image file name
   width?: number
   height?: number
   size?: number
@@ -118,14 +120,18 @@ export default function ImageWidget({
             const noticeResult = await createNotice(noticeData)
             
             if (noticeResult.success && noticeResult.message && typeof noticeResult.message !== 'string' && (noticeResult.message as any).id) {
-              const noticeId = (noticeResult.message as any).id
+              const notice = noticeResult.message as any
+              const noticeId = notice.id
+              const imageUrlFromStorage = notice.imageUrl // Get the Supabase Storage URL
               
               const imageData: ImageData = {
                 id: `img-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                url: dataUrl,
+                url: imageUrlFromStorage || dataUrl, // Use Supabase URL if available, fallback to data URL
                 title: file.name,
                 file,
                 dbId: noticeId, // Store the notice ID
+                imageUrl: imageUrlFromStorage, // Store the Supabase Storage URL
+                imageFileName: file.name, // Store the file name
                 width: img.width,
                 height: img.height,
                 size: file.size,
