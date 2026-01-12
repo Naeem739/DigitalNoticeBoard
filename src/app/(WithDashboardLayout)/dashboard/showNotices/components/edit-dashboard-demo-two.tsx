@@ -101,26 +101,129 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     
     const fetchNotices = async () => {
       try {
-        const response = await fetch('/api/notice/get-all');
-        const result = await response.json();
-        
-        if (result.success) {
-          const noticesData = result.result || [];
-          console.log('Fetched notices with image/PDF data:', noticesData.filter((notice: any) => 
-            notice.imageData || notice.imageFileName || notice.imageUrl || notice.pdfData || notice.pdfFileName || notice.pdfUrl
-          ).map((notice: any) => ({
-            title: notice.title,
-            categoryId: notice.categoryId,
-            categoryType: notice.categoryType,
-            hasImageData: !!notice.imageData,
-            hasImageFileName: !!notice.imageFileName,
-            hasImageUrl: !!notice.imageUrl,
-            hasPdfData: !!notice.pdfData,
-            hasPdfFileName: !!notice.pdfFileName,
-            hasPdfUrl: !!notice.pdfUrl
-          })));
-          setNotices(noticesData);
-        } else {
+        // Fetch text and image notices from Notice table
+        const noticeResponse = await fetch('/api/notice/get-all');
+        const noticeResult = await noticeResponse.json();
+
+        // Fetch dashboards to extract PDF widgets from containers
+        const dashboardsResponse = await fetch('/api/dashboard/get-all', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        const dashboardsResult = await dashboardsResponse.json();
+
+        // Optional: also fetch PDFs table for cross-referencing legacy container ids
+        const pdfResponse = await fetch('/api/pdf/get-all');
+        const pdfResult = await pdfResponse.json();
+
+        let allNotices: any[] = [];
+
+        // Add notices from Notice table
+        if (noticeResult.success) {
+          allNotices = [...(noticeResult.result || [])];
+        }
+
+        // Helper to build notice-like objects from container PDFs
+        const extractPdfNoticesFromDashboards = (): any[] => {
+          if (!dashboardsResult?.success || !Array.isArray(dashboardsResult.result)) return [];
+          const out: any[] = [];
+
+          const pdfById: Record<string, any> = {};
+          if (pdfResult?.success && Array.isArray(pdfResult.result)) {
+            for (const p of pdfResult.result) {
+              pdfById[p.id] = p;
+            }
+          }
+
+          dashboardsResult.result.forEach((dash: any) => {
+            const containers = dash?.containers;
+            if (!containers || !Array.isArray(containers)) return;
+
+            containers.forEach((container: any) => {
+              const type = container?.type || container?.widgetType;
+              if (type !== 'pdf') return;
+
+              // Case 1: new schema with container.pdfs array
+              if (Array.isArray(container.pdfs) && container.pdfs.length > 0) {
+                container.pdfs.forEach((pdf: any, idx: number) => {
+                  if (!pdf?.pdfUrl && !pdf?.url) return;
+                  out.push({
+                    id: `${dash.id}:${container.id}:pdf:${pdf.id ?? idx}`,
+                    title: pdf.title || container.title || 'PDF Document',
+                    content: '',
+                    category: 'PDF',
+                    categoryId: '',
+                    categoryName: 'PDF',
+                    categoryType: 'PDF',
+                    pdfUrl: pdf.pdfUrl || pdf.url,
+                    pdfFileName: pdf.fileName || pdf.title || 'document.pdf',
+                    createdAt: dash.createdAt,
+                    updatedAt: dash.createdAt
+                  });
+                });
+              }
+
+              // Case 2: container has a single pdfUrl/url
+              else if (container?.pdfUrl || container?.url) {
+                out.push({
+                  id: `${dash.id}:${container.id}:pdf`,
+                  title: container.title || 'PDF Document',
+                  content: '',
+                  category: 'PDF',
+                  categoryId: '',
+                  categoryName: 'PDF',
+                  categoryType: 'PDF',
+                  pdfUrl: container.pdfUrl || container.url,
+                  pdfFileName: container.pdfFileName || (container.title ? `${container.title}.pdf` : 'document.pdf'),
+                  createdAt: dash.createdAt,
+                  updatedAt: dash.createdAt
+                });
+              }
+
+              // Case 3: legacy ids referencing Pdf table
+              else if (Array.isArray(container?.pdfIds) && container.pdfIds.length > 0) {
+                container.pdfIds.forEach((id: string, idx: number) => {
+                  const p = pdfById[id];
+                  if (!p) return;
+                  out.push({
+                    id: `${dash.id}:${container.id}:pdfId:${id}`,
+                    title: p.title || container.title || 'PDF Document',
+                    content: '',
+                    category: 'PDF',
+                    categoryId: '',
+                    categoryName: 'PDF',
+                    categoryType: 'PDF',
+                    pdfUrl: p.pdfUrl,
+                    pdfFileName: p.fileName || p.title || 'document.pdf',
+                    createdAt: p.createdAt || dash.createdAt,
+                    updatedAt: p.updatedAt || dash.createdAt
+                  });
+                });
+              }
+            });
+          });
+
+          return out;
+        };
+
+        const dashboardPdfNotices = extractPdfNoticesFromDashboards();
+        allNotices = [...allNotices, ...dashboardPdfNotices];
+
+        console.log('Fetched all notices (including Dashboard PDFs):', allNotices.length);
+        console.log('Notices with image/PDF data:', allNotices.filter((notice: any) => 
+          notice.imageFileName || notice.imageUrl || notice.pdfFileName || notice.pdfUrl
+        ).map((notice: any) => ({
+          title: notice.title,
+          categoryType: notice.categoryType,
+          hasImageFileName: !!notice.imageFileName,
+          hasImageUrl: !!notice.imageUrl,
+          hasPdfFileName: !!notice.pdfFileName,
+          hasPdfUrl: !!notice.pdfUrl
+        })));
+
+        setNotices(allNotices);
+
+        if (!noticeResult.success && !dashboardsResult.success) {
           toast.error('Failed to fetch notices');
         }
       } catch (error) {
@@ -236,8 +339,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     .filter(notice => {
       // Special handling for TEXT filter - exclude any notices with image data
       if (selectedCategoryType === "TEXT") {
-        // If filtering by TEXT, exclude notices that have image data
-        if (notice.imageData || notice.imageFileName || notice.imageUrl) {
+        // If filtering by TEXT, exclude notices that have image
+        if (notice.imageFileName || notice.imageUrl) {
           console.log(`Excluding image notice "${notice.title}" from TEXT filter`);
           return false;
         }
@@ -245,8 +348,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
       
       // Special handling for IMAGE filter - only show notices with image data
       if (selectedCategoryType === "IMAGE") {
-        // If filtering by IMAGE, only show notices that have image data
-        if (!notice.imageData && !notice.imageFileName && !notice.imageUrl) {
+        // If filtering by IMAGE, only show notices that have image
+        if (!notice.imageFileName && !notice.imageUrl) {
           console.log(`Excluding non-image notice "${notice.title}" from IMAGE filter`);
           return false;
         }
@@ -254,8 +357,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
       
       // Special handling for PDF filter - only show notices with PDF data
       if (selectedCategoryType === "PDF") {
-        // If filtering by PDF, only show notices that have PDF data
-        if (!notice.pdfData && !notice.pdfFileName && !notice.pdfUrl) {
+        // If filtering by PDF, only show notices that have PDF
+        if (!notice.pdfFileName && !notice.pdfUrl) {
           console.log(`Excluding non-PDF notice "${notice.title}" from PDF filter`);
           return false;
         }
@@ -314,14 +417,14 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
     setSelectedPdf(null);
     setPdfPreview(null);
     
-    // Set current image preview if notice has image
-    if (notice.imageData) {
-      setImagePreview(`data:image/jpeg;base64,${notice.imageData}`);
+    // Set current image preview if notice has image URL
+    if (notice.imageUrl) {
+      setImagePreview(notice.imageUrl);
     }
     
-    // Set current PDF preview if notice has PDF
-    if (notice.pdfData) {
-      setPdfPreview(`data:application/pdf;base64,${notice.pdfData}`);
+    // Set current PDF preview if notice has PDF URL
+    if (notice.pdfUrl) {
+      setPdfPreview(notice.pdfUrl);
     }
   };
   
@@ -544,32 +647,26 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
   // Add download function for images
   const handleDownload = (notice: TNotice) => {
-    if (!notice.imageData) {
+    if (!notice.imageUrl && !notice.imageFileName) {
       toast.error('No image to download');
       return;
     }
 
     try {
-      // Create a blob from the base64 image data
-      const byteCharacters = atob(notice.imageData);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      // If we have a URL, use it directly
+      if (notice.imageUrl) {
+        const link = document.createElement('a');
+        link.href = notice.imageUrl;
+        link.download = notice.imageFileName || `${notice.title || 'notice'}.jpg`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Image download started!');
+        return;
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = notice.imageFileName || `${notice.title || 'notice'}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('Image downloaded successfully!');
+      toast.error('Image URL not available');
     } catch (error) {
       console.error('Error downloading image:', error);
       toast.error('Failed to download image');
@@ -578,32 +675,26 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
   // Add download function for PDFs
   const handlePdfDownload = (notice: TNotice) => {
-    if (!notice.pdfData) {
+    if (!notice.pdfUrl && !notice.pdfFileName) {
       toast.error('No PDF to download');
       return;
     }
 
     try {
-      // Create a blob from the base64 PDF data
-      const byteCharacters = atob(notice.pdfData);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      // If we have a URL, use it directly
+      if (notice.pdfUrl) {
+        const link = document.createElement('a');
+        link.href = notice.pdfUrl;
+        link.download = notice.pdfFileName || `${notice.title || 'notice'}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('PDF download started!');
+        return;
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/pdf' });
 
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = notice.pdfFileName || `${notice.title || 'notice'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('PDF downloaded successfully!');
+      toast.error('PDF URL not available');
     } catch (error) {
       console.error('Error downloading PDF:', error);
       toast.error('Failed to download PDF');
@@ -699,10 +790,10 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
   // Handle image modal for all roles
   const openImageModal = (notice: TNotice) => {
-    if (notice.imageData) {
+    if (notice.imageUrl || notice.imageFileName) {
       setSelectedImageContent({
         title: notice.title,
-        imageData: notice.imageData,
+        imageData: notice.imageUrl || '', // Use URL as imageData
         fileName: notice.imageFileName || 'Image'
       });
       setImageModalOpen(true);
@@ -716,10 +807,10 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
 
   // Handle PDF modal for all roles
   const openPdfModal = (notice: TNotice) => {
-    if (notice.pdfData) {
+    if (notice.pdfUrl || notice.pdfFileName) {
       setSelectedPdfContent({
         title: notice.title,
-        pdfData: notice.pdfData,
+        pdfData: notice.pdfUrl || '', // Use URL as pdfData
         fileName: notice.pdfFileName || 'PDF'
       });
       setPdfModalOpen(true);
@@ -810,9 +901,9 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
           Notice Management
         </h1>
         
-        <div className="flex flex-col w-full md:w-auto space-y-2 md:space-y-0 md:space-x-2">
+        <div className="flex flex-row flex-wrap w-full md:w-auto gap-2">
           {/* Category filter dropdown */}
-          <div className="relative w-full md:w-40">
+          <div className="relative w-auto min-w-[140px]">
             <div 
               className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all duration-200 text-sm"
               onClick={() => setShowDropdown(!showDropdown)}
@@ -853,7 +944,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
           </div>
           
           {/* Category Type filter dropdown */}
-          <div className="relative w-full md:w-36">
+          <div className="relative w-auto min-w-[120px]">
             <div 
               className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all duration-200 text-sm"
               onClick={() => setShowCategoryTypeDropdown(!showCategoryTypeDropdown)}
@@ -894,7 +985,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
           </div>
           
           {/* Search bar */}
-          <div className="relative w-full md:w-40">
+          <div className="relative w-auto min-w-[120px]">
             {showSearch ? (
               <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                 <input
@@ -930,7 +1021,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
           {hasActiveFilters && (
             <button
               onClick={handleClearFilters}
-              className="w-full md:w-auto flex items-center justify-center bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm text-gray-600 rounded-lg px-3 py-2 transition-all duration-200 text-sm font-medium"
+              className="w-auto flex items-center justify-center bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm text-gray-600 rounded-lg px-3 py-2 transition-all duration-200 text-sm font-medium"
             >
               <X className="h-4 w-4 mr-2" />
               <span>Clear</span>
@@ -942,7 +1033,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             <button
               onClick={handleClearAll}
               disabled={clearingAll}
-              className="w-full md:w-auto flex items-center justify-center bg-white border border-red-200 hover:border-red-300 hover:shadow-sm text-red-600 rounded-lg px-3 py-2 transition-all duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-auto flex items-center justify-center bg-white border border-red-200 hover:border-red-300 hover:shadow-sm text-red-600 rounded-lg px-3 py-2 transition-all duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {clearingAll ? (
                 <>
@@ -1032,7 +1123,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                 
                 {/* Content for all roles */}
                 <div>
-                  {notice.content && !notice.imageData && !notice.pdfData ? (
+                  {notice.content && !(notice.imageUrl || notice.imageFileName) && !(notice.pdfUrl || notice.pdfFileName) ? (
                     <button
                       onClick={() => openContentModal(notice)}
                       className="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition-colors duration-150 flex items-center gap-1"
@@ -1044,13 +1135,13 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                     </button>
                   ) : notice.content ? (
                     <span className="text-gray-500 text-xs sm:text-sm italic">Content available (view in edit mode)</span>
-                  ) : !notice.imageData && !notice.pdfData ? (
+                  ) : !(notice.imageUrl || notice.imageFileName) && !(notice.pdfUrl || notice.pdfFileName) ? (
                     <span className="text-gray-500 text-xs sm:text-sm italic">No content available</span>
                   ) : null}
                 </div>
                 
                 {/* Image controls */}
-                {notice.imageData && (
+                {(notice.imageUrl || notice.imageFileName) && (
                   <div className="p-2 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs sm:text-sm font-medium text-gray-700">Image Attachment</span>
@@ -1079,7 +1170,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                 )}
                 
                 {/* PDF controls */}
-                {notice.pdfData && (
+                {(notice.pdfUrl || notice.pdfFileName) && (
                   <div className="p-2 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs sm:text-sm font-medium text-gray-700">PDF Attachment</span>
@@ -1143,7 +1234,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                           
                           {/* Content for all roles - inline with title */}
                           <div className="mt-2">
-                            {notice.content && !notice.imageData && !notice.pdfData ? (
+                            {notice.content && !(notice.imageUrl || notice.imageFileName) && !(notice.pdfUrl || notice.pdfFileName) ? (
                               <button
                                 onClick={() => openContentModal(notice)}
                                 className="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition-colors duration-150 flex items-center gap-1"
@@ -1155,12 +1246,12 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                               </button>
                             ) : notice.content ? (
                               <span className="text-gray-500 text-sm italic">Content available (view in edit mode)</span>
-                            ) : !notice.imageData && !notice.pdfData ? (
+                            ) : !(notice.imageUrl || notice.imageFileName) && !(notice.pdfUrl || notice.pdfFileName) ? (
                               <span className="text-gray-500 text-sm italic">No content available</span>
                             ) : null}
                           </div>
                           {/* Image controls */}
-                          {notice.imageData && (
+                          {(notice.imageUrl || notice.imageFileName) && (
                             <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-700">Image Attachment</span>
@@ -1189,7 +1280,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                           )}
                           
                           {/* PDF controls */}
-                          {notice.pdfData && (
+                          {(notice.pdfUrl || notice.pdfFileName) && (
                             <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-700">PDF Attachment</span>
@@ -1381,7 +1472,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                 </div>
                 
                 {/* Notice Content - Show only when no image or PDF data */}
-                {(!editingNotice.imageData && !editingNotice.pdfData) && (
+                {(!(editingNotice.imageUrl || editingNotice.imageFileName) && !(editingNotice.pdfUrl || editingNotice.pdfFileName)) && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Notice Content
@@ -1413,7 +1504,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                 )}
                 
                 {/* Image Upload - Show only when imageData is not empty */}
-                {editingNotice.imageData && (
+                {(editingNotice.imageUrl || editingNotice.imageFileName) && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Notice Image
@@ -1480,8 +1571,8 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                       </div>
                     )}
                     
-                    {/* PDF Upload - Show only when pdfData is not empty */}
-                    {editingNotice.pdfData && (
+                    {/* PDF Upload - Show only when pdfUrl or pdfFileName exists */}
+                    {(editingNotice.pdfUrl || editingNotice.pdfFileName) && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Notice PDF
@@ -1526,7 +1617,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
                                 <button
                                   onClick={() => {
                                     setSelectedPdf(null);
-                                    setPdfPreview(editingNotice.pdfData ? `data:application/pdf;base64,${editingNotice.pdfData}` : null);
+                                    setPdfPreview(editingNotice.pdfUrl || null);
                                   }}
                                   className="text-red-500 hover:text-red-700"
                                 >
@@ -1662,7 +1753,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             <div className="p-3 sm:p-4 md:p-6 overflow-y-auto flex-grow flex items-center justify-center">
               <div className="max-w-full max-h-full">
                 <img
-                  src={`data:image/jpeg;base64,${selectedImageContent.imageData}`}
+                  src={selectedImageContent.imageData}
                   alt={selectedImageContent.title}
                   className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
                 />
@@ -1711,7 +1802,7 @@ export function WidgetContainer({ data, onUpdate }: WidgetContainerProps) {
             <div className="p-3 sm:p-4 md:p-6 overflow-y-auto flex-grow">
               <div className="w-full h-full">
                 <iframe
-                  src={`data:application/pdf;base64,${selectedPdfContent.pdfData}`}
+                  src={selectedPdfContent.pdfData}
                   className="w-full h-full min-h-[300px] sm:min-h-[400px] md:min-h-[600px] border border-gray-200 rounded-lg"
                   title="PDF Preview"
                 />

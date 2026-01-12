@@ -98,13 +98,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardStats()
-    
-    // Set up real-time updates every 30 seconds
-    const interval = setInterval(() => {
-      fetchDashboardStats()
-    }, 30000)
-
-    return () => clearInterval(interval)
   }, [session, router])
 
   const fetchDashboardStats = async () => {
