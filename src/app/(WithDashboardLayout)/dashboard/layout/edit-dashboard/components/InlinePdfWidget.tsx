@@ -385,6 +385,42 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
     }
   }
 
+  // Upload base64 image to Supabase storage and return URL
+  const uploadPdfImageToStorage = async (base64Image: string): Promise<string | undefined> => {
+    try {
+      if (!base64Image) return undefined
+
+      // Convert base64 data URL to Blob
+      const response = await fetch(base64Image)
+      const blob = await response.blob()
+      
+      // Create File from Blob
+      const file = new File([blob], `pdf-preview-${Date.now()}.png`, { type: 'image/png' })
+      
+      // Upload to Supabase via API
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const uploadResponse = await fetch('/api/pdf/upload-image', {
+        method: 'POST',
+        body: formData,
+      })
+      
+      const uploadResult = await uploadResponse.json()
+      
+      if (!uploadResult.success || !uploadResult.url) {
+        console.error('[PDF IMAGE] Failed to upload image to Supabase:', uploadResult.error)
+        return undefined
+      }
+      
+      console.log('[PDF IMAGE] Uploaded PDF image to Supabase:', uploadResult.url)
+      return uploadResult.url
+    } catch (err) {
+      console.error('[PDF IMAGE] Failed to upload PDF image to Supabase:', err)
+      return undefined
+    }
+  }
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || file.type !== "application/pdf") {
@@ -452,10 +488,16 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
           const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
           // Generate first page image on the client
-          const pdfimage = await generateFirstPageImage(pdfData)
+          const base64Image = await generateFirstPageImage(pdfData)
           
-          // Notify parent component about the stored PDF with URL (not base64 data)
-          onPdfStored(pdfId, pdfUrl, file.name, pdfimage)
+          // Upload PDF image to Supabase storage and get URL
+          let pdfimageUrl: string | undefined = undefined
+          if (base64Image) {
+            pdfimageUrl = await uploadPdfImageToStorage(base64Image)
+          }
+          
+          // Notify parent component about the stored PDF with image URL (not base64)
+          onPdfStored(pdfId, pdfUrl, file.name, pdfimageUrl)
           
           toast.dismiss()
           toast.success('PDF uploaded and stored successfully!')
@@ -669,8 +711,13 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
                                     saveToLocalStorage(dataUrl, n.pdfFileName || 'uploaded.pdf')
                                     
                                     const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-                                    const pdfimage = await generateFirstPageImage(dataUrl)
-                                    onPdfStored(pdfId, pdfUrl, n.pdfFileName || 'uploaded.pdf', pdfimage)
+                                    const base64Image = await generateFirstPageImage(dataUrl)
+                                    // Upload PDF image to Supabase storage and get URL
+                                    let pdfimageUrl: string | undefined = undefined
+                                    if (base64Image) {
+                                      pdfimageUrl = await uploadPdfImageToStorage(base64Image)
+                                    }
+                                    onPdfStored(pdfId, pdfUrl, n.pdfFileName || 'uploaded.pdf', pdfimageUrl)
                                     setIsSelectModalOpen(false)
                                     toast.dismiss(loadingToast)
                                     toast.success('PDF selected successfully')
@@ -742,8 +789,13 @@ function InlinePdfWidget({ widgetId, onPdfStored }: { widgetId: string, onPdfSto
                                 saveToLocalStorage(pdfDataForPreview, n.pdfFileName || 'uploaded.pdf')
                                 
                                 const pdfId = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-                                const pdfimage = await generateFirstPageImage(pdfDataForPreview)
-                                onPdfStored(pdfId, pdfUrl, n.pdfFileName || 'uploaded.pdf', pdfimage)
+                                const base64Image = await generateFirstPageImage(pdfDataForPreview)
+                                // Upload PDF image to Supabase storage and get URL
+                                let pdfimageUrl: string | undefined = undefined
+                                if (base64Image) {
+                                  pdfimageUrl = await uploadPdfImageToStorage(base64Image)
+                                }
+                                onPdfStored(pdfId, pdfUrl, n.pdfFileName || 'uploaded.pdf', pdfimageUrl)
                                 setIsSelectModalOpen(false)
                                 toast.dismiss(loadingToast)
                                 toast.success('PDF selected and uploaded successfully!')

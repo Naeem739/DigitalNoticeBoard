@@ -71,6 +71,7 @@ export default function PublicNoticePage() {
   const [images, setImages] = useState<TImage[]>([])
   const [autoPaginationEnabled, setAutoPaginationEnabled] = useState(true)
   const [countdown, setCountdown] = useState(120) // 2 minutes = 120 seconds
+  // Track viewport width for responsive behaviors
   const [viewportWidth, setViewportWidth] = useState(0)
   const isMobile = viewportWidth > 0 && viewportWidth <= 480
   const [lastDataUpdate, setLastDataUpdate] = useState<number>(Date.now())
@@ -745,8 +746,8 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className={`${isMobile ? 'flex-auto' : 'flex-1'} ${isMobile ? 'min-h-0' : 'min-h-0'} p-0 ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}>
-        <div className={`w-full ${isMobile ? 'h-auto' : 'h-full'} ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <main className={`${isMobile ? 'flex-1 min-h-[60vh] overflow-visible' : 'flex-1 overflow-hidden'} p-0`}>
+        <div className={`w-full ${isMobile ? 'min-h-[60vh] overflow-visible' : 'h-full overflow-hidden'}`}>
           {/* Dashboard Content */}
           {dashboardLoading ? (
             <motion.div 
@@ -1018,7 +1019,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                               fontSize: '12px'
                                             }}
                                           >
-                                            Published Date: {formatNoticeDate(notice.createdAt)}
+                                            Published: {formatNoticeDate(notice.createdAt)}
                                           </div>
                                         )}
                                         
@@ -1040,7 +1041,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                               fontSize: '12px'
                                             }}
                                           >
-                                            Last Updated: {formatNoticeDate(notice.updatedAt)}
+                                            Updated: {formatNoticeDate(notice.updatedAt)}
                                           </div>
                                         )}
                                       </div>
@@ -1214,7 +1215,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     border: 'none'
                                   }}
                                 >
-                                  {/* Use pdfimage (base64 PNG of first page) for Samsung QB75C compatibility */}
+                                  {/* Use pdfimage (URL from Supabase storage) for Samsung QB75C compatibility */}
                                   <div className="relative w-full h-full">
                                     {container.pdfimage ? (
                                       <img
@@ -1225,6 +1226,11 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           backgroundColor: '#ffffff',
                                           width: '100%',
                                           height: '100%'
+                                        }}
+                                        onError={(e) => {
+                                          console.error('[PDF IMAGE] Failed to load PDF image from URL:', container.pdfimage)
+                                          // Hide image on error, fallback will show
+                                          e.currentTarget.style.display = 'none'
                                         }}
                                       />
                                     ) : (
@@ -1372,7 +1378,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       justifyContent: 'center'
                                     }}
                                   >
-                                    {/* Show first-page image from container.pdfimage if available.
+                                    {/* Show first-page image from container.pdfimage (Supabase URL) if available.
                                         Fallback to a simple PDF icon text if not present. */}
                                     {container.pdfimage ? (
                                       <img
@@ -1381,6 +1387,11 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                         className="w-full h-full object-contain"
                                         style={{
                                           backgroundColor: '#ffffff'
+                                        }}
+                                        onError={(e) => {
+                                          console.error('[PDF IMAGE] Failed to load PDF image from URL:', container.pdfimage)
+                                          // Hide image on error, fallback will show
+                                          e.currentTarget.style.display = 'none'
                                         }}
                                       />
                                     ) : (
@@ -1482,10 +1493,13 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
               animate={{ opacity: 1 }}
             >
               <div className="text-center text-white px-4 max-w-full w-full">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-4">No Dashboards Available</h2>
-                <p className="text-sm sm:text-base md:text-lg opacity-80 mb-1 sm:mb-2">Please create dashboard interfaces first.</p>
-                <p className="text-xs sm:text-sm opacity-60">Dashboards will be displayed with the latest created first, then by screen order (1, 2, 3...).</p>
-              </div>
+  <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-4">No Notices Available</h2>
+  <p className="text-sm sm:text-base md:text-lg opacity-80 mb-1 sm:mb-2">Please create Notices first.</p>
+  <p className="text-xs sm:text-sm opacity-60">
+    Notices will be displayed with the latest created first, then by screen order (1, 2, 3...).
+  </p>
+</div>
+
             </motion.div>
           )}
         </div>

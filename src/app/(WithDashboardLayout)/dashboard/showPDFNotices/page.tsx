@@ -13,6 +13,7 @@ type TPDF = {
   title: string
   pdfUrl?: string
   pdfFileName?: string
+  pdfImageUrl?: string
   createdAt?: Date
   category?: string
   categoryName?: string
@@ -25,6 +26,17 @@ export default function ShowPDFNotices() {
   const [pdfs, setPdfs] = useState<TPDF[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const deleteFromStorage = async (url?: string, bucket: 'pdfs' | 'images' = 'pdfs') => {
+    if (!url) return
+    try {
+      await fetch(`/api/storage/delete?url=${encodeURIComponent(url)}&bucket=${bucket}`, {
+        method: 'DELETE'
+      })
+    } catch (error) {
+      console.error(`Error deleting file from ${bucket} storage:`, error)
+    }
+  }
 
   useEffect(() => {
     fetchPDFs()
@@ -60,6 +72,7 @@ export default function ShowPDFNotices() {
             title: notice.title,
             pdfUrl: notice.pdfUrl,
             pdfFileName: notice.pdfFileName,
+            pdfImageUrl: notice.pdfImageUrl || notice.pdfimage,
             createdAt: notice.createdAt,
             category: notice.category,
             categoryName: notice.categoryName,
@@ -97,6 +110,7 @@ export default function ShowPDFNotices() {
                   title: pdf.title || container.title || 'PDF Document',
                   pdfUrl: pdf.pdfUrl || pdf.url,
                   pdfFileName: pdf.fileName || pdf.title || 'document.pdf',
+                  pdfImageUrl: pdf.pdfimage || pdf.pdfImageUrl,
                   createdAt: pdf.createdAt || dash.createdAt,
                   category: 'PDF',
                   categoryName: 'PDF',
@@ -111,6 +125,7 @@ export default function ShowPDFNotices() {
                 title: container.title || 'PDF Document',
                 pdfUrl: container.pdfUrl || container.url,
                 pdfFileName: container.pdfFileName || (container.title ? `${container.title}.pdf` : 'document.pdf'),
+                pdfImageUrl: container.pdfimage || container.pdfImageUrl,
                 createdAt: dash.createdAt,
                 category: 'PDF',
                 categoryName: 'PDF',
@@ -127,6 +142,7 @@ export default function ShowPDFNotices() {
                   title: p.title || container.title || 'PDF Document',
                   pdfUrl: p.pdfUrl,
                   pdfFileName: p.fileName || p.title || 'document.pdf',
+                  pdfImageUrl: p.pdfimage || p.pdfImageUrl,
                   createdAt: p.createdAt || dash.createdAt,
                   category: 'PDF',
                   categoryName: 'PDF',
@@ -151,6 +167,7 @@ export default function ShowPDFNotices() {
           title: p.title || p.fileName || 'PDF',
           pdfUrl: p.pdfUrl,
           pdfFileName: p.fileName,
+          pdfImageUrl: p.pdfimage || p.pdfImageUrl,
           createdAt: p.createdAt,
           source: 'pdf' as const
         }))
@@ -198,31 +215,31 @@ export default function ShowPDFNotices() {
         const result = await response.json()
         
         if (result.success) {
+          // Backend handles storage deletion (including searching dashboard containers for pdfImageUrl)
           setPdfs(prev => prev.filter(pdf => pdf.id !== pdfId))
           toast.success('PDF deleted successfully')
         } else {
           toast.error('Failed to delete PDF')
         }
       } else if (pdfId.includes(':') && pdfId.includes(':pdf')) {
-        // Dashboard container PDF - delete from storage and container
+        // Dashboard container PDF - backend will handle storage deletion
         const parts = pdfId.split(':')
         const dashboardId = parts[0]
         const containerId = parts[1]
         
         if (pdfItem?.pdfUrl) {
-          // Delete from storage
-          try {
-            await fetch(`/api/storage/delete?url=${encodeURIComponent(pdfItem.pdfUrl)}&bucket=pdfs`, {
-              method: 'DELETE'
-            })
-          } catch (error) {
-            console.error('Error deleting PDF from storage:', error)
-          }
-          
-          // Remove from dashboard container
+          // Remove from dashboard container (backend will handle storage deletion)
           if (dashboardId && containerId) {
             try {
-              await fetch(`/api/dashboard/remove-pdf?dashboardId=${dashboardId}&containerId=${containerId}&pdfUrl=${encodeURIComponent(pdfItem.pdfUrl)}`, {
+              const qs = new URLSearchParams({
+                dashboardId,
+                containerId,
+                pdfUrl: pdfItem.pdfUrl,
+              })
+              if (pdfItem?.pdfImageUrl) {
+                qs.set('pdfImageUrl', pdfItem.pdfImageUrl)
+              }
+              await fetch(`/api/dashboard/remove-pdf?${qs.toString()}`, {
                 method: 'DELETE'
               })
             } catch (error) {
@@ -236,12 +253,17 @@ export default function ShowPDFNotices() {
       } else {
         // Regular notice or Pdf table PDF
         const endpoint = pdfItem?.source === 'pdf' ? '/api/pdf/delete' : '/api/notice/delete'
-        const response = await fetch(`${endpoint}?id=${pdfId}`, {
+        const qs = new URLSearchParams({ id: pdfId })
+        if (pdfItem?.pdfImageUrl) {
+          qs.set('pdfImageUrl', pdfItem.pdfImageUrl)
+        }
+        const response = await fetch(`${endpoint}?${qs.toString()}`, {
           method: 'DELETE'
         })
         const result = await response.json()
         
         if (result.success) {
+          // Backend handles storage deletion (including searching dashboard containers for pdfImageUrl)
           setPdfs(prev => prev.filter(pdf => pdf.id !== pdfId))
           toast.success('PDF deleted successfully')
         } else {
