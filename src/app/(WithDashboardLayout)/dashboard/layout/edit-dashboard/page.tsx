@@ -1852,7 +1852,7 @@ function EditDashboardDemo() {
             
             // Get PDF URL from widget (file is stored in Supabase bucket)
             const pdfUrl = pdf.pdfUrl || ''
-            // Get PDF image (first page converted to image)
+            // Get PDF image URL (first page image stored in Supabase storage)
             const pdfimage = pdf.pdfimage || ''
 
             // Skip PDF notice creation during save to improve performance
@@ -1876,7 +1876,7 @@ function EditDashboardDemo() {
               type: "pdf",
               pdfUrl: pdfUrl || '',
               pdfFileName: pdf.fileName || pdf.title || 'uploaded.pdf',
-              pdfimage: pdfimage, // Store first page as image
+              pdfimage: pdfimage, // Store first page image URL (from Supabase storage)
               settings: {
                 backgroundColor: settings.backgroundColor,
                 backgroundOpacity: settings.backgroundOpacity,
@@ -3239,7 +3239,7 @@ function EditDashboardDemo() {
                       <InlinePdfWidget 
                         widgetId={widget.id}
                         onPdfStored={(pdfId: string, pdfUrl: string, fileName: string, pdfimage?: string) => {
-                          // Store PDF reference in widget with PDF URL and client-generated image
+                          // Store PDF reference in widget with PDF URL and PDF image URL (from Supabase storage)
                           setWidgets(prev => prev.map(w => 
                             w.id === widget.id 
                               ? { 
@@ -3250,20 +3250,21 @@ function EditDashboardDemo() {
                                     pdfUrl: pdfUrl, 
                                     fileName: fileName || 'uploaded.pdf', 
                                     dbId: pdfId,
-                                    pdfimage: pdfimage
+                                    pdfimage: pdfimage // URL from Supabase storage, not base64
                                   }] 
                                 }
                               : w
                           ))
 
                           if (pdfimage) {
-                            console.log('[PDF IMAGE] pdfimage stored on widget state (client-generated)', {
+                            console.log('[PDF IMAGE] pdfimage URL stored on widget state (from Supabase storage)', {
                               widgetId: widget.id,
                               pdfId,
                               fileName,
+                              pdfimageUrl: pdfimage
                             })
                           } else {
-                            console.warn('[PDF IMAGE] No pdfimage provided from client generation', {
+                            console.warn('[PDF IMAGE] No pdfimage URL provided from upload', {
                               widgetId: widget.id,
                               pdfId,
                               fileName,

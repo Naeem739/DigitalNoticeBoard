@@ -458,8 +458,98 @@ export async function GET(
             transform: translateY(-2px);
           }
           
+          /* Screen-only footer row with QR + statement (hidden on print) */
+          .digital-footer {
+            position: fixed;
+            bottom: 12px;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 260px;
+            z-index: 900;
+            pointer-events: none; /* keep print button clickable */
+          }
+          
+          .digital-qr-box {
+            width: 64px;
+            height: 64px;
+            background: #fff;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            pointer-events: auto;
+          }
+          
+          .digital-qr-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+          
+          .digital-notice-statement {
+            font-size: 12px;
+            font-style: italic;
+            color: #000;
+            text-align: center;
+            max-width: calc(100% - 220px);
+            line-height: 1.4;
+            pointer-events: auto;
+          }
+
+          /* Mobile optimizations */
+          @media screen and (max-width: 768px) {
+            .digital-footer {
+              gap: 10px;
+              bottom: 10px;
+              padding: 0 10px;
+            }
+            .digital-qr-box {
+              width: 56px;
+              height: 56px;
+              padding: 5px;
+            }
+            .digital-notice-statement {
+              max-width: calc(100% - 170px);
+              font-size: 11px;
+            }
+            .page-container {
+              padding: 10mm 8mm;
+            }
+          }
+
+          @media screen and (max-width: 480px) {
+            .digital-footer {
+              gap: 8px;
+              bottom: 8px;
+              padding: 0 8px;
+            }
+            .digital-qr-box {
+              width: 48px;
+              height: 48px;
+              padding: 4px;
+            }
+            .digital-notice-statement {
+              max-width: calc(100% - 140px);
+              font-size: 10px;
+              line-height: 1.35;
+            }
+            .page-container {
+              padding: 8mm 5mm;
+            }
+          }
+          
           @media print {
             .print-button {
+              display: none;
+            }
+            
+            .digital-footer {
               display: none;
             }
             
@@ -514,6 +604,14 @@ export async function GET(
       </head>
       <body>
         <button class="print-button" onclick="window.print()">Print</button>
+        <div class="digital-footer">
+          <div class="digital-qr-box">
+            <img src="${qrDataUrl}" alt="Notice QR" />
+          </div>
+          <div class="digital-notice-statement">
+            This document is electrically generated and does not require any signature
+          </div>
+        </div>
         
         <div class="page-container">
           <!-- Header Section -->

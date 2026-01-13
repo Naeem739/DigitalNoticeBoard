@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/db/prisma'
+import { deleteFileFromStorage, extractFilePathFromUrl, STORAGE_BUCKETS } from '@/lib/supabase'
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -8,6 +9,7 @@ export async function DELETE(request: NextRequest) {
     const containerId = searchParams.get('containerId')
     const pdfUrl = searchParams.get('pdfUrl') // URL to identify which PDF to remove
     const pdfId = searchParams.get('pdfId') // For pdfIds array case
+    const pdfImageUrl = searchParams.get('pdfImageUrl') // Preview image URL to remove from storage
 
     if (!dashboardId || !containerId) {
       return NextResponse.json({ 
@@ -47,24 +49,50 @@ export async function DELETE(request: NextRequest) {
 
     const container = containers[containerIndex]
 
+    // Keep refs for storage cleanup
+    const pdfUrlsToDelete: string[] = []
+    const pdfImagesToDelete: string[] = []
+
     // Case 1: Remove from container.pdfs array
     if (Array.isArray(container.pdfs) && container.pdfs.length > 0) {
       if (pdfUrl) {
         // Remove PDF by URL
-        container.pdfs = container.pdfs.filter((pdf: any) => 
-          pdf.pdfUrl !== pdfUrl && pdf.url !== pdfUrl
-        )
+        const remaining: any[] = []
+        for (const pdf of container.pdfs) {
+          const matches = (pdf.pdfUrl === pdfUrl) || (pdf.url === pdfUrl)
+          if (matches) {
+            if (pdf.pdfUrl || pdf.url) pdfUrlsToDelete.push(pdf.pdfUrl || pdf.url)
+            if (pdf.pdfimage || pdf.pdfImageUrl || pdfImageUrl) {
+              pdfImagesToDelete.push(pdf.pdfimage || pdf.pdfImageUrl || pdfImageUrl)
+            }
+          } else {
+            remaining.push(pdf)
+          }
+        }
+        container.pdfs = remaining
       } else {
         // Remove all PDFs if no URL specified
+        for (const pdf of container.pdfs) {
+          if (pdf.pdfUrl || pdf.url) pdfUrlsToDelete.push(pdf.pdfUrl || pdf.url)
+          if (pdf.pdfimage || pdf.pdfImageUrl || pdfImageUrl) {
+            pdfImagesToDelete.push(pdf.pdfimage || pdf.pdfImageUrl || pdfImageUrl)
+          }
+        }
         container.pdfs = []
       }
     }
     // Case 2: Remove single pdfUrl/url from container
     else if (container.pdfUrl || container.url) {
       if (pdfUrl && (container.pdfUrl === pdfUrl || container.url === pdfUrl)) {
+        if (container.pdfUrl || container.url) pdfUrlsToDelete.push(container.pdfUrl || container.url)
+        if (container.pdfimage || container.pdfImageUrl || pdfImageUrl) {
+          pdfImagesToDelete.push(container.pdfimage || container.pdfImageUrl || pdfImageUrl)
+        }
         delete container.pdfUrl
         delete container.url
         delete container.pdfFileName
+        delete container.pdfimage
+        delete container.pdfImageUrl
       }
     }
     // Case 3: Remove from pdfIds array (legacy)
@@ -85,10 +113,37 @@ export async function DELETE(request: NextRequest) {
       }
     })
 
+    // Delete PDF files from storage
+    for (const pdfUrl of pdfUrlsToDelete) {
+      try {
+        const pdfFilePath = extractFilePathFromUrl(pdfUrl, STORAGE_BUCKETS.PDFS)
+        if (pdfFilePath) {
+          await deleteFileFromStorage(STORAGE_BUCKETS.PDFS, pdfFilePath)
+        }
+      } catch (error) {
+        console.error(`Error deleting PDF file ${pdfUrl} from storage:`, error)
+      }
+    }
+
+    // Delete PDF preview images from storage
+    for (const pdfImageUrl of pdfImagesToDelete) {
+      if (!pdfImageUrl) continue
+      try {
+        const pdfImgPath = extractFilePathFromUrl(pdfImageUrl, STORAGE_BUCKETS.IMAGES)
+        if (pdfImgPath) {
+          await deleteFileFromStorage(STORAGE_BUCKETS.IMAGES, pdfImgPath)
+        }
+      } catch (error) {
+        console.error(`Error deleting PDF preview image ${pdfImageUrl} from storage:`, error)
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
       message: 'PDF removed from dashboard container',
-      result: updatedDashboard
+      result: updatedDashboard,
+      deletedPdfUrls: pdfUrlsToDelete,
+      deletedPdfImages: pdfImagesToDelete
     })
 
   } catch (error) {
