@@ -1178,9 +1178,9 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       
                                       {/* Notice Content */}
                                     {settings.showFullContent && notice.content && (
-                                        <div className="mt-2 md:mt-3">
+                                        <div className="mt-2 md:mt-3 transition-all duration-300 ease-in-out">
                                       <div 
-                                            className="text-xs leading-tight opacity-75 line-clamp-2 break-words"
+                                            className="text-xs leading-tight opacity-75 line-clamp-2 break-words transition-all duration-300"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
                                               fontFamily: settings.fontFamily || "'Tiro Bangla', 'Inter', sans-serif",
@@ -1191,6 +1191,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                         }}
                                       >
                                             <div 
+                                              className="transition-opacity duration-300"
                                               dangerouslySetInnerHTML={{ 
                                                 __html: notice.content.length > 60 
                                                   ? `${notice.content.substring(0, 60)}...` 

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pdfPoppler from 'pdf-poppler'
+import gm from 'gm'
 import { writeFile, unlink, readFile } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
+
+// Use ImageMagick with Ghostscript support
+const im = gm.subClass({ imageMagick: true })
 
 export async function POST(request: NextRequest) {
   let tempPdfPath: string | null = null
@@ -31,24 +34,26 @@ export async function POST(request: NextRequest) {
     tempPdfPath = join(tmpdir(), `pdf-${Date.now()}-${Math.random().toString(36).substring(7)}.pdf`)
 
     try {
-      // Write PDF buffer to temporary file (pdf-poppler works with file paths)
+      // Write PDF buffer to temporary file
       await writeFile(tempPdfPath, pdfBuffer)
 
-      // Convert first page of PDF to image using pdf-poppler
-      const outDir = tmpdir()
-      const prefix = `image-${Date.now()}`
+      // Generate output image path
+      const imagePath = join(tmpdir(), `image-${Date.now()}-${Math.random().toString(36).substring(7)}.png`)
 
-      const options = {
-        format: 'png' as const,
-        out_dir: outDir,
-        out_prefix: prefix,
-        page: 1, // first page only
-      }
-
-      await pdfPoppler.convert(tempPdfPath, options)
-
-      // pdf-poppler will produce "<prefix>-1.png" for page 1
-      const imagePath = join(outDir, `${prefix}-1.png`)
+      // Convert first page of PDF to image using ImageMagick + Ghostscript
+      await new Promise((resolve, reject) => {
+        im(tempPdfPath + '[0]') // [0] selects the first page
+          .density(150, 150) // Set DPI for better quality
+          .quality(90) // Set quality
+          .trim() // Remove whitespace/margins around the image
+          .borderColor('white') // Set border color for fuzz trimming
+          .fuzz('10%') // Trim similar colors within 10% tolerance
+          .trim() // Apply trim again with fuzz for better whitespace removal
+          .write(imagePath, (err) => {
+            if (err) reject(err)
+            else resolve(imagePath)
+          })
+      })
 
       // Clean up temporary PDF file
       if (tempPdfPath) {

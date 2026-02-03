@@ -424,7 +424,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
 
   return (
     <div 
-      className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
+      className="bg-white rounded-lg shadow-xl border-2 border-gray-300 group"
       style={{
         width: size + 4,
         height: size + 4,
@@ -432,8 +432,11 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.8)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        cursor: 'pointer'
       }}
+      onClick={handleDownload}
+      title="Click to download"
     >
       <div className={`relative ${className}`}>
         <img
@@ -442,6 +445,10 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
           style={{ width: size, height: size }}
           className="rounded"
         />
+        {/* Download icon overlay */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded">
+          <Download className="w-4 h-4 text-white" />
+        </div>
       </div>
     </div>
   )
