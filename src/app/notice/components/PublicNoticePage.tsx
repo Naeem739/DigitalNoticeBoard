@@ -11,11 +11,11 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { NoticeQRCode } from '@/components/ui/qr-code'
-import LazyPdfWidget from './LazyPdfWidget'
 import ClientOnly from './ClientOnly'
 import { useDashboards } from '@/hooks/useDashboardData'
 import { useNotices } from '@/hooks/useNotices'
 import { usePDFs } from '@/hooks/usePDFs'
+import DirectPdfEmbed from './DirectPdfEmbed'
 
 
 type TDashboard = {
@@ -67,6 +67,7 @@ function RotatingImageWidget({
   imageBorderRadius?: number
 }) {
   const [index, setIndex] = useState(0)
+  const [isImageLoading, setIsImageLoading] = useState(true)
 
   const safeNotices = useMemo(
     () => (notices || []).filter(n => n && (n.imageUrl || n.imageData || n.imageFileName)),
@@ -97,6 +98,17 @@ function RotatingImageWidget({
   const notice = safeNotices[index]
   if (!notice) return null
 
+  const imageSrc = reconstructImageUrl(notice)
+
+  // Reset loader whenever the image changes
+  useEffect(() => {
+    if (!imageSrc) {
+      setIsImageLoading(false)
+      return
+    }
+    setIsImageLoading(true)
+  }, [imageSrc])
+
   return (
     <motion.div
       key={notice.id}
@@ -113,8 +125,18 @@ function RotatingImageWidget({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4 }}
     >
+      {/* Simple loader overlay while image loads */}
+      {isImageLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-300 border-t-blue-600 mx-auto mb-2"></div>
+            <p className="text-xs text-gray-500">Loading image...</p>
+          </div>
+        </div>
+      )}
+
       <img
-        src={reconstructImageUrl(notice)}
+        src={imageSrc}
         alt={notice.title}
         className="w-full h-full transition-transform duration-300"
         style={{
@@ -123,6 +145,8 @@ function RotatingImageWidget({
           width: '100%',
           height: '100%',
         }}
+        onLoad={() => setIsImageLoading(false)}
+        onError={() => setIsImageLoading(false)}
       />
 
       {/* QR Code - Bottom Right */}
@@ -839,8 +863,8 @@ export default function PublicNoticePage() {
       </motion.header>
 
       {/* Main Content */}
-      <main className={`${isMobile ? 'flex-1 min-h-[60vh] overflow-visible' : 'flex-1 overflow-hidden'} p-0`}>
-        <div className={`w-full ${isMobile ? 'min-h-[60vh] overflow-visible' : 'h-full overflow-hidden'}`}>
+      <main className={`${isMobile ? 'flex-1 min-h-[60vh] overflow-y-auto overflow-x-hidden' : 'flex-1 overflow-hidden'} p-0`}>
+        <div className={`w-full ${isMobile ? 'min-h-[60vh] overflow-y-auto overflow-x-hidden' : 'h-full overflow-hidden'}`}>
           {/* Dashboard Content */}
           {dashboardLoading ? (
             <motion.div 
@@ -856,21 +880,22 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className="w-full h-full overflow-hidden"
+              className={`${isMobile ? 'w-full overflow-visible' : 'w-full h-full overflow-hidden'}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
               <div 
-                className="relative w-full h-full overflow-hidden"
+                className={`relative w-full ${isMobile ? 'overflow-visible' : 'h-full overflow-hidden'}`}
                 style={{
                   // Maintain exact aspect ratio from database - no padding, no margins
                   aspectRatio: currentDashboard?.aspectRatio ? 
                     currentDashboard.aspectRatio.replace(':', '/') : '4/3',
                   width: '100%',
-                  height: '100%',
+                  height: isMobile ? 'auto' : '100%',
                   maxWidth: '100%',
-                  maxHeight: '100%',
+                  maxHeight: isMobile ? 'none' : '100%',
+                  minHeight: isMobile ? '60vh' : undefined,
                   margin: 0,
                   padding: 0
                 }}
@@ -882,7 +907,7 @@ export default function PublicNoticePage() {
                     width: '100%',
                     height: '100%',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: isMobile ? 'visible' : 'hidden'
                   }}
                 >
                   {currentDashboard.containers.map((container, index) => {
@@ -1282,12 +1307,10 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                         </div>
                                       </div>
                                     }>
-                                      <LazyPdfWidget
+                                      <DirectPdfEmbed
                                         pdfUrl={container.pdfUrl}
-                                        autoScroll={false}
+                                        title={container.settings?.customCategoryName || container.title || container.pdfFileName || 'PDF Document'}
                                         className="h-full w-full"
-                                        showTitle={false}
-                                        containerId={container.id}
                                       />
                                     </ClientOnly>
                                     
@@ -1317,165 +1340,15 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                 </motion.div>
                               )}
                               
-                              {/* Priority 2: Handle PDF widgets with pdfIds (from PDF table) */}
-                              {!container.pdfUrl && container.pdfIds && container.pdfIds.slice(0, 1).map((pdfId: string) => {
-                                const pdf = getPdfById(pdfId)
-                                if (!pdf || !pdf.pdfData) return null
-                                
-                                return (
-                                  <motion.div
-                                    key={pdfId}
-                                    className="relative w-full h-full flex flex-col overflow-hidden"
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                    style={{
-                                      height: '100%',
-                                      width: '100%',
-                                      margin: '0',
-                                      backgroundColor: '#ffffff',
-                                      borderRadius: '0',
-                                      boxShadow: 'none',
-                                      border: 'none'
-                                    }}
-                                  >
-                                    <ClientOnly fallback={
-                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
-                                        <div className="text-center">
-                                          <div className="animate-pulse">
-                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
-                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
-                                          </div>
-                                          <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
-                                        </div>
-                                      </div>
-                                    }>
-                                      <LazyPdfWidget
-                                      pdfData={pdf.pdfData}
-                                      autoScroll={false}
-                                      className="h-full w-full"
-                                      showTitle={false}
-                                        containerId={container.id}
-                                    />
-                                    </ClientOnly>
-                                    
-                                     {/* QR Code - Bottom Right - White background container for visibility */}
-                                     <div 
-                                       className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
-                                       style={{
-                                         pointerEvents: 'auto',
-                                         backgroundColor: '#ffffff',
-                                         padding: '8px',
-                                         borderRadius: '8px',
-                                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
-                                       }}
-                                     >
-                                       <NoticeQRCode 
-                                         notice={{
-                                           id: pdf.id,
-                                           title: container.settings?.customCategoryName || pdf.title || 'PDF Document',
-                                           pdfData: pdf.pdfData,
-                                           pdfFileName: pdf.fileName || pdf.title
-                                         }}
-                                         size={isMobile ? 40 : getResponsiveQRSize()}
-                                         className=""
-                                       />
-                                     </div>
-                                  </motion.div>
-                                )
-                              })}
-                              
-                              {/* Priority 3: Handle PDF widgets with pdfData directly in container (backward compatibility) */}
-                              {!container.pdfUrl && container.pdfData && typeof container.pdfData === 'string' && !container.pdfIds && (() => {
-                                // Try to find the actual PDF ID from the Pdf table by matching PDF data
-                                // This ensures we use the correct PDF ID instead of container ID
-                                const matchingPdf = findPdfByData(container.pdfData)
-                                const pdfId = matchingPdf?.id || null
-                                // Use PDF ID if found, otherwise fall back to container PDF endpoint with container ID
-                                const qrCodeId = pdfId || container.id
-                                
-                                return (
-                                  <motion.div
-                                    key={`pdf-${container.id}`}
-                                    className="relative w-full h-full flex flex-col overflow-hidden"
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                    style={{
-                                      height: '100%',
-                                      width: '100%',
-                                      margin: '0',
-                                      backgroundColor: '#ffffff',
-                                      borderRadius: '0',
-                                      boxShadow: 'none',
-                                      border: 'none',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center'
-                                    }}
-                                  >
-                                    {/* Show first-page image from container.pdfimage (Supabase URL) if available.
-                                        Fallback to a simple PDF icon text if not present. */}
-                                    {container.pdfimage ? (
-                                      <img
-                                        src={container.pdfimage as string}
-                                        alt={container.title || container.pdfFileName || 'PDF'}
-                                        className="w-full h-full object-contain"
-                                        style={{
-                                          backgroundColor: '#ffffff'
-                                        }}
-                                        onError={(e) => {
-                                          console.error('[PDF IMAGE] Failed to load PDF image from URL:', container.pdfimage)
-                                          // Hide image on error, fallback will show
-                                          e.currentTarget.style.display = 'none'
-                                        }}
-                                      />
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center w-full h-full bg-gray-50">
-                                        <div className="w-16 h-16 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-semibold mb-2">
-                                          PDF
-                                        </div>
-                                        <p className="text-xs text-gray-500 px-4 text-center">
-                                          PDF preview not available. QR code will still open the full document.
-                                        </p>
-                                      </div>
-                                    )}
-                                      
-                                       {/* QR Code - Bottom Right - White background container for visibility */}
-                                       <div 
-                                         className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
-                                         style={{
-                                           pointerEvents: 'auto',
-                                           backgroundColor: '#ffffff',
-                                           padding: '8px',
-                                           borderRadius: '8px',
-                                           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
-                                         }}
-                                       >
-                                         <NoticeQRCode 
-                                           notice={{
-                                             id: qrCodeId, // Use actual PDF ID if found, otherwise container ID
-                                             title: container.settings?.customCategoryName || matchingPdf?.title || 'PDF Document',
-                                             pdfData: container.pdfData,
-                                             pdfFileName: container.pdfFileName || matchingPdf?.fileName
-                                           }}
-                                           size={isMobile ? 40 : getResponsiveQRSize()}
-                                           className=""
-                                         />
-                                       </div>
-                                  </motion.div>
-                                )
-                              })()}
-                              
-                              {/* Fallback: If PDF widget exists but no content is available */}
-                              {!container.pdfUrl && !container.pdfIds && !container.pdfData && (
+                              {/* Public Notice view expects `pdfUrl` from the Dashboard table. If not present, show a simple placeholder. */}
+                              {!container.pdfUrl && (
                                 <div className="flex items-center justify-center h-full w-full bg-gray-50">
                                   <div className="text-center p-4">
                                     <div className="w-16 h-16 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-semibold mb-2 mx-auto">
                                       PDF
                                     </div>
-                                    <p className="text-xs text-gray-500 px-4 text-center">
-                                      PDF content not available
+                                    <p className="text-xs text-gray-600 px-4 text-center">
+                                      No PDF URL configured for this widget.
                                     </p>
                                   </div>
                                 </div>

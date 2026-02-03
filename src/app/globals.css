@@ -199,16 +199,25 @@
       height: auto !important;
     }
     
+    /* Mobile: stack widgets vertically (one per screen), instead of absolute-positioned dashboard layout */
     .notice-page-container .notice-grid-container {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 12px !important;
+      padding: 8px !important;
       overflow: visible !important;
       max-height: none !important;
       height: auto !important;
     }
     
-    /* Keep absolute positioning on mobile - layout must match design exactly */
     .notice-grid-container > div {
-      position: absolute !important;
-      /* Dimensions from database (leftPercent, topPercent, width, height) */
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      width: 100% !important;
+      /* Full "mobile screen" for each widget; header/footer remain visible, so subtract a safe amount */
+      height: calc(100dvh - 220px) !important;
+      min-height: 60vh !important;
     }
   }
 
