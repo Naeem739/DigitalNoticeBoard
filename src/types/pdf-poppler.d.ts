@@ -1,6 +1,6 @@
 declare module 'pdf-poppler' {
   interface ConvertOptions {
-    format?: 'jpeg' | 'png' | 'svg';
+    format?: string;
     out_dir?: string;
     out_prefix?: string;
     page?: number;
@@ -18,6 +18,7 @@ declare module 'pdf-poppler' {
     gray?: boolean;
     level2?: boolean;
     level3?: boolean;
+    [key: string]: any;
   }
 
   interface PdfPoppler {

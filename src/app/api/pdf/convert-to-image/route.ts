@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       const prefix = `image-${Date.now()}`
 
       const options = {
-        format: 'png',
+        format: 'png' as const,
         out_dir: outDir,
         out_prefix: prefix,
         page: 1, // first page only
