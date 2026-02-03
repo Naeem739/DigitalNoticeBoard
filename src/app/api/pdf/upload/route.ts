@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/db/prisma'
 import { uploadPDF, uploadImage } from '@/lib/supabase'
-import pdf from 'pdf-poppler'
+import pdfPoppler from 'pdf-poppler'
 import sharp from 'sharp'
 import { writeFile, unlink, readFile } from 'fs/promises'
 import { join } from 'path'
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Convert PDF to PNG using pdf-poppler
-      await pdf.convert(tempPdfPath, opts)
+      await pdfPoppler.convert(tempPdfPath, opts)
       
       // The output file will be named: {out_prefix}-1.png
       outputImagePath = join(outputDir, `${outputPrefix}-1.png`)
