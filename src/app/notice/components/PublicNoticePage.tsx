@@ -880,22 +880,24 @@ export default function PublicNoticePage() {
             </motion.div>
           ) : currentDashboard ? (
             <motion.div 
-              className={`${isMobile ? 'w-full overflow-visible' : 'w-full h-full overflow-hidden'}`}
+              className={`${isMobile ? 'w-full h-full overflow-visible' : 'w-full h-full overflow-hidden'}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
               <div 
-                className={`relative w-full ${isMobile ? 'overflow-visible' : 'h-full overflow-hidden'}`}
+                className={`relative w-full ${isMobile ? 'h-full overflow-visible' : 'h-full overflow-hidden'}`}
                 style={{
                   // Maintain exact aspect ratio from database - no padding, no margins
-                  aspectRatio: currentDashboard?.aspectRatio ? 
-                    currentDashboard.aspectRatio.replace(':', '/') : '4/3',
+                  // On mobile we stack widgets vertically, so fill the available main height
+                  ...(isMobile ? {} : {
+                    aspectRatio: currentDashboard?.aspectRatio ? 
+                      currentDashboard.aspectRatio.replace(':', '/') : '4/3',
+                  }),
                   width: '100%',
-                  height: isMobile ? 'auto' : '100%',
+                  height: '100%',
                   maxWidth: '100%',
-                  maxHeight: isMobile ? 'none' : '100%',
-                  minHeight: isMobile ? '60vh' : undefined,
+                  maxHeight: '100%',
                   margin: 0,
                   padding: 0
                 }}
