@@ -1433,7 +1433,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
         <div className={`w-full ${getResponsivePadding()}`}>
           <div className={`flex flex-col items-center justify-center gap-2 sm:gap-1 sm:flex-row text-white/60 ${getResponsiveSubtitleFontSize()}`}>
             <span className="text-center sm:text-left break-words px-2">
-              Project Superviser: Md. Rashid Al Asif, Assistant Professor, CSE, BU
+              Project Supervisor: Md. Rashid Al Asif, Assistant Professor, CSE, BU
             </span>
             <span className="hidden sm:inline">•</span>
             <span className="text-center sm:text-left break-words px-2">
