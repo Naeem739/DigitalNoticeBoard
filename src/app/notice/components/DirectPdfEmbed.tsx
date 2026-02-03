@@ -40,23 +40,29 @@ export default function DirectPdfEmbed({
 
   return (
     <div className={`w-full h-full ${className}`} style={{ backgroundColor: "#fff" }}>
-      {/* Prefer iframe (works on most browsers); object is a decent fallback */}
-      <iframe
-        title={title || "PDF"}
-        src={viewerUrl}
+      {/* Use <object> to embed the PDF, with a simple fallback if inline rendering is not supported */}
+      <object
+        data={viewerUrl}
+        type="application/pdf"
         className="w-full h-full"
         style={{ border: "none", backgroundColor: "#fff" }}
-        loading="lazy"
-      />
-
-      {/* If iframe fails (blocked by CSP), user can still open the PDF */}
-      <noscript>
-        <p>
-          <a href={safeUrl} target="_blank" rel="noreferrer">
-            Open PDF
-          </a>
-        </p>
-      </noscript>
+      >
+        <div className="flex items-center justify-center h-full w-full bg-gray-50">
+          <div className="text-center px-4">
+            <p className="text-sm text-gray-700 font-medium mb-2">
+              PDF preview is not supported in this browser.
+            </p>
+            <a
+              href={safeUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
+              Open PDF
+            </a>
+          </div>
+        </div>
+      </object>
     </div>
   )
 }
