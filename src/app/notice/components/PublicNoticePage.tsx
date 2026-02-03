@@ -429,18 +429,22 @@ export default function PublicNoticePage() {
       const element = document.getElementById(container.id)
       if (!element) return null
 
-      const noticesContainer = element.querySelector(".notices-container")
+      const noticesContainer = element.querySelector(".notices-container") as HTMLElement
       if (!noticesContainer) return null
+
+      // Apply smooth scroll behavior via CSS
+      noticesContainer.style.scrollBehavior = 'smooth'
 
       let scrollPosition = 0
       let isScrollingDown = true
-      const scrollSpeed = 1
+      const scrollSpeed = 0.2 // Much slower, smoother scroll speed
       const maxScroll = noticesContainer.scrollHeight - noticesContainer.clientHeight
 
       // Only start scrolling if there's actually content to scroll
       if (maxScroll <= 0) return null
 
-      const interval = setInterval(() => {
+      let animationFrameId: number
+      const smoothScroll = () => {
         if (isScrollingDown) {
           scrollPosition += scrollSpeed
           if (scrollPosition >= maxScroll) {
@@ -454,14 +458,17 @@ export default function PublicNoticePage() {
         }
 
         noticesContainer.scrollTop = scrollPosition
-      }, 30)
+        animationFrameId = requestAnimationFrame(smoothScroll)
+      }
 
-      return interval
+      animationFrameId = requestAnimationFrame(smoothScroll)
+
+      return animationFrameId
     })
 
     return () => {
-      scrollIntervals.forEach((interval) => {
-        if (interval) clearInterval(interval)
+      scrollIntervals.forEach((frameId) => {
+        if (frameId) cancelAnimationFrame(frameId)
       })
     }
   }, [mounted, currentDashboard])
@@ -1110,7 +1117,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
                                           size={isMobile ? 40 : getResponsiveQRSize()}
-                                          className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
+                                          className="w-full h-full"
                                         />
                                       </div>
                                       {/* Notice Title - Dynamic height based on content */}
@@ -1171,9 +1178,9 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                       
                                       {/* Notice Content */}
                                     {settings.showFullContent && notice.content && (
-                                        <div className="mt-2 md:mt-3">
+                                        <div className="mt-2 md:mt-3 transition-all duration-300 ease-in-out">
                                       <div 
-                                            className="text-xs leading-tight opacity-75 line-clamp-2 break-words"
+                                            className="text-xs leading-tight opacity-75 line-clamp-2 break-words transition-all duration-300"
                                         style={{
                                           color: settings.fontColor || '#1e293b',
                                               fontFamily: settings.fontFamily || "'Tiro Bangla', 'Inter', sans-serif",
@@ -1184,6 +1191,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                         }}
                                       >
                                             <div 
+                                              className="transition-opacity duration-300"
                                               dangerouslySetInnerHTML={{ 
                                                 __html: notice.content.length > 60 
                                                   ? `${notice.content.substring(0, 60)}...` 
@@ -1299,25 +1307,45 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     border: 'none'
                                   }}
                                 >
-                                  {/* Render the PDF directly from Supabase URL (no preview image) */}
+                                  {/* For public display, prefer the first-page image of the PDF (from database/Supabase).
+                                      Fallback to an inline PDF viewer only if the image is not available. */}
                                   <div className="relative w-full h-full">
-                                    <ClientOnly fallback={
-                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
-                                        <div className="text-center">
-                                          <div className="animate-pulse">
-                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
-                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
-                                          </div>
-                                          <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
-                                        </div>
-                                      </div>
-                                    }>
-                                      <DirectPdfEmbed
-                                        pdfUrl={container.pdfUrl}
-                                        title={container.settings?.customCategoryName || container.title || container.pdfFileName || 'PDF Document'}
-                                        className="h-full w-full"
+                                    {container.pdfimage ? (
+                                      <img
+                                        src={container.pdfimage as string}
+                                        alt={container.title || container.pdfFileName || 'PDF Preview'}
+                                        className="w-full h-full object-contain"
+                                        style={{
+                                          backgroundColor: '#ffffff',
+                                          width: '100%',
+                                          height: '100%',
+                                        }}
+                                        onError={(e) => {
+                                          // If the preview image fails, hide it so the fallback viewer below can show (if any)
+                                          e.currentTarget.style.display = 'none'
+                                        }}
                                       />
-                                    </ClientOnly>
+                                    ) : (
+                                      <ClientOnly
+                                        fallback={
+                                          <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+                                            <div className="text-center">
+                                              <div className="animate-pulse">
+                                                <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
+                                                <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
+                                              </div>
+                                              <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
+                                            </div>
+                                          </div>
+                                        }
+                                      >
+                                        <DirectPdfEmbed
+                                          pdfUrl={container.pdfUrl}
+                                          title={container.settings?.customCategoryName || container.title || container.pdfFileName || 'PDF Document'}
+                                          className="h-full w-full"
+                                        />
+                                      </ClientOnly>
+                                    )}
                                     
                                     {/* QR Code - Bottom Right - White background container for visibility */}
                                     <div 

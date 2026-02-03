@@ -1796,6 +1796,13 @@
     "@types/qs" "*"
     "@types/serve-static" "*"
 
+"@types/gm@^1.25.4":
+  version "1.25.4"
+  resolved "https://registry.npmjs.org/@types/gm/-/gm-1.25.4.tgz"
+  integrity sha512-123Spjn7f0eZZOiFlXCiloBRga+uczwAdZOlcgtva+I1h137ADcbC7I5B3SZToQBzYLMokYDlyPxRUozKSQ+Ow==
+  dependencies:
+    "@types/node" "*"
+
 "@types/http-errors@*":
   version "2.0.4"
   resolved "https://registry.npmjs.org/@types/http-errors/-/http-errors-2.0.4.tgz"
@@ -5245,6 +5252,11 @@ pdf-lib@^1.17.1:
     "@pdf-lib/upng" "^1.0.1"
     pako "^1.0.11"
     tslib "^1.11.1"
+
+pdf-poppler@^0.2.3:
+  version "0.2.3"
+  resolved "https://registry.npmjs.org/pdf-poppler/-/pdf-poppler-0.2.3.tgz"
+  integrity sha512-nUczP3M/W4c8/3F6il0LmkxkF33qTKQyxeBmUnPbQLxxhtBX42zfpZqnLysomvMdb756qVR7n5kvNr+LzisXQw==
 
 pdf@^0.1.0:
   version "0.1.0"

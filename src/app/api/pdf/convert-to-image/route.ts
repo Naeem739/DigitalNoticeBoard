@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fromPath } from 'pdf2pic'
+import gm from 'gm'
 import { writeFile, unlink, readFile } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
+
+// Use ImageMagick with Ghostscript support
+const im = gm.subClass({ imageMagick: true })
 
 export async function POST(request: NextRequest) {
   let tempPdfPath: string | null = null
@@ -31,25 +34,26 @@ export async function POST(request: NextRequest) {
     tempPdfPath = join(tmpdir(), `pdf-${Date.now()}-${Math.random().toString(36).substring(7)}.pdf`)
 
     try {
-      // Write PDF buffer to temporary file (pdf2pic needs a file path)
+      // Write PDF buffer to temporary file
       await writeFile(tempPdfPath, pdfBuffer)
 
-      // Convert first page of PDF to image using pdf2pic
-      const options = {
-        density: 100,           // DPI
-        saveFilename: `image-${Date.now()}`,
-        savePath: tmpdir(),
-        format: 'png',
-        width: 2000,
-        height: 2000
-      }
+      // Generate output image path
+      const imagePath = join(tmpdir(), `image-${Date.now()}-${Math.random().toString(36).substring(7)}.png`)
 
-      // Convert first page of PDF to image using pdf2pic
-      const convert = fromPath(tempPdfPath, options)
-      
-      // Convert first page (page 1). pdf2pic will write a PNG file to disk.
-      // The result object contains the path to the generated image.
-      const result = await convert(1)
+      // Convert first page of PDF to image using ImageMagick + Ghostscript
+      await new Promise((resolve, reject) => {
+        im(tempPdfPath + '[0]') // [0] selects the first page
+          .density(150, 150) // Set DPI for better quality
+          .quality(90) // Set quality
+          .trim() // Remove whitespace/margins around the image
+          .borderColor('white') // Set border color for fuzz trimming
+          .fuzz(10) // Trim similar colors within 10% tolerance (number, not string)
+          .trim() // Apply trim again with fuzz for better whitespace removal
+          .write(imagePath, (err) => {
+            if (err) reject(err)
+            else resolve(imagePath)
+          })
+      })
 
       // Clean up temporary PDF file
       if (tempPdfPath) {
@@ -57,16 +61,12 @@ export async function POST(request: NextRequest) {
         tempPdfPath = null
       }
 
-      if (!result || !result.path) {
-        throw new Error('Failed to convert PDF to image - no image path returned')
-      }
-
       // Read the generated image file and convert to base64
-      const imageBuffer = await readFile(result.path)
+      const imageBuffer = await readFile(imagePath)
       const base64 = imageBuffer.toString('base64')
 
       // Clean up generated image file as well
-      await unlink(result.path).catch(() => {})
+      await unlink(imagePath).catch(() => {})
 
       // Return base64 image data
       const imageDataUrl = `data:image/png;base64,${base64}`
