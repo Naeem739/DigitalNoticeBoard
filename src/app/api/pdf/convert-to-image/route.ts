@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
           .quality(90) // Set quality
           .trim() // Remove whitespace/margins around the image
           .borderColor('white') // Set border color for fuzz trimming
-          .fuzz('10%') // Trim similar colors within 10% tolerance
+          .fuzz(10) // Trim similar colors within 10% tolerance (number, not string)
           .trim() // Apply trim again with fuzz for better whitespace removal
           .write(imagePath, (err) => {
             if (err) reject(err)
