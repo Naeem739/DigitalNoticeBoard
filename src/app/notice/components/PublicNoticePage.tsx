@@ -429,18 +429,22 @@ export default function PublicNoticePage() {
       const element = document.getElementById(container.id)
       if (!element) return null
 
-      const noticesContainer = element.querySelector(".notices-container")
+      const noticesContainer = element.querySelector(".notices-container") as HTMLElement
       if (!noticesContainer) return null
+
+      // Apply smooth scroll behavior via CSS
+      noticesContainer.style.scrollBehavior = 'smooth'
 
       let scrollPosition = 0
       let isScrollingDown = true
-      const scrollSpeed = 1
+      const scrollSpeed = 0.5 // Slower, smoother scroll speed
       const maxScroll = noticesContainer.scrollHeight - noticesContainer.clientHeight
 
       // Only start scrolling if there's actually content to scroll
       if (maxScroll <= 0) return null
 
-      const interval = setInterval(() => {
+      let animationFrameId: number
+      const smoothScroll = () => {
         if (isScrollingDown) {
           scrollPosition += scrollSpeed
           if (scrollPosition >= maxScroll) {
@@ -454,14 +458,17 @@ export default function PublicNoticePage() {
         }
 
         noticesContainer.scrollTop = scrollPosition
-      }, 30)
+        animationFrameId = requestAnimationFrame(smoothScroll)
+      }
 
-      return interval
+      animationFrameId = requestAnimationFrame(smoothScroll)
+
+      return animationFrameId
     })
 
     return () => {
-      scrollIntervals.forEach((interval) => {
-        if (interval) clearInterval(interval)
+      scrollIntervals.forEach((frameId) => {
+        if (frameId) cancelAnimationFrame(frameId)
       })
     }
   }, [mounted, currentDashboard])
@@ -1110,7 +1117,7 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                           imageData={notice.imageData}
                                           imageTitle={notice.imageFileName || notice.title}
                                           size={isMobile ? 40 : getResponsiveQRSize()}
-                                          className="opacity-80 hover:opacity-100 transition-opacity w-full h-full"
+                                          className="w-full h-full"
                                         />
                                       </div>
                                       {/* Notice Title - Dynamic height based on content */}
