@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/db/prisma'
 import { uploadPDF, uploadImage } from '@/lib/supabase'
-import pdfPoppler from 'pdf-poppler'
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { createCanvas } from 'canvas'
 import sharp from 'sharp'
-import { writeFile, unlink, readFile } from 'fs/promises'
+import { writeFile, unlink } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
 
 export async function POST(request: NextRequest) {
   let tempPdfPath: string | null = null
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Generate high-quality preview image from first page
+    // Generate high-quality preview image from first page using pdfjs-dist + canvas
     let previewImageUrl: string | null = null
     let previewImageFileName: string | null = null
     
@@ -54,27 +58,35 @@ export async function POST(request: NextRequest) {
       tempPdfPath = join(tmpdir(), `pdf-${uniqueId}.pdf`)
       await writeFile(tempPdfPath, buffer)
 
-      // Convert PDF first page to high-quality PNG using pdf-poppler (600 DPI for maximum quality)
-      const outputDir = tmpdir()
-      const outputPrefix = `preview-${uniqueId}`
+      // Load PDF with pdfjs-dist (serverless-compatible)
+      const loadingTask = pdfjs.getDocument({
+        data: new Uint8Array(buffer),
+        useSystemFonts: true,
+      })
+      const pdfDocument = await loadingTask.promise
       
-      const opts = {
-        format: 'png' as const,
-        out_dir: outputDir,
-        out_prefix: outputPrefix,
-        page: 1,                    // First page only
-        scale: 600,                 // 600 DPI for exceptional quality (double the standard)
-        single_file: true           // Generate single file
-      }
-
-      // Convert PDF to PNG using pdf-poppler
-      await pdfPoppler.convert(tempPdfPath, opts)
+      // Get first page
+      const page = await pdfDocument.getPage(1)
       
-      // The output file will be named: {out_prefix}-1.png
-      outputImagePath = join(outputDir, `${outputPrefix}-1.png`)
+      // Set scale for high quality (3.0 = ~288 DPI, 4.0 = ~384 DPI, 5.0 = ~480 DPI)
+      const scale = 5.0  // Very high quality for sharp, clear output
+      const viewport = page.getViewport({ scale })
       
-      // Read the generated preview image
-      let imageBuffer = await readFile(outputImagePath)
+      // Create canvas with high resolution
+      const canvas = createCanvas(viewport.width, viewport.height)
+      const context = canvas.getContext('2d')
+      
+      // Render PDF page to canvas
+      await page.render({
+        canvasContext: context as any,
+        viewport: viewport,
+      }).promise
+      
+      // Convert canvas to buffer
+      let imageBuffer = canvas.toBuffer('image/png', {
+        compressionLevel: 6,
+        filters: canvas.PNG_FILTER_NONE,
+      })
       
       // Use sharp to enhance and optimize the image quality
       imageBuffer = await sharp(imageBuffer)
