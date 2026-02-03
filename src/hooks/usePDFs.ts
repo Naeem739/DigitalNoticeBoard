@@ -5,6 +5,9 @@ type TPDF = {
   title: string;
   fileName?: string;
   pdfData?: string;
+  pdfUrl?: string;
+  previewImageUrl?: string;
+  previewImageFileName?: string;
   createdAt?: Date;
 };
 

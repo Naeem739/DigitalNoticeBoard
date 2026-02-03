@@ -1282,68 +1282,94 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                               })}
                               
                               {/* Priority 1: Handle PDF widgets with pdfUrl (new format - from Supabase bucket) */}
-                              {container.pdfUrl && typeof container.pdfUrl === 'string' && container.pdfUrl.trim() !== '' && (
-                                <motion.div
-                                  key={`pdf-url-${container.id}`}
-                                  className="relative w-full h-full flex flex-col overflow-hidden"
-                                  initial={{ opacity: 0, scale: 0.9 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ duration: 0.3 }}
-                                  style={{
-                                    height: '100%',
-                                    width: '100%',
-                                    margin: '0',
-                                    backgroundColor: '#ffffff',
-                                    borderRadius: '0',
-                                    boxShadow: 'none',
-                                    border: 'none'
-                                  }}
-                                >
-                                  {/* Render the PDF directly from Supabase URL (no preview image) */}
-                                  <div className="relative w-full h-full">
-                                    <ClientOnly fallback={
-                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
-                                        <div className="text-center">
-                                          <div className="animate-pulse">
-                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
-                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
-                                          </div>
-                                          <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
+                              {container.pdfUrl && typeof container.pdfUrl === 'string' && container.pdfUrl.trim() !== '' && (() => {
+                                // Find the PDF from allPdfs that matches this container's pdfUrl
+                                const matchingPdf = allPdfs.find(pdf => pdf.pdfUrl === container.pdfUrl)
+                                const previewImageUrl = matchingPdf?.previewImageUrl
+                                
+                                return (
+                                  <motion.div
+                                    key={`pdf-url-${container.id}`}
+                                    className="relative w-full h-full flex flex-col overflow-hidden"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                    style={{
+                                      height: '100%',
+                                      width: '100%',
+                                      margin: '0',
+                                      backgroundColor: '#ffffff',
+                                      borderRadius: '0',
+                                      boxShadow: 'none',
+                                      border: 'none'
+                                    }}
+                                  >
+                                    {/* Render preview image if available, otherwise show PDF directly */}
+                                    <div className="relative w-full h-full">
+                                      {previewImageUrl ? (
+                                        // Show preview image (first page of PDF)
+                                        <div className="relative w-full h-full flex items-center justify-center bg-white">
+                                          <img
+                                            src={previewImageUrl}
+                                            alt={container.settings?.customCategoryName || container.title || container.pdfFileName || 'PDF Preview'}
+                                            className="w-full h-full"
+                                            style={{
+                                              objectFit: settings.imageFit || 'contain',
+                                              objectPosition: 'center'
+                                            }}
+                                            onError={(e) => {
+                                              console.error('Failed to load PDF preview image:', previewImageUrl)
+                                              e.currentTarget.style.display = 'none'
+                                            }}
+                                          />
                                         </div>
-                                      </div>
-                                    }>
-                                      <DirectPdfEmbed
-                                        pdfUrl={container.pdfUrl}
-                                        title={container.settings?.customCategoryName || container.title || container.pdfFileName || 'PDF Document'}
-                                        className="h-full w-full"
-                                      />
-                                    </ClientOnly>
-                                    
-                                    {/* QR Code - Bottom Right - White background container for visibility */}
-                                    <div 
-                                      className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
-                                      style={{
-                                        pointerEvents: 'auto',
-                                        backgroundColor: '#ffffff',
-                                        padding: '8px',
-                                        borderRadius: '8px',
-                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
-                                      }}
-                                    >
-                                      <NoticeQRCode 
-                                        notice={{
-                                          id: container.id,
-                                          title: container.settings?.customCategoryName || container.title || 'PDF Document',
-                                          pdfUrl: container.pdfUrl,
-                                          pdfFileName: container.pdfFileName || container.title || 'document.pdf'
+                                      ) : (
+                                        // Fallback to DirectPdfEmbed if no preview image
+                                        <ClientOnly fallback={
+                                          <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+                                            <div className="text-center">
+                                              <div className="animate-pulse">
+                                                <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
+                                                <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
+                                              </div>
+                                              <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
+                                            </div>
+                                          </div>
+                                        }>
+                                          <DirectPdfEmbed
+                                            pdfUrl={container.pdfUrl}
+                                            title={container.settings?.customCategoryName || container.title || container.pdfFileName || 'PDF Document'}
+                                            className="h-full w-full"
+                                          />
+                                        </ClientOnly>
+                                      )}
+                                      
+                                      {/* QR Code - Bottom Right - White background container for visibility */}
+                                      <div 
+                                        className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
+                                        style={{
+                                          pointerEvents: 'auto',
+                                          backgroundColor: '#ffffff',
+                                          padding: '8px',
+                                          borderRadius: '8px',
+                                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
                                         }}
-                                        size={isMobile ? 40 : getResponsiveQRSize()}
-                                        className=""
-                                      />
+                                      >
+                                        <NoticeQRCode 
+                                          notice={{
+                                            id: container.id,
+                                            title: container.settings?.customCategoryName || container.title || 'PDF Document',
+                                            pdfUrl: container.pdfUrl,
+                                            pdfFileName: container.pdfFileName || container.title || 'document.pdf'
+                                          }}
+                                          size={isMobile ? 40 : getResponsiveQRSize()}
+                                          className=""
+                                        />
+                                      </div>
                                     </div>
-                                  </div>
-                                </motion.div>
-                              )}
+                                  </motion.div>
+                                )
+                              })()}
                               
                               {/* Public Notice view expects `pdfUrl` from the Dashboard table. If not present, show a simple placeholder. */}
                               {!container.pdfUrl && (

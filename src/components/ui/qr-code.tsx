@@ -449,8 +449,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
             variant="secondary"
             className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 hover:bg-white"
           >
-            <Download className="w-3 h-3 mr-1" />
-            Download
+            <Download className="w-3 h-3" />
           </Button>
         </div>
       </div>
