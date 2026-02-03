@@ -1299,25 +1299,45 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     border: 'none'
                                   }}
                                 >
-                                  {/* Render the PDF directly from Supabase URL (no preview image) */}
+                                  {/* For public display, prefer the first-page image of the PDF (from database/Supabase).
+                                      Fallback to an inline PDF viewer only if the image is not available. */}
                                   <div className="relative w-full h-full">
-                                    <ClientOnly fallback={
-                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
-                                        <div className="text-center">
-                                          <div className="animate-pulse">
-                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
-                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
-                                          </div>
-                                          <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
-                                        </div>
-                                      </div>
-                                    }>
-                                      <DirectPdfEmbed
-                                        pdfUrl={container.pdfUrl}
-                                        title={container.settings?.customCategoryName || container.title || container.pdfFileName || 'PDF Document'}
-                                        className="h-full w-full"
+                                    {container.pdfimage ? (
+                                      <img
+                                        src={container.pdfimage as string}
+                                        alt={container.title || container.pdfFileName || 'PDF Preview'}
+                                        className="w-full h-full object-contain"
+                                        style={{
+                                          backgroundColor: '#ffffff',
+                                          width: '100%',
+                                          height: '100%',
+                                        }}
+                                        onError={(e) => {
+                                          // If the preview image fails, hide it so the fallback viewer below can show (if any)
+                                          e.currentTarget.style.display = 'none'
+                                        }}
                                       />
-                                    </ClientOnly>
+                                    ) : (
+                                      <ClientOnly
+                                        fallback={
+                                          <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+                                            <div className="text-center">
+                                              <div className="animate-pulse">
+                                                <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
+                                                <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
+                                              </div>
+                                              <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
+                                            </div>
+                                          </div>
+                                        }
+                                      >
+                                        <DirectPdfEmbed
+                                          pdfUrl={container.pdfUrl}
+                                          title={container.settings?.customCategoryName || container.title || container.pdfFileName || 'PDF Document'}
+                                          className="h-full w-full"
+                                        />
+                                      </ClientOnly>
+                                    )}
                                     
                                     {/* QR Code - Bottom Right - White background container for visibility */}
                                     <div 
