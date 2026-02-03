@@ -86,7 +86,6 @@ export async function POST(request: NextRequest) {
       // Convert canvas to buffer
       let imageBuffer = canvas.toBuffer('image/png', {
         compressionLevel: 6,
-        filters: canvas.PNG_FILTER_NONE,
       })
       
       // Use sharp to enhance and optimize the image quality
