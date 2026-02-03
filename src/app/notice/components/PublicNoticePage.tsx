@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePublicNoticeSettings } from '@/hooks/usePublicNoticeSettings'
 import { motion } from 'framer-motion'
 import { 
@@ -49,6 +49,99 @@ type TImage = {
   id: string
   title: string
   imageUrl: string
+}
+
+function RotatingImageWidget({
+  notices,
+  isMobile,
+  qrSize,
+  reconstructImageUrl,
+  imageFit,
+  imageBorderRadius,
+}: {
+  notices: TNotice[]
+  isMobile: boolean
+  qrSize: number
+  reconstructImageUrl: (notice: TNotice) => string
+  imageFit?: string
+  imageBorderRadius?: number
+}) {
+  const [index, setIndex] = useState(0)
+
+  const safeNotices = useMemo(
+    () => (notices || []).filter(n => n && (n.imageUrl || n.imageData || n.imageFileName)),
+    [notices],
+  )
+
+  // Keep index in range if list changes (real-time updates)
+  useEffect(() => {
+    if (safeNotices.length === 0) {
+      setIndex(0)
+      return
+    }
+    if (index >= safeNotices.length) {
+      setIndex(0)
+    }
+  }, [safeNotices.length, index])
+
+  // Simple slideshow when multiple images exist
+  useEffect(() => {
+    if (safeNotices.length <= 1) return
+    const intervalMs = 10_000
+    const t = setInterval(() => {
+      setIndex(prev => (prev + 1) % safeNotices.length)
+    }, intervalMs)
+    return () => clearInterval(t)
+  }, [safeNotices.length])
+
+  const notice = safeNotices[index]
+  if (!notice) return null
+
+  return (
+    <motion.div
+      key={notice.id}
+      className="w-full h-full relative group rounded-lg shadow-md"
+      style={{
+        height: '100%',
+        width: '100%',
+        margin: '0',
+        borderRadius: `${imageBorderRadius || 12}px`,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
+        border: '1px solid rgba(229, 231, 235, 0.8)',
+      }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4 }}
+    >
+      <img
+        src={reconstructImageUrl(notice)}
+        alt={notice.title}
+        className="w-full h-full transition-transform duration-300"
+        style={{
+          objectFit: (imageFit as any) || 'contain',
+          borderRadius: `${imageBorderRadius || 12}px`,
+          width: '100%',
+          height: '100%',
+        }}
+      />
+
+      {/* QR Code - Bottom Right */}
+      <div
+        className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
+        style={{
+          pointerEvents: 'auto',
+        }}
+      >
+        <NoticeQRCode
+          notice={notice}
+          imageData={notice.imageData}
+          imageTitle={notice.imageFileName || notice.title}
+          size={isMobile ? 40 : qrSize}
+          className=""
+        />
+      </div>
+    </motion.div>
+  )
 }
 
 type TPagination = {
@@ -1130,54 +1223,15 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     .filter(notice => notice.imageUrl || notice.imageData || notice.imageFileName)
                                 }
 
-                                // Get the first image notice
-                                const notice = imageNotices[0]
-                                if (!notice) return null
-                                
                                 return (
-                                  <motion.div 
-                                    key={notice.id} 
-                                    className="w-full h-full relative group rounded-lg shadow-md"
-                                    style={{
-                                      height: '100%',
-                                      width: '100%',
-                                      margin: '0',
-                                      borderRadius: `${settings.imageBorderRadius || 12}px`,
-                                      boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
-                                      border: '1px solid rgba(229, 231, 235, 0.8)'
-                                    }}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.4 }}
-                                  >
-                                    <img
-                                      src={reconstructImageUrl(notice)}
-                                      alt={notice.title}
-                                      className="w-full h-full transition-transform duration-300"
-                                      style={{
-                                        objectFit: settings.imageFit || 'contain',
-                                        borderRadius: `${settings.imageBorderRadius || 12}px`,
-                                        width: '100%',
-                                        height: '100%'
-                                      }}
-                                    />
-                                    
-                                    {/* QR Code - Bottom Right - Solid white background container with padding (same as PDF/text widgets) */}
-                                    <div 
-                                      className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-4 right-4'} z-50`}
-                                      style={{
-                                        pointerEvents: 'auto'
-                                      }}
-                                    >
-                                      <NoticeQRCode 
-                                        notice={notice}
-                                        imageData={notice.imageData}
-                                        imageTitle={notice.imageFileName || notice.title}
-                                        size={isMobile ? 40 : getResponsiveQRSize()}
-                                        className=""
-                                      />
-                                    </div>
-                                  </motion.div>
+                                  <RotatingImageWidget
+                                    notices={imageNotices}
+                                    isMobile={isMobile}
+                                    qrSize={getResponsiveQRSize()}
+                                    reconstructImageUrl={reconstructImageUrl}
+                                    imageFit={settings.imageFit}
+                                    imageBorderRadius={settings.imageBorderRadius}
+                                  />
                                 )
                               })()}
                             </div>
@@ -1215,45 +1269,27 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                                     border: 'none'
                                   }}
                                 >
-                                  {/* Use pdfimage (URL from Supabase storage) for Samsung QB75C compatibility */}
+                                  {/* Render the PDF directly from Supabase URL (no preview image) */}
                                   <div className="relative w-full h-full">
-                                    {container.pdfimage ? (
-                                      <img
-                                        src={container.pdfimage as string}
-                                        alt={container.title || container.pdfFileName || 'PDF Preview'}
-                                        className="w-full h-full object-contain"
-                                        style={{
-                                          backgroundColor: '#ffffff',
-                                          width: '100%',
-                                          height: '100%'
-                                        }}
-                                        onError={(e) => {
-                                          console.error('[PDF IMAGE] Failed to load PDF image from URL:', container.pdfimage)
-                                          // Hide image on error, fallback will show
-                                          e.currentTarget.style.display = 'none'
-                                        }}
-                                      />
-                                    ) : (
-                                      <ClientOnly fallback={
-                                        <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
-                                          <div className="text-center">
-                                            <div className="animate-pulse">
-                                              <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
-                                              <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-2">PDF image not available</p>
+                                    <ClientOnly fallback={
+                                      <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+                                        <div className="text-center">
+                                          <div className="animate-pulse">
+                                            <div className="w-16 h-16 bg-gray-300 rounded-lg mx-auto mb-2"></div>
+                                            <div className="h-4 bg-gray-300 rounded w-24 mx-auto"></div>
                                           </div>
+                                          <p className="text-xs text-gray-500 mt-2">Loading PDF...</p>
                                         </div>
-                                      }>
-                                        <LazyPdfWidget
-                                          pdfUrl={container.pdfUrl}
-                                          autoScroll={false}
-                                          className="h-full w-full"
-                                          showTitle={false}
-                                          containerId={container.id}
-                                        />
-                                      </ClientOnly>
-                                    )}
+                                      </div>
+                                    }>
+                                      <LazyPdfWidget
+                                        pdfUrl={container.pdfUrl}
+                                        autoScroll={false}
+                                        className="h-full w-full"
+                                        showTitle={false}
+                                        containerId={container.id}
+                                      />
+                                    </ClientOnly>
                                     
                                     {/* QR Code - Bottom Right - White background container for visibility */}
                                     <div 
