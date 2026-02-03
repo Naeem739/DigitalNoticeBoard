@@ -923,13 +923,16 @@ export default function PublicNoticePage() {
                     const leftPercent = container.leftPercent || '0%'
                     const topPercent = container.topPercent || '0%'
                     const width = container.width || '100%'
-                    const height = container.height || '100%'
+                    const baseHeight = container.height || '100%'
+                    // On mobile, use a fixed pixel height for PDF widgets so the first page is clearly visible.
+                    // The actual pixel height is controlled via CSS (.pdf-widget) to avoid conflicts with !important rules.
+                    const height = baseHeight
                     
                     return (
                       <motion.div
                         key={container.id}
                         id={container.id}
-                        className="absolute rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm"
+                        className={`absolute rounded-xl shadow-lg overflow-hidden flex flex-col backdrop-blur-sm ${container.type === 'pdf' ? 'pdf-widget' : ''}`}
                         style={{
                           // Use exact stored positions and dimensions
                           left: leftPercent,

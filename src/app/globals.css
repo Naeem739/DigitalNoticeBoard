@@ -221,10 +221,17 @@
       left: auto !important;
       top: auto !important;
       width: 100% !important;
-      /* Each widget fills the "main" area (between header + footer) */
+      /* Default: let widgets size themselves, one per screen section */
       height: 100% !important;
       min-height: 100% !important;
       flex: 0 0 100% !important;
+    }
+
+    /* Only PDF widgets get a fixed height so the first page is clearly visible */
+    .notice-grid-container > div.pdf-widget {
+      height: 920px !important;
+      min-height: 920px !important;
+      flex: 0 0 auto !important;
     }
   }
 
