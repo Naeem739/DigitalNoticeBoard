@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       const outputPrefix = `preview-${uniqueId}`
       
       const opts = {
-        format: 'png',
+        format: 'png' as const,
         out_dir: outputDir,
         out_prefix: outputPrefix,
         page: 1,                    // First page only
