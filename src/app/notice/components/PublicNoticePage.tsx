@@ -437,7 +437,7 @@ export default function PublicNoticePage() {
 
       let scrollPosition = 0
       let isScrollingDown = true
-      const scrollSpeed = 0.5 // Slower, smoother scroll speed
+      const scrollSpeed = 0.2 // Much slower, smoother scroll speed
       const maxScroll = noticesContainer.scrollHeight - noticesContainer.clientHeight
 
       // Only start scrolling if there's actually content to scroll

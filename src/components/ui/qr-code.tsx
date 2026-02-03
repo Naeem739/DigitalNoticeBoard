@@ -424,7 +424,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
 
   return (
     <div 
-      className="bg-white rounded-lg shadow-xl border-2 border-gray-300 group"
+      className="bg-white rounded-lg shadow-xl border-2 border-gray-300"
       style={{
         width: size + 4,
         height: size + 4,
@@ -445,9 +445,11 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
           style={{ width: size, height: size }}
           className="rounded"
         />
-        {/* Download icon overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded">
-          <Download className="w-4 h-4 text-white" />
+        {/* Download icon overlay - always visible, no animation */}
+        <div className="absolute inset-0 flex items-center justify-center rounded pointer-events-none">
+          <div className="bg-white rounded-full p-1 shadow-md">
+            <Download className="w-3 h-3 text-gray-700" />
+          </div>
         </div>
       </div>
     </div>
