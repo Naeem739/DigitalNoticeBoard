@@ -129,13 +129,15 @@ model PublicNoticeTemplate {
 }
 
 model Pdf {
-  id        String   @id @default(cuid())
-  title     String
-  pdfUrl    String
-  fileName  String
-  fileSize  Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  title                String
+  pdfUrl               String
+  fileName             String
+  fileSize             Int?
+  previewImageUrl      String?
+  previewImageFileName String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model ModeratorPermission {

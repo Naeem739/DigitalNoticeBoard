@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import QRCode from 'qrcode'
 import { Download, QrCode } from 'lucide-react'
 import { Button } from './button'
@@ -27,6 +27,11 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
+
+  // Create a stable key that only changes when actual QR content changes
+  const qrContentKey = useMemo(() => {
+    return `${notice.id}-${notice.pdfUrl || ''}-${notice.imageUrl || ''}`
+  }, [notice.id, notice.pdfUrl, notice.imageUrl])
 
   // Helper to check if we have a "real" Notice id (UUID-like) vs a widget id (e.g. "widget-...")
   const isValidNoticeId = (id: string | undefined | null) => {
@@ -197,19 +202,13 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
     }
   }
 
-  // Generate QR code on mount
+  // Generate QR code on mount or when content changes
   useEffect(() => {
     if (notice.id && !qrDataUrl && !isLoading) {
       console.log('Starting QR code generation for notice:', notice.id)
-      
-      // Add a small delay to ensure component is fully mounted
-      const timer = setTimeout(() => {
-        generateQRCode()
-      }, 100)
-      
-      return () => clearTimeout(timer)
+      generateQRCode()
     }
-  }, [notice.id])
+  }, [qrContentKey]) // Only regenerate when the actual content key changes
 
   const handleDownload = async () => {
     try {
@@ -449,8 +448,7 @@ export function NoticeQRCode({ notice, imageData, imageTitle, className = "", si
             variant="secondary"
             className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 hover:bg-white"
           >
-            <Download className="w-3 h-3 mr-1" />
-            Download
+            <Download className="w-3 h-3" />
           </Button>
         </div>
       </div>
