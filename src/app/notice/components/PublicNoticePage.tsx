@@ -1283,9 +1283,12 @@ const displayedNotices = widgetNotices.slice(0, maxNotices)
                               
                               {/* Priority 1: Handle PDF widgets with pdfUrl (new format - from Supabase bucket) */}
                               {container.pdfUrl && typeof container.pdfUrl === 'string' && container.pdfUrl.trim() !== '' && (() => {
+                                // First check if container has pdfimage directly (from Dashboard containers field)
+                                const containerPdfImage = container.pdfimage || container.pdfImage
+                                
                                 // Find the PDF from allPdfs that matches this container's pdfUrl
                                 const matchingPdf = allPdfs.find(pdf => pdf.pdfUrl === container.pdfUrl)
-                                const previewImageUrl = matchingPdf?.previewImageUrl
+                                const previewImageUrl = containerPdfImage || matchingPdf?.previewImageUrl
                                 
                                 return (
                                   <motion.div
