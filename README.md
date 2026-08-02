@@ -1,60 +1,70 @@
 A modern, responsive digital notice board system built with **Next.js 15**, featuring real-time updates, drag-and-drop layouts, and comprehensive content management.
 
-#deleted from here,,,, 
+#deleted from here,,,,
 
 ## ✨ Features
 
 # Role-Based Access Control (RBAC) System
 
 ## Overview
+
 DigitalNoticeBoard implements a four-tier role system with automatic Super Admin assignment for the first user. Each role has specific permissions and route access restrictions.
 
 ## Role Hierarchy
 
 ### Super Admin (First User)
-- **Automatic Assignment:** First signup becomes Super Admin  
-- **Full Access:** Complete system control and user management  
-- **Can Create:** All user types (Super Admin, Admin, Moderator, User)  
+
+- **Automatic Assignment:** First signup becomes Super Admin
+- **Full Access:** Complete system control and user management
+- **Can Create:** All user types (Super Admin, Admin, Moderator, User)
 
 ### Admin
-- **User Management:** Can create Moderators and Users only  
-- **Full System Access:** All dashboard features except Super Admin pages  
-- **Content Control:** Full CRUD operations on notices, categories, templates  
+
+- **User Management:** Can create Moderators and Users only
+- **Full System Access:** All dashboard features except Super Admin pages
+- **Content Control:** Full CRUD operations on notices, categories, templates
 
 ### Moderator
-- **Content Management:** CRUD operations on notices  
-- **User Creation:** Can create Users only  
-- **Limited Access:** Cannot create templates or access admin pages  
+
+- **Content Management:** CRUD operations on notices
+- **User Creation:** Can create Users only
+- **Limited Access:** Cannot create templates or access admin pages
 
 ### User (Default Role)
-- **Read-Only Access:** View notices, images, and PDFs  
-- **No Administrative Functions:** Cannot create, edit, or manage content  
+
+- **Read-Only Access:** View notices, images, and PDFs
+- **No Administrative Functions:** Cannot create, edit, or manage content
 
 ## Route Protection
 
 ### Public Routes
-- `/`  
-- `/login`  
-- `/signup`  
+
+- `/`
+- `/login`
+- `/signup`
 
 ### Protected Routes by Role
-- **Super Admin:** All routes  
-- **Admin:** Most routes (except Super Admin management)  
-- **Moderator:** Content viewing and basic management  
-- **User:** View-only routes only  
+
+- **Super Admin:** All routes
+- **Admin:** Most routes (except Super Admin management)
+- **Moderator:** Content viewing and basic management
+- **User:** View-only routes only
 
 ## Security Features
-- **NextAuth.js:** Secure session management  
-- **Middleware Protection:** Automatic route access control  
-- **Password Hashing:** Bcrypt encryption  
-- **Role Validation:** Server-side permission checks  
+
+- **NextAuth.js:** Secure session management
+- **Middleware Protection:** Automatic route access control
+- **Password Hashing:** Bcrypt encryption
+- **Role Validation:** Server-side permission checks
 
 ## User Creation Flow
-- **First User:** Automatically becomes Super Admin  
-- **Regular Signup:** Defaults to User role  
-- **Admin Creation:** Existing admins can assign specific roles  
+
+- **First User:** Automatically becomes Super Admin
+- **Regular Signup:** Defaults to User role
+- **Admin Creation:** Existing admins can assign specific roles
 
 ### 🎨 Dashboard Management
+
 - **Drag-and-Drop Layout**: Customizable widget positioning with React Grid Layout
 - **Real-time Updates**: Live content synchronization across devices
 - **Responsive Design**: Optimized for desktop, tablet, and mobile
@@ -63,6 +73,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 - **Auto-rotation**: Automatic dashboard switching with configurable intervals
 
 ### �� Content Management
+
 - **Rich Text Editor**: Advanced content creation with TipTap
 - **Category Management**: Organize notices with custom categories and icons
 - **Image Upload**: Preview-supported image upload with multiple formats
@@ -71,6 +82,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 - **File Management**: Base64 encoding for secure file storage
 
 ### 🔐 Authentication & Security
+
 - **NextAuth.js Integration**: Secure user authentication
 - **Role-based Access**: Admin and user permission levels
 - **Session Management**: Persistent login states
@@ -78,6 +90,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 - **Protected Routes**: Middleware-based route protection
 
 ### �� Widget System
+
 - **Notice Widgets**: Display text content with rich formatting
 - **Image Widgets**: Show images with customizable fit options
 - **Statistics Widgets**: Real-time analytics and metrics
@@ -85,12 +98,14 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 - **Category Styling**: Custom category appearance and positioning
 
 ### 📊 Analytics & Monitoring
+
 - **Dashboard Statistics**: Track user activity and content metrics
 - **Real-time Charts**: Visual representation with Recharts
 - **Performance Monitoring**: Optimized rendering and loading
 - **Usage Analytics**: Monitor dashboard and content usage
 
 ### 🌐 Public Display Features
+
 - **QR Code Integration**: Easy access to notices via QR codes
 - **Auto-refresh**: Automatic content updates every 30 minutes
 - **Background Customization**: Solid colors, gradients, or custom images
@@ -102,6 +117,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 ## 🛠️ Tech Stack
 
 ### Frontend
+
 - **Next.js 15** (App Router) - React framework with server-side rendering
 - **TypeScript** - Type-safe JavaScript development
 - **Tailwind CSS** - Utility-first CSS framework
@@ -113,6 +129,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 - **Zod** - Schema validation
 
 ### Backend
+
 - **Next.js API Routes** - Serverless API endpoints
 - **Prisma ORM** - Type-safe database client
 - **PostgreSQL** - Primary relational database
@@ -121,6 +138,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 - **Bcrypt** - Password hashing
 
 ### File Handling & Media
+
 - **@react-pdf/renderer** - PDF generation and manipulation
 - **pdf-lib** - PDF document processing
 - **Sharp** - Image processing and optimization
@@ -128,6 +146,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 - **jsPDF** - PDF generation from HTML content
 
 ### Development Tools
+
 - **ESLint** - Code linting and quality
 - **PostCSS** - CSS processing and optimization
 - **Docker** - Containerization
@@ -136,7 +155,8 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 ---
 
 ## 📁 Detailed Project Structure
- ```DigitalNoticeBoard/
+
+```DigitalNoticeBoard/
 ├── 📁 src/
 │ ├── 📁 app/ # Next.js App Router
 │ │ ├── 📁 (WithCommonLayout)/ # Public-facing pages
@@ -315,7 +335,7 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 │
 ├── 📁 prisma/ # Database schema and migrations
 │ ├── 📁 migrations/ # Database migration files
-│ │ 
+│ │
 ├── 📁 public/ # Static files
 │ ├── file.svg # File icon
 │ ├── globe.svg # Globe icon
@@ -336,13 +356,14 @@ DigitalNoticeBoard implements a four-tier role system with automatic Super Admin
 ├── postcss.config.mjs # PostCSS configuration
 ├── tailwind.config.ts # Tailwind CSS configuration
 └── tsconfig.json # TypeScript configuration
- ```
+```
 
 ## 🗄️ Database Schema Overview
 
 ### Core Models
 
 #### **User Model**
+
 ```typescript
 model User {
   id        String   @id @default(cuid())
@@ -355,13 +376,14 @@ model User {
 ```
 
 #### **Notice Model**
+
 ```typescript
 model Notice {
-  id          String @id @default(uuid()) 
+  id          String @id @default(uuid())
   title       String
   content     String
   category    String
-  categoryId   String 
+  categoryId   String
   pdfUrl      String?           // PDF file URL
   pdfFileName String?           // Original PDF filename
   pdfData     String?           // Base64 encoded PDF data
@@ -375,6 +397,7 @@ model Notice {
 ```
 
 #### **Category Model**
+
 ```typescript
 model Category {
   id      String @id @default(uuid())
@@ -388,6 +411,7 @@ model Category {
 ```
 
 #### **Dashboard Model**
+
 ```typescript
 model Dashboard {
   id           String @id @default(uuid())
@@ -398,6 +422,7 @@ model Dashboard {
 ```
 
 #### **Template Model**
+
 ```typescript
 model Template {
   id             String   @id @default(cuid())
@@ -412,6 +437,7 @@ model Template {
 ```
 
 #### **PublicNoticeSettings Model**
+
 ```typescript
 model PublicNoticeSettings {
   id                String   @id @default(cuid())
@@ -422,19 +448,19 @@ model PublicNoticeSettings {
   emergencyNumber   String   @default("01734528367")
   emergencyContact  String   @default("Md. Rashid Al Asif")
   departmentName    String   @default("Information Technology Department")
-  
+
   // Background settings
   backgroundType    String   @default("gradient")
   backgroundColor   String?
   gradientColors    Json?
   backgroundImage   String?
   backgroundImageFileName String?
-  
+
   // Styling
   headerBackgroundColor String @default("#1e293b")
   footerBackgroundColor String @default("#1e293b")
   accentColor         String @default("#3b82f6")
-  
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -442,64 +468,161 @@ model PublicNoticeSettings {
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Node.js 18+ 
-- PostgreSQL 14+
-- Docker (optional)
+This guide is written for someone who is doing this for the first time. The easiest way to run this project is with Docker.
 
-### Installation
+### What you need
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/DigitalNoticeBoard.git
-   cd DigitalNoticeBoard
-   ```
+Before you begin, make sure you have:
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+- Docker Desktop installed and running
+- Git installed
+- A terminal (PowerShell, Command Prompt, or Bash)
 
-3. **Environment Setup**
-   ```bash
-   cp .env.example .env.local
-   ```
-   
-   Configure your environment variables:
-   ```env
-   DATABASE_URL="postgresql://username:password@localhost:5432/digitalnoticeboard"
-   NEXTAUTH_SECRET="your-secret-key"
-   NEXTAUTH_URL="http://localhost:3000"
-   ```
+> You do not need to install PostgreSQL manually. Docker will start it for you.
 
-4. **Database Setup**
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
+### Option A: Deploy with Docker (Recommended)
 
-5. **Run Development Server**
-   ```bash
-   npm run dev
-   ```
+#### 1. Clone the project
 
-6. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+```bash
+git clone https://github.com/yourusername/DigitalNoticeBoard.git
+cd DigitalNoticeBoard
+```
 
-### Docker Deployment
+#### 2. Create your environment file
 
-1. **Build and run with Docker Compose**
-   ```bash
-   docker-compose up --build
-   ```
+Copy the example environment file:
 
-2. **Access the application**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+```bash
+copy .env.example .env
+```
+
+If you are using Linux or macOS, use:
+
+```bash
+cp .env.example .env
+```
+
+Now open the file named [.env](.env) and update the values if needed.
+
+Important values:
+
+- `NEXTAUTH_SECRET` = any long random string
+- `NEXTAUTH_URL` = `http://localhost:3000`
+- `NEXT_PUBLIC_APP_URL` = `http://localhost:3000`
+
+You can leave the database values as they are unless you want to change the database name or password.
+
+#### 3. Start the app and database
+
+Run this command from the project folder:
+
+```bash
+docker compose up --build -d
+```
+
+This will:
+
+- build the application container
+- start PostgreSQL in a database container
+- connect the app to the database
+- apply the Prisma schema automatically
+
+#### 4. Wait for everything to start
+
+It may take 30 to 60 seconds for the app to become ready.
+
+You can check the logs with:
+
+```bash
+docker compose logs -f app
+```
+
+If you see the app is running, you are ready.
+
+#### 5. Open the application
+
+Open your browser and go to:
+
+```text
+http://localhost:3000
+```
+
+#### 6. Stop the containers later
+
+When you are done, stop everything with:
+
+```bash
+docker compose down
+```
+
+#### 7. Reset the database (optional)
+
+If you want to delete all saved database data and start fresh:
+
+```bash
+docker compose down -v
+```
+
+### What the Docker files do
+
+These files are already included for you:
+
+- [Dockerfile](Dockerfile) — tells Docker how to build the app image
+- [docker-compose.yml](docker-compose.yml) — starts both the app and the PostgreSQL database
+- [.env.example](.env.example) — example environment settings
+- [.dockerignore](.dockerignore) — keeps the Docker build small and clean
+
+### Common problems and fixes
+
+#### Problem: Port 3000 is already in use
+
+Another app may already be using port 3000. In that case, stop the other app or change the port in the environment file.
+
+#### Problem: The app does not start
+
+Check the logs:
+
+```bash
+docker compose logs -f app
+```
+
+If the database is still starting, wait a little longer and try again.
+
+#### Problem: The database is not reachable
+
+Make sure Docker is running and then try:
+
+```bash
+docker compose ps
+```
+
+You should see both the app and database containers listed.
+
+### Option B: Run without Docker
+
+If you prefer to run the app directly on your machine instead of using Docker, you can still do it:
+
+```bash
+npm install
+cp .env.example .env
+npx prisma generate
+npx prisma db push
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
 
 ## 🎨 Key Features Explained
 
 ### **Dashboard Layout System**
+
 The dashboard uses React Grid Layout for creating customizable, responsive layouts. Users can:
+
 - Drag and drop widgets to reposition them
 - Resize widgets by dragging corners
 - Save layouts as templates
@@ -507,9 +630,11 @@ The dashboard uses React Grid Layout for creating customizable, responsive layou
 - Auto-rotate between multiple dashboards
 
 ### **Widget Management**
+
 Each widget type has specific features:
 
 **Notice Widgets:**
+
 - Rich text editing with TipTap
 - Category assignment
 - Custom styling options
@@ -517,12 +642,14 @@ Each widget type has specific features:
 - PDF and image support
 
 **Image Widgets:**
+
 - Multiple image format support
 - Customizable fit options (cover, contain, fill)
 - Border radius and shadow settings
 - Hover effects and animations
 
 ### **Category System**
+
 - Create and manage notice categories
 - Assign icons to categories
 - Edit category names
@@ -530,6 +657,7 @@ Each widget type has specific features:
 - Uncategorized notices handling
 
 ### **Public Display Features**
+
 - Real-time content updates
 - QR code integration for mobile access
 - Customizable branding and styling
@@ -539,11 +667,13 @@ Each widget type has specific features:
 ## �� API Endpoints
 
 ### **Authentication**
+
 - `POST /api/auth/signin` - User login
 - `POST /api/auth/signup` - User registration
 - `GET /api/auth/session` - Get current session
 
 ### **Notices**
+
 - `GET /api/notice/get-all` - Fetch all notices
 - `POST /api/notice/create` - Create new notice
 - `PUT /api/notice/update` - Update notice
@@ -552,18 +682,21 @@ Each widget type has specific features:
 - `GET /api/notice/download-image/[id]` - Download notice image
 
 ### **Categories**
+
 - `GET /api/category/get-all` - Fetch all categories
 - `POST /api/category/create` - Create category
 - `PUT /api/category/update` - Update category
 - `DELETE /api/category/delete/[id]` - Delete category
 
 ### **Dashboard**
+
 - `GET /api/dashboard/get-all` - Fetch all dashboards
 - `GET /api/dashboard/get-by-id/[id]` - Fetch specific dashboard
 - `GET /api/dashboard/get-default` - Fetch default dashboard
 - `PUT /api/dashboard/update/[id]` - Update dashboard
 
 ### **Templates**
+
 - `GET /api/templates` - Fetch all templates
 - `POST /api/templates` - Create template
 - `GET /api/templates/[id]` - Fetch specific template
@@ -571,10 +704,12 @@ Each widget type has specific features:
 - `DELETE /api/templates/[id]` - Delete template
 
 ### **Public Notice Settings**
+
 - `GET /api/public-notice-settings` - Fetch settings
 - `PUT /api/public-notice-settings` - Update settings
 
 ### **Admin Management**
+
 - `GET /api/admin/allAdmins` - Fetch all admins
 - `POST /api/admin` - Create admin
 - `DELETE /api/admin/delete/[id]` - Delete admin
@@ -582,6 +717,7 @@ Each widget type has specific features:
 ## 🎯 Usage Examples
 
 ### **Creating a Notice**
+
 1. Navigate to Dashboard → Create Notice
 2. Use the rich text editor to create content
 3. Select a category or create a new one
@@ -589,6 +725,7 @@ Each widget type has specific features:
 5. Save the notice
 
 ### **Customizing Dashboard Layout**
+
 1. Go to Dashboard → Layout Editor
 2. Drag widgets to desired positions
 3. Resize widgets as needed
@@ -596,6 +733,7 @@ Each widget type has specific features:
 5. Save the layout
 
 ### **Managing Categories**
+
 1. Access Dashboard → Category
 2. Create new categories with custom names
 3. Assign icons to categories
@@ -603,6 +741,7 @@ Each widget type has specific features:
 5. Filter and organize content
 
 ### **Setting Up Public Display**
+
 1. Go to Dashboard → Manage Public Notice
 2. Configure branding (logo, title, subtitle)
 3. Set background (solid, gradient, or image)
@@ -622,16 +761,19 @@ Each widget type has specific features:
 ## �� Deployment
 
 ### **Vercel Deployment**
+
 1. Connect your GitHub repository to Vercel
 2. Configure environment variables
 3. Deploy automatically on push
 
 ### **Docker Deployment**
+
 1. Build the Docker image
 2. Configure environment variables
 3. Run with Docker Compose
 
 ### **Traditional Server**
+
 1. Build the production version: `npm run build`
 2. Start the production server: `npm start`
 3. Configure reverse proxy (nginx/Apache)
@@ -659,13 +801,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 If you have any questions or need help, please:
+
 - Open an issue on GitHub
 - Check the documentation
 - Contact the development team
 
 ---
-______________________________________________________
-__________________________________________________________
-_______________________________________________________________
+
+---
+
+---
+
+---
 
 **Made with ❤️ by the DigitalNoticeBoard Team**
