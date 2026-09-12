@@ -1,6 +1,5 @@
 FROM node:20-bookworm-slim AS base
 
-ENV NODE_ENV=production
 WORKDIR /app
 
 RUN apt-get update \
@@ -10,13 +9,16 @@ RUN apt-get update \
 COPY package*.json ./
 COPY prisma ./prisma
 
-RUN npm ci
+# Install dev dependencies for the build step because TypeScript and type packages
+# (such as @types/react-grid-layout) are required during next build.
+RUN npm ci --include=dev
 
 COPY . .
 
 RUN npx prisma generate
 RUN npm run build
 
+ENV NODE_ENV=production
 EXPOSE 3000
 
 ENV PORT=3000
